@@ -4,7 +4,7 @@
 Mod Package (.modpkg) Reader
 Reads LeagueToolkit's .modpkg format (format version 1, specified in
 docs/design/modpkg.md of LeagueToolkit/league-mod) and unpacks it into the mod
-folder layout Rose packs into a .fantome for LTK Manager:
+folder layout Parasite packs into a .fantome for LTK Manager:
 
     META/info.json                         written from the package metadata
     META/image.webp                        the package thumbnail, if any
@@ -12,7 +12,7 @@ folder layout Rose packs into a .fantome for LTK Manager:
 
 Files are named by their path hash, the key the game and a WAD use inside
 one, so no path stored in a package ever becomes a file name. Only the base
-layer is unpacked: other layers are optional content Rose cannot toggle.
+layer is unpacked: other layers are optional content Parasite cannot toggle.
 """
 
 from __future__ import annotations
@@ -61,7 +61,7 @@ _HEX_NAME = re.compile(r"[0-9a-fA-F]{16}")
 
 
 class ModpkgError(ValueError):
-    """The file is not a .modpkg package Rose can read"""
+    """The file is not a .modpkg package Parasite can read"""
 
 
 class _Record(NamedTuple):
@@ -246,16 +246,16 @@ class ModPackage:
 
 
 def extract_modpkg(source: Union[str, Path], dest_dir: Union[str, Path]) -> None:
-    """Unpack a .modpkg into *dest_dir* as a mod folder Rose can repack"""
+    """Unpack a .modpkg into *dest_dir* as a mod folder Parasite can repack"""
     source = Path(source)
     dest_dir = Path(dest_dir)
     with ModPackage.open(source) as package:
         if not package.wad_file_count:
-            raise ModpkgError("The .modpkg has no game files Rose can inject")
+            raise ModpkgError("The .modpkg has no game files Parasite can inject")
         if package.optional_layers:
             log.info(
                 f"[MODPKG] {source.name}: skipping optional layers "
-                f"{', '.join(package.optional_layers)} (Rose injects the base layer)"
+                f"{', '.join(package.optional_layers)} (Parasite injects the base layer)"
             )
         if package.unplaced_file_count:
             log.warning(f"[MODPKG] {source.name}: skipping {package.unplaced_file_count} files that target no game WAD")

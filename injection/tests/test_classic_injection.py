@@ -28,7 +28,7 @@ class ClassicIdTests(unittest.TestCase):
 
 
 class ClassicInjectionTests(unittest.TestCase):
-    """Rift Classic games inject the stored Classic skins (%LOCALAPPDATA%/Rose/classic)"""
+    """Rift Classic games inject the stored Classic skins (%LOCALAPPDATA%/Parasite/classic)"""
 
     def setUp(self):
         temp_dir = tempfile.TemporaryDirectory()

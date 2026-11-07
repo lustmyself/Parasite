@@ -24,7 +24,7 @@ PERSISTENT_ROOT_FILES = ("icon.ico", "unins000.exe", "unins000.dat")
 # In frozen builds, files are under _internal/
 PERSISTENT_USER_FILES = ()
 
-# Copies the update over the install once Rose has exited, then starts it
+# Copies the update over the install once Parasite has exited, then starts it
 # again. Its paths come in as environment variables (see install). robocopy
 # retries a locked file 1,000,000 times 30s apart by default, which left the
 # update hanging unseen: /R:5 /W:2 makes it fail and say so instead. /XD only
@@ -34,7 +34,7 @@ APPLY_UPDATE_SCRIPT = r"""@echo off
 setlocal enableextensions
 echo [%date% %time%] Update start > "%LOG%"
 if defined PID (
-    echo [%date% %time%] Waiting for Rose to exit >> "%LOG%"
+    echo [%date% %time%] Waiting for Parasite to exit >> "%LOG%"
     powershell -NoProfile -NonInteractive -Command "Wait-Process -Id %PID% -Timeout 30 -ErrorAction SilentlyContinue" >nul 2>&1
 )
 echo [%date% %time%] Mirroring files >> "%LOG%"
@@ -42,16 +42,16 @@ robocopy "%SOURCE%" "%DEST%" /MIR /R:5 /W:2 /NFL /NDL /NJH /NJS /XD __pycache__ 
 set "RC=%ERRORLEVEL%"
 echo [%date% %time%] robocopy exit code %RC% >> "%LOG%"
 if %RC% GEQ 8 goto :robofail
-echo [%date% %time%] Updating ROSE plugins (preserving user-installed) >> "%LOG%"
+echo [%date% %time%] Updating PARASITE plugins (preserving user-installed) >> "%LOG%"
 if exist "%SOURCE%\Pengu Loader\plugins" (
     if not exist "%DEST%\Pengu Loader\plugins" mkdir "%DEST%\Pengu Loader\plugins"
-    for /d %%D in ("%SOURCE%\Pengu Loader\plugins\ROSE-*") do (
+    for /d %%D in ("%SOURCE%\Pengu Loader\plugins\PARASITE-*") do (
         echo [%date% %time%]   Sync plugin %%~nxD >> "%LOG%"
         robocopy "%%D" "%DEST%\Pengu Loader\plugins\%%~nxD" /MIR /R:5 /W:2 /NFL /NDL /NJH /NJS /XD __pycache__ >> "%LOG%" 2>&1
         if errorlevel 8 goto :robofail
     )
 )
-echo [%date% %time%] Starting Rose >> "%LOG%"
+echo [%date% %time%] Starting Parasite >> "%LOG%"
 start "" /D "%DEST%" "%DEST%\%EXE%"
 echo [%date% %time%] Cleaning staging >> "%LOG%"
 if exist "%STAGING%" rd /s /q "%STAGING%" >> "%LOG%" 2>&1
@@ -125,7 +125,7 @@ class UpdateInstaller:
         staging_dir: Path,
         status_callback: Callable[[str], None],
     ) -> bool:
-        """Start the script that copies the update over the install once Rose exits
+        """Start the script that copies the update over the install once Parasite exits
 
         Args:
             extracted_root: Root directory of extracted update
@@ -208,7 +208,7 @@ class UpdateInstaller:
             updater_log.error(f"Failed to launch installer: {exc}")
             return False
 
-        # The files are only copied once Rose has exited: whether that worked
+        # The files are only copied once Parasite has exited: whether that worked
         # is in the script's own log
         updater_log.info(f"Update script started, its log is {log_path}")
         return True

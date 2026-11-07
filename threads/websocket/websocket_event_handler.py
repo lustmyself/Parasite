@@ -170,7 +170,7 @@ class WebSocketEventHandler:
         """Bring LTK Manager up as champion select begins. Its patcher must
         already scan when the client creates the game, and LTK Manager took
         7-14s from its launch to that scan (#431): more than Practice Tool's
-        countdown, which is when Rose used to bring it up. The countdown
+        countdown, which is when Parasite used to bring it up. The countdown
         still stages the skin; it now finds LTK Manager ready."""
         if not self.injection_manager:
             return

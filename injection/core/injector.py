@@ -207,7 +207,7 @@ class SkinInjector:
         # An injected skin runs as the champion's default one, so the loading screen prints the champion's name. This
         # adds a mod that puts the skin's name there instead, built from the player's own game files (their language,
         # their patch). It never fails the injection: without it the screen simply reads as it did before.
-        # A chroma shows its skin's name ("Arcana Aurora", not "Arcana Aurora (Rose Quartz)").
+        # A chroma shows its skin's name ("Arcana Aurora", not "Arcana Aurora (Parasite Quartz)").
         loading_name_mod = build_loading_name(
             self.game_dir, Path(target_dir), mod_folder,
             parent_skin_id(zp, parse_skin_id(skin_name, champion_id)),
@@ -288,7 +288,7 @@ class SkinInjector:
                 "warning",
                 "Injection failed.",
                 details={"total_s": f"{total_duration:.2f}", "import_s": f"{import_duration:.2f}", "skin": skin_name},
-                hint="Check Rose logs for details, then retry.",
+                hint="Check Parasite logs for details, then retry.",
             )
         
         return result == 0

@@ -9,9 +9,9 @@ from injection.overlay.overlay_manager import OverlayManager
 
 
 class OverlayCleanupTests(unittest.TestCase):
-    """Both wipes empty a directory without deleting it: Rose creates the
+    """Both wipes empty a directory without deleting it: Parasite creates the
     mods directory before every injection, and an injection that runs while
-    Rose restarts must not trip over a missing one."""
+    Parasite restarts must not trip over a missing one."""
 
     def setUp(self):
         temp_dir = tempfile.TemporaryDirectory()

@@ -6,7 +6,7 @@ from utils.download.repo_downloader import RepoDownloader
 
 
 class ClassicLibraryTests(unittest.TestCase):
-    """LeagueSkins' classic/ folder is kept in %LOCALAPPDATA%/Rose/classic
+    """LeagueSkins' classic/ folder is kept in %LOCALAPPDATA%/Parasite/classic
     (the sync itself is tested in test_skin_sync)"""
 
     def setUp(self):

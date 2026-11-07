@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 """TCP client for the LeagueToolFlop (LTF) bridge.
 
-Rose builds ``LeagueToolFlop.dll`` (see native/ltf/) and ``ltk_launcher.exe``
+Parasite builds ``LeagueToolFlop.dll`` (see native/ltf/) and ``ltk_launcher.exe``
 starts LTK Manager with that DLL injected into it. The DLL serves a
 newline-delimited JSON API on 127.0.0.1 (port 46321-46340, discovered through
 the registry, the port files, or a scan) which drives LTK Manager's own
@@ -64,7 +64,7 @@ class BridgeCommandError(RuntimeError):
 
 def _bridge_dirs() -> List[Path]:
     """Where the DLL writes its port and token files: the desktop user's
-    local app data (LTK Manager runs as that user, an elevated Rose may not),
+    local app data (LTK Manager runs as that user, an elevated Parasite may not),
     then this process's own."""
     dirs: List[Path] = []
     try:
@@ -177,7 +177,7 @@ def _port_from_file(path) -> Optional[int]:
 
 
 def token_candidates() -> List[Tuple[str, str]]:
-    """(where, token) of every published token Rose can read, without
+    """(where, token) of every published token Parasite can read, without
     duplicates: the token files, then the registry. A stale copy can sit in
     one place while the running bridge wrote another (#443)."""
     found: List[Tuple[str, str]] = []
@@ -207,7 +207,7 @@ def token_candidates() -> List[Tuple[str, str]]:
 
 
 def read_token() -> Optional[str]:
-    """The API token the running bridge published, if Rose can read it."""
+    """The API token the running bridge published, if Parasite can read it."""
     found = token_candidates()
     return found[0][1] if found else None
 
@@ -363,7 +363,7 @@ class LtkBridge:
         if not _unauthorized(response):
             return response
         # Refused before it ran: the bridge restarted with a new token, or the
-        # copy Rose read first is a stale one while the bridge wrote another
+        # copy Parasite read first is a stale one while the bridge wrote another
         tried = {self._token}
         candidates = [("the token files", read_token())] + token_candidates()
         for where, candidate in candidates:
@@ -413,7 +413,7 @@ class LtkBridge:
         """The installed mods.
 
         Raises BridgeCommandError when LTK Manager does not answer with its
-        library: an empty list would read as "nothing installed", and Rose
+        library: an empty list would read as "nothing installed", and Parasite
         would then take every entry for one it just created.
         """
         response = self.list_mods()
@@ -430,7 +430,7 @@ class LtkBridge:
         return self._ok(payload, timeout=IMPORT_TIMEOUT_S)
 
     def import_fantome_bytes(self, data: bytes, name: str) -> Dict[str, Any]:
-        """Install an archive LTK Manager cannot read from Rose's folder, sent inline."""
+        """Install an archive LTK Manager cannot read from Parasite's folder, sent inline."""
         payload: Dict[str, Any] = {
             "cmd": "import",
             "data_b64": base64.b64encode(data).decode("ascii"),

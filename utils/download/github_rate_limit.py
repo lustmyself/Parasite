@@ -3,7 +3,7 @@
 """GitHub API calls that respect GitHub's rate limit.
 
 Without a login, GitHub allows 60 API calls per hour per IP, and an answer that
-nothing changed (304) still counts. Rose reads its updates, game hashes and
+nothing changed (304) still counts. Parasite reads its updates, game hashes and
 skin library from raw.githubusercontent.com and github.com instead, which do not
 count; the API is only a fallback. When GitHub refuses a call for its limit,
 the time it gives back is saved, and no API call is made again before it: the

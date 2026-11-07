@@ -20,7 +20,7 @@ class LtfDiagnosticsTests(unittest.TestCase):
     def test_an_import_failure_without_ltf_in_its_text_is_still_one(self):
         # The mod name and the error text name neither LTF nor LTK Manager
         (summary,) = summarize((
-            "Injection failed: could not install Beezcrank (Rose Quartz) (LTKBridge request failed: timed out).",
+            "Injection failed: could not install Beezcrank (Parasite Quartz) (LTKBridge request failed: timed out).",
             f"Free some disk space, then retry. {LTF_LOGS_HINT}",
         ))
 
@@ -38,7 +38,7 @@ class LtfDiagnosticsTests(unittest.TestCase):
 
     def test_an_open_ltk_manager_gets_its_own_cause(self):
         (summary,) = summarize((
-            "Injection failed: LTK Manager is already open without Rose's bridge",
+            "Injection failed: LTK Manager is already open without Parasite's bridge",
             f"Close LTK Manager, then retry. {LTF_LOGS_HINT}",
         ))
 
@@ -48,7 +48,7 @@ class LtfDiagnosticsTests(unittest.TestCase):
     def test_ltk_managers_browser_not_answering_gets_its_own_cause(self):
         # The bridge reached LTK Manager, but not the browser it drives it through (#425)
         (summary,) = summarize((
-            "Injection failed: Rose's bridge could not reach LTK Manager's built-in browser "
+            "Injection failed: Parasite's bridge could not reach LTK Manager's built-in browser "
             "(CDP unavailable or timed out)",
             f"Restart your PC, then retry. {LTF_LOGS_HINT}",
         ))

@@ -1,6 +1,6 @@
 # Vendored LeagueToolFlop (LTF) sources
 
-Rose builds the LTF bridge from these sources instead of bundling LTK's
+Parasite builds the LTF bridge from these sources instead of bundling LTK's
 patcher binaries. `ltk_launcher.exe` starts LTK Manager (hidden), injects
 `LeagueToolFlop.dll` into it, and the DLL serves the TCP bridge API that
 `injection/tools/bridge.py` talks to (import/toggle mods, start/stop LTK
@@ -20,12 +20,12 @@ The launcher hardcodes the bridge DLL's file name: it must find
 
 To update: copy the two files from the LTF project again. The LTF project
 also ships `fantome_processor.hpp` (with zstd and miniz), which rewrote each
-skin on import: Rose does not use it, so leave it out and keep `CmdImport`
-installing the archive as Rose sent it.
+skin on import: Parasite does not use it, so leave it out and keep `CmdImport`
+installing the archive as Parasite sent it.
 
-## Rose's changes to the LTF sources
+## Parasite's changes to the LTF sources
 
-An update must carry these over (Rose's Python side depends on them):
+An update must carry these over (Parasite's Python side depends on them):
 
 - **Launcher**: `wmain` (UTF-16 paths), `--quiet` (no message boxes), a free
   CDP port per launch instead of 9222, and `--remote-allow-origins` limited to

@@ -163,7 +163,7 @@ class SkinSyncTests(unittest.TestCase):
         self.assertEqual(len(self.github.downloads()), 2)
         self.assertEqual(self.local("skins/1/1001/1001.fantome").read_bytes(), b"skin 1001, 16.22")
 
-    def test_a_library_from_an_older_rose_is_checked_once_not_downloaded(self):
+    def test_a_library_from_an_older_parasite_is_checked_once_not_downloaded(self):
         for path, data in self.github.files.items():
             self.local(path).parent.mkdir(parents=True, exist_ok=True)
             self.local(path).write_bytes(data)
@@ -214,7 +214,7 @@ class SkinSyncTests(unittest.TestCase):
         self.assertFalse(old.exists())
         self.assertFalse(old.parent.exists())
         self.assertFalse(self.local("skins/1/1001/1002/1002.fantome").exists())
-        self.assertTrue((self.skins / skin_sync.STATE_FILE).exists())  # Rose's own files stay
+        self.assertTrue((self.skins / skin_sync.STATE_FILE).exists())  # Parasite's own files stay
 
     def test_a_rewritten_commit_falls_back_to_main(self):
         self.github.commit_gone = True
@@ -326,7 +326,7 @@ class HashUpdaterTests(unittest.TestCase):
         self.remote["hashes.game.txt.3"] = '"changed"'
         self.assertTrue(self.hash_updater.check_for_updates())
 
-    def test_a_state_from_an_older_rose_is_taken_as_current(self):
+    def test_a_state_from_an_older_parasite_is_taken_as_current(self):
         self.state = {"files": {"hashes.game.txt.0": {"sha": "abc"}}}
 
         self.assertFalse(self.hash_updater.check_for_updates(target_exists=True))
@@ -347,10 +347,10 @@ class ReleaseCheckTests(unittest.TestCase):
 
     def test_the_latest_release_comes_from_the_redirect(self):
         def head(url, **kwargs):
-            self.assertEqual(url, "https://github.com/Alban1911/Rose/releases/download/1.5.2/update_package_1.5.2.zip")
+            self.assertEqual(url, "https://github.com/lustmyself/Parasite/releases/download/1.5.2/update_package_1.5.2.zip")
             return FakeResponse(200, headers={"Content-Length": "35066861"})
 
-        redirect = FakeResponse(302, headers={"Location": "https://github.com/Alban1911/Rose/releases/tag/1.5.2"})
+        redirect = FakeResponse(302, headers={"Location": "https://github.com/lustmyself/Parasite/releases/tag/1.5.2"})
         with patch("requests.get", return_value=redirect), patch("requests.head", side_effect=head), \
                 patch.object(self.github_client.github_rate_limit, "api_get") as api:
             release = self.github_client.GitHubClient().get_latest_release()

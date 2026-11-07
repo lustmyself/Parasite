@@ -2,17 +2,17 @@
 
 ## Summary
 
-On the LTF-bridge pipeline, Rose reports `INJECTION COMPLETED` but the skin does
-not appear in-game. The cause is **downstream of Rose**: LTK Manager's patcher DLL
+On the LTF-bridge pipeline, Parasite reports `INJECTION COMPLETED` but the skin does
+not appear in-game. The cause is **downstream of Parasite**: LTK Manager's patcher DLL
 builds the overlay, attaches to the game, and then **refuses to apply it** with a
 host-verification error written to **LTK Manager's own log**.
 
-Rose's launcher tripped that check by starting `ltk-manager.exe` itself: the DLL
+Parasite's launcher tripped that check by starting `ltk-manager.exe` itself: the DLL
 walks the process chain that started `ltk_patcher_host.exe` and only accepts the
 chain a hand-started manager has (`ltk_patcher_host.exe` ← `ltk-manager.exe` ←
-`explorer.exe`). Rose's chain has `ltk_launcher.exe` where `explorer.exe` should
+`explorer.exe`). Parasite's chain has `ltk_launcher.exe` where `explorer.exe` should
 be. `native/ltf/LeagueToolFlop-inj.cpp` now seeds the manager's parent as the
-desktop shell, which makes the chain match while keeping Rose's environment, the
+desktop shell, which makes the chain match while keeping Parasite's environment, the
 suspended start and the WebView2 debugging port. See **The fix** below.
 
 ## Evidence (LTK Manager's own log)
@@ -27,7 +27,7 @@ suspended start and the WebView2 debugging port. See **The fix** below.
 
 The overlay build itself succeeds (`Overlay build complete: 3 built, 0 reused`),
 the host is spawned, the DLL is injected into the game (pid=28800) and installs
-its hooks — then `verify` refuses the overlay about 1.2 s later. Rose's log for
+its hooks — then `verify` refuses the overlay about 1.2 s later. Parasite's log for
 the same run is clean end to end (`[INJECT] The LTK patcher attached to the game`,
 `INJECTION COMPLETED >>> SKIN_105002 <<<`): the bridge's status never carries the
 refusal, only LTK's log does.
@@ -50,7 +50,7 @@ Process elevation facts=ElevationFacts { ..., parent: Some("ltk_launcher.exe") }
 
 A run where the manager relaunched itself through the shell logged
 `parent: Some("explorer.exe")` instead — the only structural difference between
-Rose's chain and a hand-started manager's.
+Parasite's chain and a hand-started manager's.
 
 ## What the check looks like in the DLL
 
@@ -73,21 +73,21 @@ built from:
 
 The payload after the code is what the check saw: a pid alone (`(27688)`), or a
 pid and name (`(19480,ltk-manager.exe)` in
-[Rose#404](https://github.com/Alban1911/Rose/issues/404)). The payload shapes do
+[Parasite#404](https://github.com/lustmyself/Parasite/issues/404)). The payload shapes do
 not pin down each code's meaning, and reading the accepted chain out of the
 machine code is not a short job. What is certain:
 
 - the check exists to block third-party apps driving LTK's patcher
   ([ltk-manager#923](https://github.com/LeagueToolkit/ltk-manager/issues/923);
   contributor: *"This check is meant to block third-party apps from using the DLL."*);
-- a patcher built before the check (1.29.1) applies Rose's overlays
-  ([Rose#401](https://github.com/Alban1911/Rose/issues/401) comment, Oct 31:
+- a patcher built before the check (1.29.1) applies Parasite's overlays
+  ([Parasite#401](https://github.com/lustmyself/Parasite/issues/401) comment, Oct 31:
   `overlay verified 2 wad(s)`, skin visibly worked), so the refusal lives in the
-  DLL, not in Rose's drive method;
+  DLL, not in Parasite's drive method;
 - the check arrived with `ltk_patcher-25` / Manager 1.30.0 and is still there on
   `ltk_patcher-30`.
 
-Of everything the check can read, the parent chain is the one signal Rose can
+Of everything the check can read, the parent chain is the one signal Parasite can
 correct without touching LTK's binaries, and the one that visibly differs from a
 hand-started manager. That is what the launcher now changes. If the refusal comes
 back with a shell-parented manager, the payload names the check that fired.
@@ -102,7 +102,7 @@ records `explorer.exe` as the manager's parent, so the chain the DLL reads becom
 game ← ltk_patcher_host.exe ← ltk-manager.exe ← explorer.exe
 ```
 
-exactly what a manager started from the Start menu looks like. Rose keeps
+exactly what a manager started from the Start menu looks like. Parasite keeps
 everything it needs:
 
 - the launcher's environment (`WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS`,
@@ -118,13 +118,13 @@ behaviour, not a broken session. It also logs what Windows recorded:
 [launch] spawned pid = N (suspended), parent pid = M (explorer.exe)
 ```
 
-Rose no longer reports a refusal as a success. `LtkLogTail` already reads LTK
+Parasite no longer reports a refusal as a success. `LtkLogTail` already reads LTK
 Manager's log while the game runs (that is how `dll attached` and `joined too
 late` are noticed), so `_check_patcher_verdict` now also matches
 `host verification failed` / `[VRF########]` and reports `LTF_FAILED` with a
 `refused` cause, the code, and what the check saw.
 
-On an elevated Rose the manager still has to run with the desktop user's token,
+On an elevated Parasite the manager still has to run with the desktop user's token,
 and `CreateProcessWithTokenW` refuses the extended startup info (err 87). The
 launcher therefore starts an unelevated copy of itself (`--as-user-child`) that
 opens the shell, spawns the manager with that parent, injects the bridge and
@@ -152,10 +152,10 @@ No `host verification failed`, and the skin showed in game.
 A skin changed *after* the game process exists still ends in
 `joined too late, not overlaying`: LTK's host locates the game by its window
 (`League of Legends (TM) Client`, `FindWindowExA` + `SetWindowsHookEx`), so it
-cannot hook a game that Rose froze, and by the time the game is resumed and found
+cannot hook a game that Parasite froze, and by the time the game is resumed and found
 it has already opened its WADs. That is a hard limit of this patcher, not
-something Rose can wait out: the patcher must be scanning before the game process
-is created (Rose's staging does exactly that), so a skin change made after the
+something Parasite can wait out: the patcher must be scanning before the game process
+is created (Parasite's staging does exactly that), so a skin change made after the
 client started the game applies to the next game at best.
 
 ## Why the pinned-patcher workaround is not durable
@@ -173,6 +173,6 @@ changes between patcher releases.
 ## Related
 
 - LeagueToolkit/ltk-manager #923 — `host verification failed, refusing overlay: [VRF00000008]` (third-party app; a contributor confirms the intent)
-- Rose #404 — selected skin/chroma fails to appear in the match; its log shows `[VRF00000008] (19480,ltk-manager.exe)`
-- Rose #401 — not working on latest patch; 1.28.1/1.29.1 patcher pairs reported working, then broken by the 2026-11-03 patch
-- dat1208/Dat-Rose PR #1 — pins a signed patcher pair and turns the host check into a warning only
+- Parasite #404 — selected skin/chroma fails to appear in the match; its log shows `[VRF00000008] (19480,ltk-manager.exe)`
+- Parasite #401 — not working on latest patch; 1.28.1/1.29.1 patcher pairs reported working, then broken by the 2026-11-03 patch
+- dat1208/Dat-Parasite PR #1 — pins a signed patcher pair and turns the host check into a warning only

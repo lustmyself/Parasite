@@ -130,7 +130,7 @@ class FakeBridge:
 
 
 class LtfSessionTestCase(unittest.TestCase):
-    """Shared setup: a temp Rose tree and a faked bridge/launcher"""
+    """Shared setup: a temp Parasite tree and a faked bridge/launcher"""
 
     def setUp(self):
         temp_dir = tempfile.TemporaryDirectory()
@@ -197,7 +197,7 @@ class LtfSessionTestCase(unittest.TestCase):
         return name
 
     def launched(self, pid=4242):
-        """Patches for an LTK Manager Rose starts through the launcher."""
+        """Patches for an LTK Manager Parasite starts through the launcher."""
         return (
             patch.object(overlay_manager, "find_bridge", return_value=None),
             patch.object(overlay_manager.subprocess, "run",
@@ -229,8 +229,8 @@ class InjectionSessionTests(LtfSessionTestCase):
         self.assertIn("import", names)
         self.assertIn("start_patcher", names)
         self.assertIn("stop_patcher", names)
-        self.assertNotIn("kill", names)  # Rose did not start this LTK Manager
-        self.assertEqual(self.bridge.library_entries, [])  # Rose's mod was removed
+        self.assertNotIn("kill", names)  # Parasite did not start this LTK Manager
+        self.assertEqual(self.bridge.library_entries, [])  # Parasite's mod was removed
         self.assertEqual(self.reported_codes(), [])
         self.assertEqual(self.state()["installed"], {})
         self.assertIn("import_duration", self.overlay.last_injection_timing)
@@ -301,7 +301,7 @@ class InjectionSessionTests(LtfSessionTestCase):
     def test_an_import_answered_with_its_entry_is_not_looked_up_again(self):
         FakeBridge.full_install_answer = True
         FakeBridge.initial_library = [{"id": "user-mod", "name": "Map", "displayName": "Map", "enabled": True}]
-        mods = [self.make_mod(), self.make_mod("ROSE-LoadingName", "Loading screen name")]
+        mods = [self.make_mod(), self.make_mod("PARASITE-LoadingName", "Loading screen name")]
 
         self.overlay.mk_run_overlay(mods, stop_callback=lambda: True)
 
@@ -339,7 +339,7 @@ class InjectionSessionTests(LtfSessionTestCase):
         with patch.object(FakeBridge, "import_fantome", answer_with_users_mod):
             self.overlay.mk_run_overlay([self.make_mod()], stop_callback=lambda: True)
 
-        # The user's mod is never removed with Rose's
+        # The user's mod is never removed with Parasite's
         self.assertNotIn(("uninstall", "user-mod"), self.bridge.calls)
         self.assertEqual([e["id"] for e in self.bridge.library_entries], ["user-mod"])
 
@@ -395,7 +395,7 @@ class InjectionSessionTests(LtfSessionTestCase):
         self.assertEqual(self.process_manager.ltk_manager_process, (4242, None))
         self.assertEqual(self.state()["manager"]["pid"], 4242)
 
-    def test_a_reused_manager_rose_started_earlier_is_closed_after_the_game(self):
+    def test_a_reused_manager_parasite_started_earlier_is_closed_after_the_game(self):
         self.state_path.write_text(json.dumps({"manager": {"pid": 777, "created": None}}), encoding="utf-8")
         mod = self.make_mod()
 
@@ -528,11 +528,11 @@ class InjectionSessionTests(LtfSessionTestCase):
 
 
 class LibraryOwnershipTests(LtfSessionTestCase):
-    """Rose only ever removes or keeps off what it changed itself"""
+    """Parasite only ever removes or keeps off what it changed itself"""
 
     user_mod = {"id": "user-mod", "name": "Eternal Aspect Leona", "displayName": "Eternal Aspect Leona", "enabled": True}
 
-    def test_a_user_mod_with_the_same_name_is_never_taken_for_roses(self):
+    def test_a_user_mod_with_the_same_name_is_never_taken_for_parasites(self):
         FakeBridge.initial_library = [dict(self.user_mod)]
         mod = self.make_mod(display="Eternal Aspect Leona")
 
@@ -666,9 +666,9 @@ class EarlySessionTests(LtfSessionTestCase):
 
         names = self.bridge.command_names()
         self.assertIn("stop_patcher", names)
-        self.assertNotIn("kill", names)  # a manager Rose merely attached to stays up
+        self.assertNotIn("kill", names)  # a manager Parasite merely attached to stays up
 
-    def test_discard_closes_a_manager_rose_launched(self):
+    def test_discard_closes_a_manager_parasite_launched(self):
         no_bridge, run = self.launched()
         with no_bridge, run:
             self.overlay.start_patcher_early()
@@ -846,7 +846,7 @@ class PatcherStatusParsingTests(LtfSessionTestCase):
 
     def test_an_overlay_disabled_by_the_integrity_check_is_reported_once(self):
         """#432: LTK Manager turned the overlay off for a custom skin made of
-        another skin's files, while Rose logged the injection as completed"""
+        another skin's files, while Parasite logged the injection as completed"""
         session = self._session()
         FakeBridge.patcher_statuses = [status(session={"log": '2026-11-05T07:07:34.554873Z  INFO ltk_manager_runtime::patcher::injector: [ltk-dll pid=19852 tid=9656 ERROR] ltk_patcher_dll::verify: overlay verification failed, disabling overlay: wad data/final/champions/zed.wad.client: base-skin check: skin0 is another skin: SkinAudioProperties.BankUnits.Name names zedSkin<n>' + "\n" + '2026-11-05T07:07:35.337701Z  INFO ltk_manager_core::patching::pipeline: Incident recorded: Skinhack Detection id=2026-11-05T10-07-32 verdict=SkinhackDetected'})]
 
@@ -1407,9 +1407,9 @@ class FailureCauseTests(unittest.TestCase):
             overlay_manager.CDP_UNREACHABLE_REASON + "; Windows runs every program as administrator on this account"
         ), "cdp")
 
-    def test_ltk_managers_missing_patcher_is_not_blamed_on_roses_files(self):
+    def test_ltk_managers_missing_patcher_is_not_blamed_on_parasites_files(self):
         """#431: LTK Manager's own ltk_patcher_host.exe was gone (an antivirus),
-        and the hint sent the user to check Rose's launcher files"""
+        and the hint sent the user to check Parasite's launcher files"""
         reason = ("could not start the LTK patcher (start_patcher failed: UNKNOWN: ltk_patcher_host.exe not "
                   "found. Tried:\n - C:\\Program Files\\LTK Manager\\ltk_patcher_host.exe)")
         self.assertEqual(ltk_failure_cause(reason), "host_missing")
@@ -1495,7 +1495,7 @@ class ProcessManagerSessionTests(unittest.TestCase):
         self.process_manager.stop_overlay_process()
 
         self.assertEqual(self.stopped, ["stopped"])
-        self.assertTrue(self.process_manager.stopped_by_rose)
+        self.assertTrue(self.process_manager.stopped_by_parasite)
 
     def test_a_user_stop_ends_the_session_and_is_flagged(self):
         self.process_manager.stop_injection_by_user()
@@ -1507,14 +1507,14 @@ class ProcessManagerSessionTests(unittest.TestCase):
         self.process_manager.kill_all_runoverlay_processes()
 
         self.assertEqual(self.stopped, ["stopped"])
-        self.assertTrue(self.process_manager.stopped_by_rose)
+        self.assertTrue(self.process_manager.stopped_by_parasite)
 
     def test_a_stopping_session_without_a_stopper_does_not_raise(self):
         self.process_manager.set_session_stopper(None)
 
         self.process_manager.stop_overlay_process()
 
-        self.assertTrue(self.process_manager.stopped_by_rose)
+        self.assertTrue(self.process_manager.stopped_by_parasite)
 
     def test_a_broken_stopper_is_swallowed(self):
         def boom():
@@ -1524,7 +1524,7 @@ class ProcessManagerSessionTests(unittest.TestCase):
 
         self.process_manager.stop_overlay_process()
 
-        self.assertTrue(self.process_manager.stopped_by_rose)
+        self.assertTrue(self.process_manager.stopped_by_parasite)
 
     def test_clearing_keeps_a_newer_sessions_stopper(self):
         newer = lambda: None
@@ -1546,7 +1546,7 @@ class ProcessManagerSessionTests(unittest.TestCase):
             self.process_manager.kill_all_modtools_processes()
         return fake_psutil
 
-    def test_the_sweep_only_closes_the_ltk_manager_rose_started(self):
+    def test_the_sweep_only_closes_the_ltk_manager_parasite_started(self):
         process = FakeProcess("ltk-manager.exe")
 
         fake_psutil = self._sweep(process)
@@ -1570,7 +1570,7 @@ class ProcessManagerSessionTests(unittest.TestCase):
 
         self.assertFalse(process.terminated)
 
-    def test_nothing_is_closed_when_rose_started_no_ltk_manager(self):
+    def test_nothing_is_closed_when_parasite_started_no_ltk_manager(self):
         fake_psutil = self._sweep(FakeProcess("ltk-manager.exe"), registered=None)
 
         fake_psutil.Process.assert_not_called()

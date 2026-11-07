@@ -2,12 +2,12 @@
 # -*- coding: utf-8 -*-
 """Whether Windows runs every program as administrator on this account.
 
-Rose starts LTK Manager unelevated, with the Windows shell (explorer.exe) as
+Parasite starts LTK Manager unelevated, with the Windows shell (explorer.exe) as
 its parent and the shell's token. LTK Manager refuses to start its patcher as
 administrator, so when the shell itself runs as administrator, no skin can
 apply. That happens on the built-in Administrator account (some custom Windows
 builds such as KernelOS set it up as the user's account) and with User Account
-Control turned off. Rose runs as administrator either way, so its own token
+Control turned off. Parasite runs as administrator either way, so its own token
 says nothing: the shell's integrity level is what tells.
 """
 
@@ -126,7 +126,7 @@ def process_elevated(pid: int) -> Optional[bool]:
     try:
         _declare_signatures()
         rids = _process_token_rids(int(pid))
-    except Exception as e:  # a diagnostic must never stop Rose
+    except Exception as e:  # a diagnostic must never stop Parasite
         log.debug(f"[ACCOUNT] Could not read the token of process {pid}: {e}")
         return None
     return None if rids is None else rids[0] >= SECURITY_MANDATORY_HIGH_RID
@@ -154,7 +154,7 @@ def shell_account() -> Optional[ShellAccount]:
             builtin_administrator=user_rid == BUILTIN_ADMINISTRATOR_RID,
             uac_disabled=_uac_disabled(),
         )
-    except Exception as e:  # a diagnostic must never stop Rose
+    except Exception as e:  # a diagnostic must never stop Parasite
         log.debug(f"[ACCOUNT] Could not read the Windows shell's token: {e}")
         return None
 
@@ -167,7 +167,7 @@ MESSAGES = {
     "other": "LTK Manager can't apply skins: Windows runs every program as administrator on this account.",
 }
 HINTS = {
-    "builtin": "Use Rose, League and LTK Manager from a regular Windows account "
+    "builtin": "Use Parasite, League and LTK Manager from a regular Windows account "
                "(Settings > Accounts > Other users > Add account).",
     "uac": "Turn User Account Control back on (search Windows for \"Change User Account Control settings\" "
            "and move the slider above \"Never notify\"), then restart the PC.",
@@ -257,7 +257,7 @@ def _check_league_settings() -> bool:
     from utils.core.issue_reporter import remove_issues, report_issue
     try:
         entries = league_run_as_admin_entries()
-    except Exception as e:  # a diagnostic must never stop Rose
+    except Exception as e:  # a diagnostic must never stop Parasite
         log.debug(f"[ACCOUNT] Could not read the compatibility settings: {e}")
         return False
     if not entries:

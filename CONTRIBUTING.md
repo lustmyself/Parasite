@@ -1,11 +1,11 @@
-# Contributing to Rose
+# Contributing to Parasite
 
-Contributions are welcome! Report bugs or suggest features through the [issue forms](https://github.com/Alban1911/Rose/issues/new/choose), submit pull requests, or join our [Discord](https://discord.com/invite/roseskins) for discussions and installation help.
+Contributions are welcome! Report bugs or suggest features through the [issue forms](https://github.com/lustmyself/Parasite/issues/new/choose), submit pull requests, or join our [Discord](https://discord.com/invite/roseskins) for discussions and installation help.
 
 ## Reporting bugs
 
-Use the **Bug report** form. Besides your Rose version, League patch, client,
-region and game mode, it asks for the message shown in Rose's Troubleshooting
+Use the **Bug report** form. Besides your Parasite version, League patch, client,
+region and game mode, it asks for the message shown in Parasite's Troubleshooting
 panel and the latest log file from **Open Logs Folder**. Remove party tokens,
 account identifiers and personal paths before posting. For ideas, use the
 **Feature request** form.
@@ -14,16 +14,16 @@ account identifiers and personal paths before posting. For ideas, use the
 
 ```powershell
 # Create conda environment with Python 3.11
-conda create -n rose python=3.11 -y
+conda create -n parasite python=3.11 -y
 
 # Activate the environment
-conda activate rose
+conda activate parasite
 
 # Clone the repository
-git clone https://github.com/Alban1911/Rose.git
+git clone https://github.com/lustmyself/Parasite.git
 
 # Navigate to project directory
-cd Rose
+cd Parasite
 
 # Create a feature branch (e.g. feat/skin-preview, fix/chroma-crash, docs/readme)
 git checkout -b feat/your-feature-name
@@ -36,7 +36,7 @@ pip install -r requirements.txt
 
 ## Building locally
 
-Rose builds the Pengu Loader executable from the vendored source in
+Parasite builds the Pengu Loader executable from the vendored source in
 `vendor/PenguLoader-1.1.6/` during packaging. A prebuilt `Pengu Loader.exe`
 is intentionally not committed to the repository.
 
@@ -53,24 +53,24 @@ python scripts/build_pengu_loader.py
 # Build the LTF bridge only (ltk_launcher.exe + LeagueToolFlop.dll)
 python scripts/build_ltf.py
 
-# Build Rose (rebuilds Pengu Loader and the LTF bridge)
+# Build Parasite (rebuilds Pengu Loader and the LTF bridge)
 python scripts/build_pyinstaller.py
 
-# Build Rose and the Windows installer (installer/Rose_Setup_<version>.exe)
+# Build Parasite and the Windows installer (installer/Parasite_Setup_<version>.exe)
 python scripts/build_all.py
 
-# Zip dist/Rose into the auto-updater's package (installer/update_package_<version>.zip)
+# Zip dist/Parasite into the auto-updater's package (installer/update_package_<version>.zip)
 python scripts/create_update_package.py
 ```
 
-To test Rose itself, you also need LTK Manager installed: Rose finds it on its
+To test Parasite itself, you also need LTK Manager installed: Parasite finds it on its
 own (`ltkManagerPath` in `config.ini` wins, then a running instance, then the
 known install locations) and starts it through the bridge built into
 `injection/tools/`.
 
-`scripts/build_pyinstaller.py` is the canonical Rose package build entry point; it
+`scripts/build_pyinstaller.py` is the canonical Parasite package build entry point; it
 compiles the loader before invoking PyInstaller. Use it or `scripts/build_all.py`
-instead of invoking `pyinstaller Rose.spec` directly.
+instead of invoking `pyinstaller Parasite.spec` directly.
 
 ## Tests and checks
 
@@ -105,16 +105,16 @@ changes on pull requests.
 
 ## Writing plugins
 
-`ROSE-SkinMonitor` hosts the WebSocket bridge to Rose and exposes it as
-`window.__roseBridge` once the bridge port is known; other plugins wait for
+`PARASITE-SkinMonitor` hosts the WebSocket bridge to Parasite and exposes it as
+`window.__parasiteBridge` once the bridge port is known; other plugins wait for
 that object to appear. It offers `send(payload)`, `subscribe(type, cb)` /
-`unsubscribe(type, cb)` for messages from Rose, `onReady(cb)`, and
-`onDisconnect(cb)`, which runs when an open connection to Rose closes (not on
+`unsubscribe(type, cb)` for messages from Parasite, `onReady(cb)`, and
+`onDisconnect(cb)`, which runs when an open connection to Parasite closes (not on
 each failed reconnect), so a plugin waiting on an answer can give up.
 
 ## Translations
 
-Rose's menus are translated in `Pengu Loader/plugins/ROSE-I18n/locales/`, one
+Parasite's menus are translated in `Pengu Loader/plugins/PARASITE-I18n/locales/`, one
 `<language>.json` per language, keyed by the English text. English is the
 fallback, so a missing text shows in English. Both the plugins and the Python
 side (`utils/core/i18n.py`) read these files.
@@ -122,7 +122,7 @@ side (`utils/core/i18n.py`) read these files.
 ## Project Structure
 
 ```
-Rose/
+Parasite/
 ├── main.py                 # Application entry point
 ├── config.py               # Configuration constants
 ├── requirements.txt        # Python dependencies
@@ -329,30 +329,30 @@ Rose/
 │       └── analytics_thread.py  # Background thread for startup/heartbeat/close pings
 │
 ├── scripts/                # Build scripts (loader, LTF bridge, PyInstaller, installer, update package)
-├── native/ltf/             # LeagueToolFlop source Rose builds its bridge from (vendored)
-├── vendor/PenguLoader-1.1.6/  # Pengu Loader source, built with Rose
+├── native/ltf/             # LeagueToolFlop source Parasite builds its bridge from (vendored)
+├── vendor/PenguLoader-1.1.6/  # Pengu Loader source, built with Parasite
 │
 └── Pengu Loader/           # Runtime loader files and plugins
     ├── Pengu Loader.exe    # Generated during builds from vendor/PenguLoader-1.1.6
     ├── core.dll            # Pengu Loader's hook, loaded into the League client
     └── plugins/            # JavaScript plugins
-        ├── ROSE-UI/
-        ├── ROSE-SkinMonitor/
-        ├── ROSE-ChromaWheel/
-        ├── ROSE-FormsWheel/
-        ├── ROSE-CustomSkinSelector/
-        ├── ROSE-CustomWheel/
-        ├── ROSE-SettingsPanel/
-        ├── ROSE-RandomSkin/
-        ├── ROSE-HistoricMode/
-        ├── ROSE-PartyMode/
-        ├── ROSE-I18n/      # Translations (locales/<language>.json)
-        └── ROSE-Jade/      # Shipped disabled (index.js_)
+        ├── PARASITE-UI/
+        ├── PARASITE-SkinMonitor/
+        ├── PARASITE-ChromaWheel/
+        ├── PARASITE-FormsWheel/
+        ├── PARASITE-CustomSkinSelector/
+        ├── PARASITE-CustomWheel/
+        ├── PARASITE-SettingsPanel/
+        ├── PARASITE-RandomSkin/
+        ├── PARASITE-HistoricMode/
+        ├── PARASITE-PartyMode/
+        ├── PARASITE-I18n/      # Translations (locales/<language>.json)
+        └── PARASITE-Jade/      # Shipped disabled (index.js_)
 ```
 
 ## Credits
 
-Rose uses the [official Pengu Loader](https://github.com/PenguLoader/PenguLoader)
-project. Its source is vendored and built as part of Rose, with Rose-specific
+Parasite uses the [official Pengu Loader](https://github.com/PenguLoader/PenguLoader)
+project. Its source is vendored and built as part of Parasite, with Parasite-specific
 lifecycle integration added around the loader. See the
 [official Pengu Loader license](https://github.com/PenguLoader/PenguLoader/blob/main/LICENSE).

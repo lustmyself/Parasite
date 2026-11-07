@@ -6,7 +6,7 @@ Issue Reporter
 Writes a small, human-friendly diagnostics file that summarizes important
 errors and "non-error failure reasons" (e.g., timeouts, settings mismatches).
 
-File: %LOCALAPPDATA%\\Rose\\rose_diagnostics.txt
+File: %LOCALAPPDATA%\\Parasite\\parasite_diagnostics.txt
 """
 
 from __future__ import annotations
@@ -23,7 +23,7 @@ log = get_logger()
 _LOCK = threading.Lock()
 _LAST: Dict[str, float] = {}  # naive dedupe: key -> last timestamp
 
-# Keep rose_diagnostics.txt focused on actionable tuning problems and critical
+# Keep parasite_diagnostics.txt focused on actionable tuning problems and critical
 # resource failures that commonly confuse users. Everything else should go to
 # the normal logs.
 _ALLOWED_CODES = {
@@ -32,12 +32,12 @@ _ALLOWED_CODES = {
     'BASE_SKIN_VERIFY_FAILED',  # Base skin verification mismatch (often causes skin not to show)
     'LEAGUE_ELEVATED',        # The League client runs as administrator: LTK Manager's patcher can't reach it
     'LOW_DISK_SPACE',         # Injection could not install a mod with the available disk space
-    'LTF_MISSING',            # Rose's LTF bridge files (ltk_launcher.exe + LeagueToolFlop.dll) are missing
-    'LTK_MANAGER_MISSING',    # LTK Manager, which Rose drives through the bridge, is not installed
+    'LTF_MISSING',            # Parasite's LTF bridge files (ltk_launcher.exe + LeagueToolFlop.dll) are missing
+    'LTK_MANAGER_MISSING',    # LTK Manager, which Parasite drives through the bridge, is not installed
     'LTF_FAILED',             # The LTF session (bridge or LTK patcher) reported an error
     'LTK_HEAVY_BUILTINS',     # LTK Manager's built-in mods put every champion's archive into the overlay
     'LTF_IMPORT_FAILED',      # A mod could not be imported into LTK Manager's library
-    'PENGU_ACTIVATION_FAILED',  # Pengu Loader could not be activated: Rose is missing from the client
+    'PENGU_ACTIVATION_FAILED',  # Pengu Loader could not be activated: Parasite is missing from the client
     'WINDOWS_ADMIN_SHELL',    # Windows runs every program as administrator: LTK Manager refuses to patch
 }
 
@@ -46,7 +46,7 @@ _ALLOWED_CODES = {
 def _issues_path():
     base_dir = get_user_data_dir()
     base_dir.mkdir(parents=True, exist_ok=True)
-    return base_dir / "rose_diagnostics.txt"
+    return base_dir / "parasite_diagnostics.txt"
 
 
 def report_issue(
@@ -106,7 +106,7 @@ def report_issue(
 
 
 def read_issues_tail(*, max_lines: int = 60) -> list[str]:
-    """Read the last N lines from rose_diagnostics.txt (safe, never raises)."""
+    """Read the last N lines from parasite_diagnostics.txt (safe, never raises)."""
     try:
         p = _issues_path()
         if not p.exists():
@@ -151,7 +151,7 @@ def remove_issues(should_remove: Callable[[str, str], bool]) -> bool:
 
 
 def clear_issues() -> bool:
-    """Clear rose_diagnostics.txt (safe, never raises). Returns True if cleared."""
+    """Clear parasite_diagnostics.txt (safe, never raises). Returns True if cleared."""
     try:
         with _LOCK:
             p = _issues_path()

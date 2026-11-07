@@ -84,7 +84,7 @@ def check_for_updates(target_exists: bool = True) -> bool:
 
     Args:
         target_exists: whether the combined file is on disk. A state saved by an
-            older Rose (commit SHAs, no ETags) is then taken as current: its
+            older Parasite (commit SHAs, no ETags) is then taken as current: its
             ETags are recorded instead of downloading everything again.
 
     Returns:

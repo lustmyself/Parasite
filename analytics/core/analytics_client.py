@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""HTTP client for Rose's pseudonymous analytics activity and presence."""
+"""HTTP client for Parasite's pseudonymous analytics activity and presence."""
 
 from typing import Literal, Optional
 

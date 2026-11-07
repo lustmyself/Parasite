@@ -4,12 +4,12 @@
 Overlay Manager
 Drives LTK Manager through the LeagueToolFlop (LTF) bridge.
 
-Rose builds the LTF bridge from native/ltf/ (ltk_launcher.exe +
+Parasite builds the LTF bridge from native/ltf/ (ltk_launcher.exe +
 LeagueToolFlop.dll). The launcher starts LTK Manager hidden with the DLL
 injected, and the DLL serves a TCP API (injection/tools/bridge.py) that
-imports Rose's mod folders into LTK Manager's library and starts LTK
+imports Parasite's mod folders into LTK Manager's library and starts LTK
 Manager's own patcher. The patcher builds the overlay and starts scanning;
-Rose then resumes the game, watches for the end of it, stops the patcher,
+Parasite then resumes the game, watches for the end of it, stops the patcher,
 removes the mods it installed and turns the user's own mods back on.
 
 The patcher only overlays a game the client creates after its scan started,
@@ -22,7 +22,7 @@ Security Notes:
     - subprocess calls use only internal paths (tools_dir, mods_dir) and the
       LTK Manager path from config/known install locations
     - Commands only execute ltk_launcher.exe from the verified tools directory
-    - Mod names are folder names Rose itself extracted into mods_dir
+    - Mod names are folder names Parasite itself extracted into mods_dir
 """
 
 import json
@@ -78,13 +78,13 @@ PATCHER_READY_TIMEOUT_S = 45.0
 RESTART_MISSED_GAME = True
 RECONNECT_MAX = 1
 # The Monitor Auto-Resume Timeout setting: how long after the client created
-# the game Rose may still restart it for the patcher. Past it the player is in
+# the game Parasite may still restart it for the patcher. Past it the player is in
 # the match: the game is left running without the overlay, and Troubleshooting
 # suggests a longer timeout
 RESTART_WINDOW_DEFAULT_S = 60.0
 RESTART_WINDOW_MIN_S = 1.0
 RESTART_WINDOW_MAX_S = 180.0
-RESTART_SKIPPED_MESSAGE = "Rose did not restart the game for the LTK patcher"
+RESTART_SKIPPED_MESSAGE = "Parasite did not restart the game for the LTK patcher"
 
 
 def restart_window_s() -> float:
@@ -179,20 +179,20 @@ LTK_PATCHER_ERROR_LINE = re.compile(
 )
 # The longest LTK Manager error kept for a report
 LTK_ERROR_MAX_CHARS = 300
-ALREADY_OPEN_REASON = "LTK Manager is already open without Rose's bridge"
+ALREADY_OPEN_REASON = "LTK Manager is already open without Parasite's bridge"
 # The bridge drives LTK Manager through the remote debugging port (CDP) of its
 # WebView2 window; when that port never answers, every command fails with this
 CDP_FAILURE_MARKER = "cdp unavailable"
 # LTK Manager's page loaded, its Tauri IPC not yet: the browser answers but
 # window.__TAURI_INTERNALS__ is still undefined (#441)
 TAURI_NOT_READY_MARKER = "reading 'invoke'"
-CDP_UNREACHABLE_REASON = "Rose's bridge could not reach LTK Manager's built-in browser (CDP unavailable or timed out)"
+CDP_UNREACHABLE_REASON = "Parasite's bridge could not reach LTK Manager's built-in browser (CDP unavailable or timed out)"
 # Every LTF report's hint ends with it (Troubleshooting recognizes the reports by it)
 LTF_LOGS_HINT = "Details are in C:\\Users\\Public\\ltk_bridge.log, ltk_api.log and ltk_launcher.log."
 
 
 def ltk_failure_cause(reason: str) -> str:
-    """Why the LTF session failed, from the reason Rose reported: what to do
+    """Why the LTF session failed, from the reason Parasite reported: what to do
     about it depends on it (Troubleshooting shows a hint for each)"""
     lowered = reason.lower()
     # Before "import" and "bridge": a failed install or command names them too
@@ -205,7 +205,7 @@ def ltk_failure_cause(reason: str) -> str:
     if "manager_elevated" in lowered or "ltk manager is running as administrator" in lowered:
         return "manager_admin"
     # LTK Manager's own patcher missing from its folder (an antivirus took
-    # it): reinstalling LTK Manager is the fix, not Rose's files
+    # it): reinstalling LTK Manager is the fix, not Parasite's files
     if "ltk_patcher_host.exe not found" in lowered:
         return "host_missing"
     if OVERLAY_DISABLED_MESSAGE in lowered:
@@ -263,9 +263,9 @@ def _cdp_unreachable_reason() -> str:
 # the game starts long before the patcher scans, and games crashed with it (#441)
 HEAVY_BUILTINS_MESSAGE = "LTK Manager's built-in mods put every champion's archive into the overlay"
 HEAVY_BUILTINS_HINT = (
-    "Quit Rose, open LTK Manager from the Start menu > Settings > Built-in mods, set Base skins to Off "
+    "Quit Parasite, open LTK Manager from the Start menu > Settings > Built-in mods, set Base skins to Off "
     "(or Modded champions) and limit Character inking to chosen champions, then close LTK Manager "
-    "(also from the system tray) and start Rose again."
+    "(also from the system tray) and start Parasite again."
 )
 
 
@@ -300,7 +300,7 @@ class LtkLogTail:
     @staticmethod
     def log_dir() -> Optional[Path]:
         """LTK Manager's log folder: in the roaming app data of the desktop
-        user it runs as (an elevated Rose may run as another account)."""
+        user it runs as (an elevated Parasite may run as another account)."""
         import os
 
         candidates = []
@@ -463,7 +463,7 @@ class OverlayManager:
         self._update_state(add)
 
     def _untrack(self, removed=(), restored=()) -> None:
-        """Forget the mods Rose removed and the user's mods it turned back on."""
+        """Forget the mods Parasite removed and the user's mods it turned back on."""
         removed, restored = set(removed), set(restored)
         if not removed and not restored:
             return
@@ -475,7 +475,7 @@ class OverlayManager:
         self._update_state(drop)
 
     def _cleanup_stale_installs(self, bridge: LtkBridge) -> None:
-        """Undo what an earlier session left in LTK Manager (Rose crashed or
+        """Undo what an earlier session left in LTK Manager (Parasite crashed or
         was closed before its cleanup ran): remove its mods, turn the user's
         back on. What cannot be undone now stays recorded for the next try."""
         state = self._read_state()
@@ -516,7 +516,7 @@ class OverlayManager:
                 log.debug(f"[INJECT] Could not turn {mod_id} back on: {e}")
         self._untrack(removed, restored)
 
-    # -- the LTK Manager Rose started -----------------------------------------
+    # -- the LTK Manager Parasite started -----------------------------------------
     @staticmethod
     def _process_created(pid: Optional[int]) -> Optional[float]:
         if not pid or not PSUTIL_AVAILABLE:
@@ -527,7 +527,7 @@ class OverlayManager:
             return None
 
     def _register_manager(self, pid: Optional[int]) -> None:
-        """Remember the LTK Manager Rose started: it is the only one Rose closes."""
+        """Remember the LTK Manager Parasite started: it is the only one Parasite closes."""
         if not pid:
             return
         created = self._process_created(pid)
@@ -535,8 +535,8 @@ class OverlayManager:
             self.process_manager.ltk_manager_process = (pid, created)
         self._update_state(lambda state: state.__setitem__("manager", {"pid": pid, "created": created}))
 
-    def _is_rose_manager(self, pid: Optional[int]) -> bool:
-        """Whether the LTK Manager with *pid* is one Rose started (this run or before)."""
+    def _is_parasite_manager(self, pid: Optional[int]) -> bool:
+        """Whether the LTK Manager with *pid* is one Parasite started (this run or before)."""
         manager = self._read_state()["manager"]
         if not pid or not manager or manager.get("pid") != pid:
             return False
@@ -544,7 +544,7 @@ class OverlayManager:
         return created is None or recorded is None or abs(created - float(recorded)) <= 1.0
 
     def _terminate_manager(self, pid: Optional[int], grace_s: float = 0.0) -> None:
-        """Terminate the LTK Manager *pid* Rose started, if it still runs
+        """Terminate the LTK Manager *pid* Parasite started, if it still runs
         after *grace_s* (the time a requested exit gets to finish)."""
         if not pid or not PSUTIL_AVAILABLE:
             return
@@ -563,18 +563,18 @@ class OverlayManager:
                 proc.wait(timeout=3)
             except psutil.TimeoutExpired:
                 proc.kill()
-            log.info(f"[INJECT] Closed the LTK Manager Rose started (PID {pid})")
+            log.info(f"[INJECT] Closed the LTK Manager Parasite started (PID {pid})")
         except (psutil.Error, OSError) as e:
             log.debug(f"[INJECT] Could not close LTK Manager (PID {pid}): {e}")
 
-    def _close_stale_rose_manager(self) -> None:
-        """Close an LTK Manager Rose started whose bridge no longer answers."""
+    def _close_stale_parasite_manager(self) -> None:
+        """Close an LTK Manager Parasite started whose bridge no longer answers."""
         manager = self._read_state()["manager"]
         if not manager:
             return
         pid = manager.get("pid")
-        if self._is_rose_manager(pid) and self._process_created(pid) is not None:
-            log.info(f"[INJECT] The LTK Manager Rose started (PID {pid}) lost its bridge - closing it")
+        if self._is_parasite_manager(pid) and self._process_created(pid) is not None:
+            log.info(f"[INJECT] The LTK Manager Parasite started (PID {pid}) lost its bridge - closing it")
             self._terminate_manager(pid)
         self._update_state(lambda state: state.__setitem__("manager", None))
 
@@ -657,10 +657,10 @@ class OverlayManager:
                 report_issue(
                     "LTF_MISSING",
                     "error",
-                    "Injection failed: Rose's LTF bridge files are missing.",
+                    "Injection failed: Parasite's LTF bridge files are missing.",
                     details={"missing": f"{LTF_LAUNCHER} + {LTF_BRIDGE_DLL}"},
-                    hint="Reinstall Rose, or restore ltk_launcher.exe and LeagueToolFlop.dll "
-                         "from your antivirus quarantine, then restart Rose.",
+                    hint="Reinstall Parasite, or restore ltk_launcher.exe and LeagueToolFlop.dll "
+                         "from your antivirus quarantine, then restart Parasite.",
                 )
             return None
 
@@ -742,25 +742,25 @@ class OverlayManager:
 
     def _connect_bridge(self, launcher: Path, manager: Path, report: bool,
                         cancelled: Optional[Callable[[], bool]] = None):
-        """The bridge and whether Rose started LTK Manager for it."""
+        """The bridge and whether Parasite started LTK Manager for it."""
         found = find_bridge()
         if found is not None:
             port, hello = found
             pid = hello.get("pid")
-            launched = self._is_rose_manager(pid)
+            launched = self._is_parasite_manager(pid)
             if launched:
                 self._register_manager(pid)
             log.info(
                 f"[INJECT] Reusing the running LTK Manager (bridge on port {port}"
-                f"{', started by Rose' if launched else ''})"
+                f"{', started by Parasite' if launched else ''})"
             )
             return LtkBridge(port, pid=pid), launched
 
         # The bridge only loads into an LTK Manager the launcher starts, and
-        # an LTK Manager Rose did not start is the user's: it stays open
-        self._close_stale_rose_manager()
+        # an LTK Manager Parasite did not start is the user's: it stays open
+        self._close_stale_parasite_manager()
         if self._ltk_manager_running():
-            log.warning("[INJECT] LTK Manager is already open without Rose's bridge - leaving it alone")
+            log.warning("[INJECT] LTK Manager is already open without Parasite's bridge - leaving it alone")
             self._report_ltf_failure(ALREADY_OPEN_REASON, report)
             return None, False
 
@@ -801,7 +801,7 @@ class OverlayManager:
                 log.debug("[INJECT] Stopped waiting for the LTF bridge: the session is no longer wanted")
             else:
                 self._report_ltf_failure(f"the LTF bridge is unreachable ({e})", report)
-            # Started hidden by Rose: it would linger out of sight
+            # Started hidden by Parasite: it would linger out of sight
             self._terminate_manager(pid)
             return None, False
         self._register_manager(bridge.pid or pid)
@@ -829,7 +829,7 @@ class OverlayManager:
             if session is not None:
                 if self._check_bridge(session):
                     return
-                # Rose stopped it after the last game: connect again for this one
+                # Parasite stopped it after the last game: connect again for this one
                 with self._session_lock:
                     if self._early_session is session:
                         self._early_session = None
@@ -861,7 +861,7 @@ class OverlayManager:
                 if self._check_bridge(session):
                     return session
                 self._end_session(session)
-            return self._start_ltf_session(report=True, cancelled=self._stopped_by_rose)
+            return self._start_ltf_session(report=True, cancelled=self._stopped_by_parasite)
 
     def discard_early_patcher(self) -> None:
         """Stop an LTF session whose injection never built its overlay.
@@ -878,10 +878,10 @@ class OverlayManager:
             self._end_session(session)
 
     def _end_session(self, session: dict) -> None:
-        """Stop the patcher, remove Rose's mods, turn the user's back on, and
-        close LTK Manager if Rose started it (a running one is the user's).
+        """Stop the patcher, remove Parasite's mods, turn the user's back on, and
+        close LTK Manager if Parasite started it (a running one is the user's).
 
-        Safe to call more than once: Rose's cleanup and the session loop can
+        Safe to call more than once: Parasite's cleanup and the session loop can
         both get here.
         """
         with session["lock"]:
@@ -899,7 +899,7 @@ class OverlayManager:
         if not bridge.alive():
             # Nothing answers to undo anything: the state file keeps it for
             # the next session
-            log.info("[INJECT] The LTF bridge is gone - Rose's mods are removed at the next session")
+            log.info("[INJECT] The LTF bridge is gone - Parasite's mods are removed at the next session")
             if session["launched"]:
                 self._terminate_manager(bridge.pid)
         else:
@@ -940,15 +940,15 @@ class OverlayManager:
             return False
         return bridge.alive()
 
-    def _stopped_by_rose(self) -> bool:
-        """Whether Rose (or the user) asked to stop the current session."""
+    def _stopped_by_parasite(self) -> bool:
+        """Whether Parasite (or the user) asked to stop the current session."""
         if not self.process_manager:
             return False
-        return bool(self.process_manager.stopped_by_user or self.process_manager.stopped_by_rose)
+        return bool(self.process_manager.stopped_by_user or self.process_manager.stopped_by_parasite)
 
     def _session_stopped(self, session: dict) -> bool:
-        """Whether the session was stopped (by Rose, the user, or its end)."""
-        return bool(session["ended"]) or self._stopped_by_rose()
+        """Whether the session was stopped (by Parasite, the user, or its end)."""
+        return bool(session["ended"]) or self._stopped_by_parasite()
 
     # -- mod installation ---------------------------------------------------
     @staticmethod
@@ -966,7 +966,7 @@ class OverlayManager:
     @classmethod
     def _created_entries(cls, library: list, before_ids: set, folder: Path, display_name: str) -> list:
         """The entries an import created: new ids only, never one the user
-        already had (it would be removed with Rose's). Name matches first;
+        already had (it would be removed with Parasite's). Name matches first;
         a lone new entry otherwise."""
         new_entries = [e for e in library if e.get("id") and str(e.get("id")) not in before_ids]
         named = [e for e in new_entries if cls._entry_matches(e, folder, display_name)]
@@ -998,21 +998,21 @@ class OverlayManager:
 
     def _track_late_install(self, session: dict, before_ids: set, folder: Path, display_name: str) -> None:
         """Record whatever an import that reported a failure still installed
-        (its answer lost or too late): it is Rose's to remove."""
+        (its answer lost or too late): it is Parasite's to remove."""
         try:
             library = session["bridge"].library()
         except (BridgeUnavailable, BridgeCommandError):
             return
         for entry in self._created_entries(library, before_ids, folder, display_name):
-            log.warning(f"[INJECT] {display_name} was installed although the import failed - Rose removes it after the session")
+            log.warning(f"[INJECT] {display_name} was installed although the import failed - Parasite removes it after the session")
             self._track_installed(session, str(entry.get("id")), folder.name)
 
     def _staging_root(self) -> Path:
         """Where archives wait for LTK Manager to import them.
 
         Not tempfile: Python 3.13 makes its folders private to the elevated
-        Rose, and LTK Manager restarts itself unelevated, so it could not read
-        them. Rose's data folder belongs to the desktop user, who runs it.
+        Parasite, and LTK Manager restarts itself unelevated, so it could not read
+        them. Parasite's data folder belongs to the desktop user, who runs it.
         """
         return self.mods_dir.parent / "ltf_staging"
 
@@ -1045,7 +1045,7 @@ class OverlayManager:
         return entry
 
     def _remove_unwanted(self, session: dict, mod_ids: List[str]) -> bool:
-        """Remove Rose's mods that are no longer selected (staged for another skin)."""
+        """Remove Parasite's mods that are no longer selected (staged for another skin)."""
         bridge = session["bridge"]
         removed, ok = [], True
         for mod_id in mod_ids:
@@ -1072,7 +1072,7 @@ class OverlayManager:
     def _install_mods(self, session: dict, mod_names: List[str], folder_dir: Optional[Path] = None,
                       report: bool = True, stopped: Optional[Callable[[], bool]] = None,
                       archives: Optional[Dict[str, Path]] = None) -> bool:
-        """Make Rose's mods in LTK Manager's library exactly the folders
+        """Make Parasite's mods in LTK Manager's library exactly the folders
         *mod_names* (in *folder_dir*, mods_dir by default).
 
         A mod already installed from the same content (staged during the
@@ -1111,7 +1111,7 @@ class OverlayManager:
                     "error",
                     "Injection failed: no mods could be installed into LTK Manager.",
                     details={"mods": "/".join(mod_names)},
-                    hint=f"Retry; if it keeps happening, report it with rose_*.log. {LTF_LOGS_HINT}",
+                    hint=f"Retry; if it keeps happening, report it with parasite_*.log. {LTF_LOGS_HINT}",
                 )
             return False
 
@@ -1375,7 +1375,7 @@ class OverlayManager:
         """Turn off the user's own enabled mods for this session.
 
         LTK Manager's patcher applies every enabled mod, and the overlay must
-        hold Rose's alone (as mod-tools' did). Each one is recorded before it
+        hold Parasite's alone (as mod-tools' did). Each one is recorded before it
         is turned off, so a crash still turns it back on next session.
         """
         bridge = session["bridge"]
@@ -1416,7 +1416,7 @@ class OverlayManager:
             # A stop from the previous session must not count against this
             # one; a stop from now on does, even while LTK Manager starts
             self.process_manager.stopped_by_user = False
-            self.process_manager.stopped_by_rose = False
+            self.process_manager.stopped_by_parasite = False
 
         # The countdown's staging ends here (an in-flight one finishes first:
         # its mods are likely the ones this injection wants)
@@ -1424,7 +1424,7 @@ class OverlayManager:
         with self._stage_lock:
             session = self._acquire_session()
             if session is None:
-                return 0 if self._stopped_by_rose() else 1
+                return 0 if self._stopped_by_parasite() else 1
             if self._session_stopped(session):
                 log.info("[INJECT] Injection stopped while LTK Manager was starting")
                 self._end_session(session)
@@ -1449,7 +1449,7 @@ class OverlayManager:
             self._disable_other_mods(session)
 
             if self.process_manager:
-                # Rose's cleanup (user stop, lobby change, shutdown) ends the
+                # Parasite's cleanup (user stop, lobby change, shutdown) ends the
                 # session gracefully instead of killing the manager outright
                 session["stopper"] = lambda: self._end_session(session)
                 self.process_manager.set_session_stopper(session["stopper"])
@@ -1461,7 +1461,7 @@ class OverlayManager:
                 return 1
 
         if not self._wait_for_patcher(session):
-            failed = bool(session["error"]) and not self._stopped_by_rose()
+            failed = bool(session["error"]) and not self._stopped_by_parasite()
             if failed:
                 log.error(f"[INJECT] LTK patcher failed: {session['error']}")
                 self._report_ltf_failure(session["error"])
@@ -1526,7 +1526,7 @@ class OverlayManager:
                 f"{RESTART_SKIPPED_MESSAGE}: it was ready after {age:.0f}s, "
                 f"past the Monitor Auto-Resume Timeout ({window:.0f}s).",
                 details={"auto_resume_timeout_s": f"{window:.0f}", "elapsed_s": f"{age:.1f}"},
-                hint="Settings → Monitor Auto-Resume Timeout → increase it, so Rose can still restart the game "
+                hint="Settings → Monitor Auto-Resume Timeout → increase it, so Parasite can still restart the game "
                      "once LTK Manager is ready.",
             )
             return False
@@ -1537,9 +1537,9 @@ class OverlayManager:
         session["restarted_at"] = time.time()
         if not reconnect_to_game(stopped=lambda: self._session_stopped(session)):
             log.error("[INJECT] The game was closed, but the client did not reconnect - use Reconnect in the client")
-            if not self._stopped_by_rose():
+            if not self._stopped_by_parasite():
                 self._report_ltf_failure(
-                    "Rose restarted the game so the LTK patcher could apply the overlay, but the client did not "
+                    "Parasite restarted the game so the LTK patcher could apply the overlay, but the client did not "
                     "reconnect to the match (use Reconnect in the client)"
                 )
             return False
@@ -1748,9 +1748,9 @@ class OverlayManager:
                 "AUTO_RESUME_TRIGGERED",
                 "warning",
                 f"{RESTART_SKIPPED_MESSAGE}: it was still building the overlay after {waited:.0f}s, past the "
-                f"Monitor Auto-Resume Timeout ({window:.0f}s), so Rose resumed the game without it.",
+                f"Monitor Auto-Resume Timeout ({window:.0f}s), so Parasite resumed the game without it.",
                 details={"auto_resume_timeout_s": f"{window:.0f}", "elapsed_s": f"{waited:.1f}"},
-                hint="Settings → Monitor Auto-Resume Timeout → increase it, so Rose can hold the game until "
+                hint="Settings → Monitor Auto-Resume Timeout → increase it, so Parasite can hold the game until "
                      "LTK Manager is ready.",
             )
         try:
@@ -1779,9 +1779,9 @@ class OverlayManager:
         session["restarted_at"] = time.time()
         if not reconnect_to_game(stopped=lambda: self._session_stopped(session)):
             log.error("[INJECT] The game was closed, but the client did not reconnect - use Reconnect in the client")
-            if not self._stopped_by_rose():
+            if not self._stopped_by_parasite():
                 self._report_ltf_failure(
-                    "Rose restarted the game so the LTK patcher could apply the overlay, but the client did not "
+                    "Parasite restarted the game so the LTK patcher could apply the overlay, but the client did not "
                     "reconnect to the match (use Reconnect in the client)"
                 )
             return False
@@ -1815,7 +1815,7 @@ class OverlayManager:
                     self._check_patcher_verdict(session)  # LTK Manager's verdict on the game
                     break
                 if session["ended"]:
-                    continue  # Rose stopped the session while the callback ran
+                    continue  # Parasite stopped the session while the callback ran
                 if not self._check_bridge(session):
                     session["error"] = "the LTF bridge went away during the game"
                     log.error("[INJECT] The LTF bridge went away - LTK Manager closed")
@@ -1827,18 +1827,18 @@ class OverlayManager:
                         break
                 time.sleep(PROCESS_MONITOR_SLEEP_S)
 
-            if session["error"] and not self._stopped_by_rose():
+            if session["error"] and not self._stopped_by_parasite():
                 log.error(f"[INJECT] LTK patcher failed: {session['error']}")
         except Exception as e:
             log.error(f"[INJECT] LTF session error: {e}")
             if not session["error"]:
                 session["error"] = str(e)
         finally:
-            stopped = self._stopped_by_rose()
+            stopped = self._stopped_by_parasite()
             self._end_session(session)
 
         if stopped:
-            log.info("[INJECT] LTK patcher stopped by Rose")
+            log.info("[INJECT] LTK patcher stopped by Parasite")
             return 0
         if session["error"]:
             self._report_ltf_failure(session["error"])
@@ -1951,7 +1951,7 @@ class OverlayManager:
         return f"the LTK patcher was started {started:.1f}s ago and is still building the overlay"
 
     def _late_join_detail(self, session: dict) -> str:
-        """Why the patcher came too late, from what Rose saw: when its scan
+        """Why the patcher came too late, from what Parasite saw: when its scan
         started against when the client created the game, and what took the
         time before it ("" when nothing is known)."""
         parts = []
@@ -1974,7 +1974,7 @@ class OverlayManager:
             parts.append(f"LTK Manager took {build:.1f}s to build the overlay")
         staged = session.get("staged_after_s")
         if staged is not None:
-            parts.append(f"Rose started it {staged:.1f}s after the skin was picked")
+            parts.append(f"Parasite started it {staged:.1f}s after the skin was picked")
         return "; ".join(parts)
 
     def _check_patcher_verdict(self, session: dict, value: Optional[dict] = None) -> None:
@@ -2005,7 +2005,7 @@ class OverlayManager:
                 "[INJECT] The LTK patcher joined the game too late - the overlay is not applied this game"
                 + (f" ({detail})" if detail else "")
             )
-            if not self._stopped_by_rose():
+            if not self._stopped_by_parasite():
                 self._report_ltf_failure(
                     "the game started before the LTK patcher was scanning (joined too late"
                     + (f": {detail})" if detail else ")")
@@ -2019,13 +2019,13 @@ class OverlayManager:
             signature = session.get("ltk_signature")
             if signature:
                 log.error(f"[INJECT] {SIGNATURE_FAILURE_MESSAGE} ({signature}): reinstall LTK Manager")
-            if not self._stopped_by_rose():
+            if not self._stopped_by_parasite():
                 self._report_ltf_failure(
                     f"LTK Manager's patcher refused the overlay (host verification failed: {described}"
                     + (f"; {SIGNATURE_FAILURE_MESSAGE}, {signature})" if signature else ")")
                 )
         # LTK Manager's own verdicts on the game: the overlay turned off by its
-        # integrity scan, an incident after the game. Rose's injection
+        # integrity scan, an incident after the game. Parasite's injection
         # "completes" either way: without these, nothing told the user (#432)
         disabled = session.get("ltk_disabled")
         if disabled and not session.get("disabled_reported"):
@@ -2048,7 +2048,7 @@ class OverlayManager:
         completed cannot be told apart from it giving up, and the bridge
         aliveness already catches the crash case. A stopped patcher ends the
         session only once the game it served has exited: before the game
-        appears, the session waits for it (or for Rose to end it).
+        appears, the session waits for it (or for Parasite to end it).
         """
         value = self._read_patcher_status(session)
         if value is None:
@@ -2111,7 +2111,7 @@ class OverlayManager:
 
         if self.process_manager:
             self.process_manager.stopped_by_user = False
-            self.process_manager.stopped_by_rose = False
+            self.process_manager.stopped_by_parasite = False
 
         session = self._acquire_session()
         if session is None:
@@ -2195,7 +2195,7 @@ class OverlayManager:
                 'overlay_path': str(self.mods_dir.parent),
                 'mods': '/'.join(mod_names or ()),
             },
-            hint='Free up disk space on the drive containing Rose injection files, then retry the skin.',
+            hint='Free up disk space on the drive containing Parasite injection files, then retry the skin.',
         )
         return True
 
@@ -2203,10 +2203,10 @@ class OverlayManager:
     def _ltk_failure_hint(reason: str) -> str:
         """What the user can do about a session failure, by the cause it reported."""
         logs = LTF_LOGS_HINT
-        report = "report it with rose_*.log and those logs"
+        report = "report it with parasite_*.log and those logs"
         cause = ltk_failure_cause(reason)
         if cause == "cdp":
-            return ("Rose drives LTK Manager through the debugging port of its built-in browser, which did not "
+            return ("Parasite drives LTK Manager through the debugging port of its built-in browser, which did not "
                     "answer. Restart your PC, then retry. If it keeps happening, use a regular Windows account (not "
                     f"the built-in Administrator) and check that your antivirus does not block LTK Manager. {logs}")
         if cause == "league_admin":
@@ -2233,10 +2233,10 @@ class OverlayManager:
         if cause == "incident":
             return (f"LTK Manager's incident file says what went wrong in the game and which mods it suspects. {logs}")
         if cause == "start":
-            return ("Rose could not start the LTK patcher. Check that ltk_launcher.exe and LeagueToolFlop.dll "
-                    f"are still in Rose's tools folder: an antivirus may have removed them. {logs}")
+            return ("Parasite could not start the LTK patcher. Check that ltk_launcher.exe and LeagueToolFlop.dll "
+                    f"are still in Parasite's tools folder: an antivirus may have removed them. {logs}")
         if cause == "running":
-            return ("Close LTK Manager (also from the system tray), then retry: Rose starts it with its "
+            return ("Close LTK Manager (also from the system tray), then retry: Parasite starts it with its "
                     f"bridge and closes it again after the game. {logs}")
         if cause == "late":
             return ("The game started before the patcher was scanning: the skin changed in the last seconds "
@@ -2248,16 +2248,16 @@ class OverlayManager:
                     "could not verify it: a file was modified or damaged. Reinstall LTK Manager from its official "
                     f"release (github.com/LeagueToolkit/ltk-manager/releases), then retry. {logs}")
         if cause == "refused":
-            return ("LTK Manager's patcher refused to apply the overlay. Update Rose (its launcher starts LTK "
+            return ("LTK Manager's patcher refused to apply the overlay. Update Parasite (its launcher starts LTK "
                     f"Manager the way the patcher expects); if it still happens, {report}. {logs}")
         if cause == "bridge":
             return (f"LTK Manager closed while the game was running. Retry the next game; "
                     f"if it happens every game, {report}. {logs}")
         if cause == "import":
-            return f"Rose could not install the mod into LTK Manager. Free some disk space, then retry. {logs}"
+            return f"Parasite could not install the mod into LTK Manager. Free some disk space, then retry. {logs}"
         if cause == "killed":
             return ("Another program closed LTK Manager, most often an antivirus. "
-                    f"Add Rose's folder to its exclusions, then retry. {logs}")
+                    f"Add Parasite's folder to its exclusions, then retry. {logs}")
         if cause == "crashed":
             return (f"LTK Manager crashed. Retry the next game; if it crashes every game, {report}. {logs}")
         return f"Retry the next game. If it fails every game, {report}. {logs}"

@@ -162,7 +162,7 @@ class OverlayStagingTests(LtfSessionTestCase):
 
     def test_an_install_running_when_staging_closes_finishes_if_still_wanted(self):
         mods = [self.make_mod(where=self.stage_dir),
-                self.make_mod("ROSE-LoadingName", "Loading screen name", where=self.stage_dir)]
+                self.make_mod("PARASITE-LoadingName", "Loading screen name", where=self.stage_dir)]
         original = FakeBridge.import_fantome
 
         def import_then_close(bridge_self, path, name=None):
@@ -178,7 +178,7 @@ class OverlayStagingTests(LtfSessionTestCase):
 
     def test_an_install_no_longer_wanted_stops(self):
         mods = [self.make_mod(where=self.stage_dir),
-                self.make_mod("ROSE-LoadingName", "Loading screen name", where=self.stage_dir)]
+                self.make_mod("PARASITE-LoadingName", "Loading screen name", where=self.stage_dir)]
         wanted = {"value": True}
         original = FakeBridge.import_fantome
 
@@ -401,7 +401,7 @@ class LtkLogReadingTests(LtfSessionTestCase):
         reason = self.report_issue.call_args.kwargs["details"]["reason"]
         self.assertIn("its scan started 0.2s after the client created the game", reason)
         self.assertIn("LTK Manager took 4.3s to build the overlay", reason)
-        self.assertIn("Rose started it 2.2s after the skin was picked", reason)
+        self.assertIn("Parasite started it 2.2s after the skin was picked", reason)
         self.assertEqual(self.reported_causes(), ["late"])
 
     def test_a_restart_forgets_the_previous_build(self):
@@ -976,11 +976,11 @@ class PreparePlanTests(unittest.TestCase):
         return archive
 
     def test_a_skin_is_prepared_like_the_injection_does(self):
-        self.injector.prepare_skin_mods.return_value = ["1001", "ROSE-LoadingName"]
+        self.injector.prepare_skin_mods.return_value = ["1001", "PARASITE-LoadingName"]
 
         names = prepare_plan(self.injector, skin_plan("skin_1001", "Leona", 1, True), self.target)
 
-        self.assertEqual(names, ["1001", "ROSE-LoadingName"])
+        self.assertEqual(names, ["1001", "PARASITE-LoadingName"])
         self.injector.prepare_skin_mods.assert_called_once_with(
             "skin_1001", self.target, champion_name="Leona", champion_id=1, classic=True, report=False,
         )
@@ -997,10 +997,10 @@ class PreparePlanTests(unittest.TestCase):
             LoadingNameStep(1001),
         ))
 
-        with patch.object(stage_plan_module, "build_loading_name", return_value="ROSE-LoadingName") as loading_name:
+        with patch.object(stage_plan_module, "build_loading_name", return_value="PARASITE-LoadingName") as loading_name:
             names = prepare_plan(self.injector, plan, self.target)
 
-        self.assertEqual(names, ["1001", "My mod", "Rift", "ROSE-LoadingName"])
+        self.assertEqual(names, ["1001", "My mod", "Rift", "PARASITE-LoadingName"])
         self.assertEqual((self.target / "Rift" / "WAD" / "Map11.wad.client").read_bytes(), b"rift")
         self.assertEqual(mod_fingerprint(self.target / "Rift"), mod_fingerprint(rift))
         loading_name.assert_called_once_with(

@@ -1,2 +1,2 @@
-# Rose - Modular Skin Injector
+# Parasite - Modular Skin Injector
 # Main package initialization

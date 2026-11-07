@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 """
 Tools Manager
-Detects the injection runtime Rose ships (the LTF bridge, built from
+Detects the injection runtime Parasite ships (the LTF bridge, built from
 native/ltf/) and the LTK Manager install it drives.
 """
 
@@ -13,11 +13,11 @@ from utils.core.logging import get_logger
 
 log = get_logger()
 
-# Built from native/ltf/ by scripts/build_ltf.py and shipped with Rose
+# Built from native/ltf/ by scripts/build_ltf.py and shipped with Parasite
 LTF_LAUNCHER = "ltk_launcher.exe"
 LTF_BRIDGE_DLL = "LeagueToolFlop.dll"
 
-# Where LTK Manager installs itself unless Rose is told otherwise
+# Where LTK Manager installs itself unless Parasite is told otherwise
 LTK_MANAGER_DEFAULT_DIR = "LTK Manager"
 LTK_MANAGER_EXECUTABLES = ("ltk-manager.exe", "LTK Manager.exe")
 
@@ -44,10 +44,10 @@ class ToolsManager:
         self.tools_dir = tools_dir
 
     def check_tools_available(self) -> bool:
-        """Check if the injection runtime Rose ships is present."""
+        """Check if the injection runtime Parasite ships is present."""
         if self.detect_ltf_launcher() is None:
             log.warning(f"Missing injection runtime in {self.tools_dir}: {LTF_LAUNCHER} + {LTF_BRIDGE_DLL}")
-            log.warning("Reinstall Rose, or allow its files through your antivirus.")
+            log.warning("Reinstall Parasite, or allow its files through your antivirus.")
             return False
         return True
 

@@ -226,7 +226,7 @@ class LoadingNameTests(unittest.TestCase):
         record = b'\x01\x02' + struct.pack('<H', len(key)) + key + b'\x03'
         patched = loading_name._with_own_record_key(record, 'zed')
         self.assertEqual(len(patched), len(record))
-        self.assertIn(struct.pack('<H', len(key)) + b'rose_character_displayname_Zed', patched)
+        self.assertIn(struct.pack('<H', len(key)) + b'parasite_character_displayname_Zed', patched)
         self.assertIsNone(loading_name._with_own_record_key(b'nothing here', 'Zed'))
 
     def _game_with_zed_record(self, language):
@@ -259,10 +259,10 @@ class LoadingNameTests(unittest.TestCase):
         meta = json.loads((mods / name / 'META' / 'info.json').read_text(encoding='utf-8'))
         self.assertEqual(meta['Layers']['base']['StringOverrides'], {'en_us': {
             'game_character_displayname_Zed': 'Shockblade Zed',
-            'rose_character_displayname_Zed': 'Zed',
+            'parasite_character_displayname_Zed': 'Zed',
         }})
         written = (mods / name / 'RAW' / 'data' / 'characters' / 'zed' / 'zed.bin').read_bytes()
-        self.assertIn(b'rose_character_displayname_Zed', written)
+        self.assertIn(b'parasite_character_displayname_Zed', written)
 
     def test_an_english_table_next_to_the_clients_language_builds_nothing(self):
         # The mod's table is rejected and the overrides find no table of the client's language:
@@ -300,7 +300,7 @@ class LoadingNameTests(unittest.TestCase):
         name = loading_name.build(game, mods, mod, 238001)
 
         shadow = (mods / name / 'RAW' / 'data' / 'characters' / 'zedshadow' / 'zedshadow.bin').read_bytes()
-        self.assertEqual(shadow, b'	' + struct.pack('<H', len(key)) + b'rose_character_displayname_Zed')
+        self.assertEqual(shadow, b'	' + struct.pack('<H', len(key)) + b'parasite_character_displayname_Zed')
         self.assertTrue((mods / name / 'RAW' / 'data' / 'characters' / 'zed' / 'zed.bin').exists())
 
     def test_the_chat_keeps_the_champions_name(self):
@@ -326,10 +326,10 @@ class LoadingNameTests(unittest.TestCase):
         table = (mods / name / loading_name.TABLE_PATH).read_bytes()
         self.assertEqual(loading_name._text_of(table, loading_name._key_hash('game_character_displayname_Zed')),
                          'Shockblade Zed')
-        self.assertEqual(loading_name._text_of(table, loading_name._key_hash('rose_character_displayname_Zed')),
+        self.assertEqual(loading_name._text_of(table, loading_name._key_hash('parasite_character_displayname_Zed')),
                          'Zed')
         written = (mods / name / 'RAW' / 'data' / 'characters' / 'zed' / 'zed.bin').read_bytes()
-        self.assertEqual(written, struct.pack('<H', len(key)) + b'rose_character_displayname_Zed')
+        self.assertEqual(written, struct.pack('<H', len(key)) + b'parasite_character_displayname_Zed')
 
 
 def make_wad_entries(entries):

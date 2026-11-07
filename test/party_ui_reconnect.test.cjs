@@ -1,4 +1,4 @@
-// ROSE-PartyMode when its connection to Rose drops mid-request.
+// PARASITE-PartyMode when its connection to Parasite drops mid-request.
 // Runs the real plugin in a VM with a small fake DOM and WebSocket:
 //   node --test test/party_ui_reconnect.test.cjs
 // PARTY_MODE_PLUGIN=<path> runs it against another copy of the plugin.
@@ -11,7 +11,7 @@ const path = require("node:path");
 const vm = require("node:vm");
 
 const PLUGIN = process.env.PARTY_MODE_PLUGIN ||
-  path.join(__dirname, "..", "Pengu Loader", "plugins", "ROSE-PartyMode", "index.js");
+  path.join(__dirname, "..", "Pengu Loader", "plugins", "PARASITE-PartyMode", "index.js");
 
 // ─── Fake DOM: the parts of it the plugin uses ───────────────────────────
 
@@ -250,7 +250,7 @@ async function loadPlugin() {
     console: { log() {}, warn() {}, error() {} },
     WebSocket: FakeWebSocket,
     AbortSignal,
-    fetch: () => Promise.reject(new Error("no Rose in tests")),
+    fetch: () => Promise.reject(new Error("no Parasite in tests")),
     localStorage: {
       getItem: (k) => (storage.has(k) ? storage.get(k) : null),
       setItem: (k, v) => storage.set(k, String(v)),
@@ -276,8 +276,8 @@ async function loadPlugin() {
     el: (id) => document.getElementById(id),
     text: (id) => document.getElementById(id).textContent.replace(/\s+/g, " ").trim(),
     dialog: () => document.querySelector(".party-dialog"),
-    panelVisible: () => document.getElementById("rose-party-panel").classList.contains("visible"),
-    openPanel() { document.getElementById("rose-party-lobby-button").click(); },
+    panelVisible: () => document.getElementById("parasite-party-panel").classList.contains("visible"),
+    openPanel() { document.getElementById("parasite-party-lobby-button").click(); },
     // Run the reconnect timer the plugin set when its connection dropped
     reconnect() {
       const index = timeouts.findIndex((t) => t.ms === 1000);
@@ -285,7 +285,7 @@ async function loadPlugin() {
       timeouts.splice(index, 1)[0].fn();
     },
     state(enabled, extra = {}) {
-      this.socket.receive({ type: "party-state", enabled, connection: enabled ? "online" : "offline", my_token: enabled ? "ROSE:mine" : null, peers: [], ...extra });
+      this.socket.receive({ type: "party-state", enabled, connection: enabled ? "online" : "offline", my_token: enabled ? "PARASITE:mine" : null, peers: [], ...extra });
     },
   };
   ui.socket.open();
@@ -307,18 +307,18 @@ test("a dropped connection while adding a friend gives the panel back, token inc
   ui.openPanel();
   assert.ok(ui.panelVisible());
 
-  ui.el("add-peer-input").value = "ROSE:friend";
+  ui.el("add-peer-input").value = "PARASITE:friend";
   ui.el("add-peer-btn").click();
-  assert.deepEqual(ui.socket.sent.at(-1), { type: "party-add-peer", token: "ROSE:friend" });
-  assert.equal(ui.dialog().hasAttribute("close-button"), false, "locked while Rose connects");
+  assert.deepEqual(ui.socket.sent.at(-1), { type: "party-add-peer", token: "PARASITE:friend" });
+  assert.equal(ui.dialog().hasAttribute("close-button"), false, "locked while Parasite connects");
 
   const first = ui.socket;
   first.drop();
 
   assertPanelUnlocked(ui);
   assert.ok(ui.panelVisible(), "the panel stays open");
-  assert.equal(ui.el("add-peer-input").value, "ROSE:friend", "the token is back, ready to retry");
-  assert.match(ui.text("add-peer-message"), /Lost the connection to Rose/);
+  assert.equal(ui.el("add-peer-input").value, "PARASITE:friend", "the token is back, ready to retry");
+  assert.match(ui.text("add-peer-message"), /Lost the connection to Parasite/);
 
   // Back online: nothing is sent again on its own; the user retries
   ui.reconnect();
@@ -328,9 +328,9 @@ test("a dropped connection while adding a friend gives the panel back, token inc
   assert.equal(ui.text("add-peer-message"), "", "the connection error is gone");
   ui.state(true);
   ui.el("add-peer-btn").click();
-  assert.deepEqual(ui.socket.sent.at(-1), { type: "party-add-peer", token: "ROSE:friend" });
+  assert.deepEqual(ui.socket.sent.at(-1), { type: "party-add-peer", token: "PARASITE:friend" });
 
-  // And the panel closes again once Rose answers
+  // And the panel closes again once Parasite answers
   ui.socket.receive({ type: "party-peer-added", success: true, message: "Connected to B" });
   ui.dialog().dispatchEvent({ type: "dialogFrameDismissed" });
   assert.equal(ui.panelVisible(), false);
@@ -349,7 +349,7 @@ for (const [enabled, request, label] of [[false, "party-enable", "Enable Party M
     ui.socket.drop();
     assert.equal(ui.el("party-toggle-btn").disabled, false);
     assert.equal(ui.text("party-toggle-btn"), label);
-    assert.match(ui.text("party-toggle-message"), /Lost the connection to Rose/);
+    assert.match(ui.text("party-toggle-message"), /Lost the connection to Parasite/);
     assert.ok(ui.panelVisible());
 
     ui.reconnect();
@@ -362,20 +362,20 @@ for (const [enabled, request, label] of [[false, "party-enable", "Enable Party M
   });
 }
 
-test("a request made while Rose is unreachable is refused at once, never sent later", async () => {
+test("a request made while Parasite is unreachable is refused at once, never sent later", async () => {
   const ui = await loadPlugin();
   ui.state(true);
   ui.openPanel();
   ui.socket.drop();
 
-  ui.el("add-peer-input").value = "ROSE:friend";
+  ui.el("add-peer-input").value = "PARASITE:friend";
   ui.el("add-peer-btn").click();
-  assert.match(ui.text("add-peer-message"), /Rose is not reachable/);
+  assert.match(ui.text("add-peer-message"), /Parasite is not reachable/);
   assertPanelUnlocked(ui);
-  assert.equal(ui.el("add-peer-input").value, "ROSE:friend");
+  assert.equal(ui.el("add-peer-input").value, "PARASITE:friend");
 
   ui.el("party-toggle-btn").click();
-  assert.match(ui.text("party-toggle-message"), /Rose is not reachable/);
+  assert.match(ui.text("party-toggle-message"), /Parasite is not reachable/);
   assert.equal(ui.el("party-toggle-btn").disabled, false);
 
   ui.reconnect();
@@ -383,7 +383,7 @@ test("a request made while Rose is unreachable is refused at once, never sent la
   assert.deepEqual(ui.socket.types(), ["party-get-state"]);
 });
 
-test("Rose's party state settles a request whose answer was lost", async () => {
+test("Parasite's party state settles a request whose answer was lost", async () => {
   const ui = await loadPlugin();
   ui.state(false);
   ui.openPanel();
@@ -394,7 +394,7 @@ test("Rose's party state settles a request whose answer was lost", async () => {
   assert.equal(ui.el("party-toggle-btn").disabled, false);
   assert.equal(ui.text("party-toggle-btn"), "Disable Party Mode");
 
-  ui.el("add-peer-input").value = "ROSE:friend";
+  ui.el("add-peer-input").value = "PARASITE:friend";
   ui.el("add-peer-btn").click();
   ui.state(true, { connection: "reconnecting" }); // still adding: stays locked
   assert.equal(ui.dialog().hasAttribute("close-button"), false);

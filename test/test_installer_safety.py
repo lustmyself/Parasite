@@ -17,7 +17,7 @@ class InstallerSafetyTests(unittest.TestCase):
 
     def test_installed_files_and_existing_hook_cleanup_remain_registered(self):
         for entry in ('recursesubdirs createallsubdirs', 'injection\\overlay',
-                      'injection\\mods', '--uninstall --silent', '/Delete /TN Rose /F',
+                      'injection\\mods', '--uninstall --silent', '/Delete /TN Parasite /F',
                       '_CleanupStartupRegistry();', '_RemoveDeadPenguIfeo();'):
             self.assertIn(entry, self.script)
         self.assertRegex(self.script, r'(?m)^AppId=\{\{A1B2C3D4-E5F6-7890-ABCD-EF1234567890\}\}')

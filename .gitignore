@@ -110,7 +110,7 @@ CLAUDE.md
 # Built from native/ltf by scripts/build_ltf.py
 injection/tools/ltk_launcher.exe
 injection/tools/LeagueToolFlop.dll
-# Left over from the old pipeline (Rose uses LTF now)
+# Left over from the old pipeline (Parasite uses LTF now)
 injection/tools/ltk_patcher_host.exe
 injection/tools/ltk_patcher_dll.dll
 injection/tools/cslol-dll.dll
@@ -121,8 +121,8 @@ Pengu Loader/pengu.log
 # Test artifacts
 test_party_punch.py
 test_party_relay.py
-Rose_PunchTest*.spec
-Rose_PartyTest.spec
+Parasite_PunchTest*.spec
+Parasite_PartyTest.spec
 relay_server.py
 
 # Relay config (contains Worker URL — keep secret)

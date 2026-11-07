@@ -18,10 +18,10 @@ from utils.core.logging import get_logger
 log = get_logger()
 
 # Token prefix for identification
-TOKEN_PREFIX = "ROSE:"
+TOKEN_PREFIX = "PARASITE:"
 # Token version (v2 = WebSocket relay, no IP/port needed)
 TOKEN_VERSION = 2
-# Rose 1.3.1 and older reject tokens older than this, so tokens are
+# Parasite 1.3.1 and older reject tokens older than this, so tokens are
 # re-encoded with a fresh timestamp whenever they're shown. Newer versions
 # accept any age: the party key is kept across sessions, so a token stays a
 # valid address for its owner's room.
@@ -59,7 +59,7 @@ class PartyToken:
         Total: 45 bytes before compression
 
         Returns:
-            String like "ROSE:abc123..." suitable for sharing
+            String like "PARASITE:abc123..." suitable for sharing
         """
         try:
             data = struct.pack(
@@ -87,7 +87,7 @@ class PartyToken:
         Supports both v1 (legacy P2P with IP/port) and v2 (relay-only) tokens.
 
         Args:
-            token_str: Token string (with or without ROSE: prefix)
+            token_str: Token string (with or without PARASITE: prefix)
 
         Returns:
             PartyToken instance
@@ -146,7 +146,7 @@ class PartyToken:
         """Inflate a token payload, never past the largest known payload size.
 
         The stream must end exactly where the data does: a truncated stream,
-        or bytes after its end, is not a token Rose made.
+        or bytes after its end, is not a token Parasite made.
         """
         limit = max(TOKEN_PAYLOAD_SIZES.values())
         inflater = zlib.decompressobj()

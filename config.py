@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Global constants for Rose
+Global constants for Parasite
 All arbitrary values are centralized here for easy tracking and modification
 """
 
@@ -24,7 +24,7 @@ log = logging.getLogger(__name__)
 # =============================================================================
 
 APP_VERSION = "1.5.3"                           # Application version
-APP_USER_AGENT = f"Rose/{APP_VERSION}"  # User-Agent header for HTTP requests
+APP_USER_AGENT = f"Parasite/{APP_VERSION}"  # User-Agent header for HTTP requests
 GAME_EXECUTABLE_NAMES = ("League of Legends.exe", "League of Legends (TM) Client.exe")
 
 # Values are raw text: a '%' in a path must not be read as interpolation
@@ -48,7 +48,7 @@ _CONFIG_ENCODING = "mbcs" if sys.platform == "win32" else "utf-8"
 
 
 def _decode_config(data: bytes) -> str:
-    """Decode config.ini, including lines older Rose versions wrote as UTF-8."""
+    """Decode config.ini, including lines older Parasite versions wrote as UTF-8."""
     if data.startswith(b"\xff\xfe"):
         return data.decode("utf-16")
     if data.startswith(b"\xef\xbb\xbf"):
@@ -358,16 +358,16 @@ WINDOWS_DPI_AWARENESS_SYSTEM = 1         # PROCESS_SYSTEM_DPI_AWARE
 # =============================================================================
 
 # Lock file name
-LOCK_FILE_NAME = "rose.lock"
+LOCK_FILE_NAME = "parasite.lock"
 
 # NEW: Windows named mutex for single-instance (per-user/session)
 _IS_DEV_BUILD = bool(getattr(sys, "frozen", False)) and (
-    "rosedev" in Path(sys.executable).stem.lower() or "rose-dev" in Path(sys.executable).stem.lower()
+    "parasitedev" in Path(sys.executable).stem.lower() or "parasite-dev" in Path(sys.executable).stem.lower()
 )
-SINGLE_INSTANCE_MUTEX_NAME = r"Local\RoseDevSingleInstance" if _IS_DEV_BUILD else r"Local\RoseSingleInstance"
+SINGLE_INSTANCE_MUTEX_NAME = r"Local\ParasiteDevSingleInstance" if _IS_DEV_BUILD else r"Local\ParasiteSingleInstance"
 
 # Log file patterns (handles .log files)
-LOG_FILE_PATTERN = "rose_*.log*"
+LOG_FILE_PATTERN = "parasite_*.log*"
 UPDATER_LOG_FILE_PATTERN = "log_updater_*.log*"
 LOG_TIMESTAMP_FORMAT = "%d-%m-%Y_%H-%M-%S"  # European format, Windows-compatible
 
@@ -395,7 +395,7 @@ INTERESTING_PHASES = {
 
 ANALYTICS_SERVER_URL = 'https://analytics.rosekeys.site/'  # Analytics server endpoint
 ANALYTICS_PING_INTERVAL_S = 900  # Seconds between presence heartbeats (15 minutes)
-ANALYTICS_ENABLED = True  # Enable/disable analytics tracking
+ANALYTICS_ENABLED = False  # Enable/disable analytics tracking
 ANALYTICS_TIMEOUT_S = 5  # Request timeout in seconds
 
 # =============================================================================

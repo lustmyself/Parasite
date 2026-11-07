@@ -19,7 +19,7 @@ from .skin_name_resolver import SkinNameResolver
 
 log = get_logger()
 
-# How often the countdown looks at friends' skins: they reach Rose over the
+# How often the countdown looks at friends' skins: they reach Parasite over the
 # relay while it runs, and a change stages them again
 PARTY_POLL_S = 0.25
 

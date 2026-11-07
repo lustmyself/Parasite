@@ -1,28 +1,31 @@
-# 🌹 Rose - Effortless Skin Changer for LoL
+# 🦠 Parasite - Effortless Skin Changer for LoL
 
 <div align="center">
 
-  <img src="./assets/icon.png" alt="Rose Icon" width="128" height="128">
+  <img src="./assets/icon.png" alt="Parasite Icon" width="128" height="128">
 
-[![Installer](https://img.shields.io/badge/Installer-Windows-32A832)](https://github.com/Alban1911/Rose/releases/latest) [![Ko-Fi](https://img.shields.io/badge/KoFi-Donate-C03030?logo=ko-fi&logoColor=white)](https://ko-fi.com/roseapp) [![Discord](https://img.shields.io/discord/1490473857075642621?color=32A832&logo=discord&logoColor=white&label=Discord)](https://discord.com/invite/roseskins) [![License](https://img.shields.io/badge/License-MIT-C03030)](LICENSE) [![Downloads](https://img.shields.io/github/downloads/Alban1911/Rose/total?color=32A832&label=Downloads&cacheSeconds=86400)](https://github.com/Alban1911/Rose/releases/latest)
+[![Installer](https://img.shields.io/badge/Installer-Windows-32A832)](https://github.com/lustmyself/Parasite/releases/latest) [![Ko-Fi](https://img.shields.io/badge/KoFi-Donate-C03030?logo=ko-fi&logoColor=white)](https://ko-fi.com/roseapp) [![Discord](https://img.shields.io/discord/1490473857075642621?color=32A832&logo=discord&logoColor=white&label=Discord)](https://discord.com/invite/roseskins) [![License](https://img.shields.io/badge/License-MIT-C03030)](LICENSE) [![Downloads](https://img.shields.io/github/downloads/lustmyself/Parasite/total?color=32A832&label=Downloads&cacheSeconds=86400)](https://github.com/lustmyself/Parasite/releases/latest)
 
 
 </div>
 
+> [!NOTE]
+> **Parasite is a fork of [Rose](https://github.com/Alban1911/Rose) by Alban and Florent**, renamed and redistributed under the terms of the MIT License. All credit for the original work goes to its authors. This fork is not affiliated with or endorsed by the original Rose project. The Discord, Ko-Fi and LeagueSkins links below belong to the original project.
+
 > [!CAUTION]
-> The `roseskin.xyz` website is **UNRELATED** to this project and does not represent this project. **THE DOWNLOAD ON THAT SITE CONTAINS MALWARE**. If you downloaded anything from `roseskin.xyz`, reinstall your PC. The only official download is the [GitHub releases page](https://github.com/Alban1911/Rose/releases/latest).
+> The `roseskin.xyz` website is **UNRELATED** to this project and does not represent this project. **THE DOWNLOAD ON THAT SITE CONTAINS MALWARE**. If you downloaded anything from `roseskin.xyz`, reinstall your PC. The only official download is the [GitHub releases page](https://github.com/lustmyself/Parasite/releases/latest).
 
 ---
 
 ## Overview
 
-Rose is an open-source automatic skin changer for League of Legends that enables seamless access to all skins in the game. The application runs silently in the system tray and automatically detects skin selections during champion select, injecting the chosen skin when the game loads.
+Parasite is an open-source automatic skin changer for League of Legends that enables seamless access to all skins in the game. The application runs silently in the system tray and automatically detects skin selections during champion select, injecting the chosen skin when the game loads.
 
-Built on the [Pengu Loader](https://github.com/PenguLoader/PenguLoader) framework, Rose integrates JavaScript extensions into the League Client to enable modular UI interactions. It strictly modifies local rendering variables to display custom models and textures. It is designed purely as an exploration of client-side asset management, providing no manipulation of network data, memory states, or gameplay mechanics, thereby **offering zero competitive advantage**.
+Built on the [Pengu Loader](https://github.com/PenguLoader/PenguLoader) framework, Parasite integrates JavaScript extensions into the League Client to enable modular UI interactions. It strictly modifies local rendering variables to display custom models and textures. It is designed purely as an exploration of client-side asset management, providing no manipulation of network data, memory states, or gameplay mechanics, thereby **offering zero competitive advantage**.
 
 ## Architecture
 
-Rose consists of three main components:
+Parasite consists of three main components:
 
 ### Python Backend
 
@@ -37,7 +40,7 @@ Rose consists of three main components:
 
 ### Analytics and privacy
 
-Rose sends a pseudonymous, randomly generated installation ID and the app version
+Parasite sends a pseudonymous, randomly generated installation ID and the app version
 to `https://analytics.rosekeys.site/` when analytics are enabled. The ID is not derived
 from the Windows Machine GUID. Analytics can be disabled with
 `ANALYTICS_ENABLED = False` in `config.py`.
@@ -48,40 +51,40 @@ dashboard; raw activity and server credentials remain private.
 
 ### Cloudflare Workers
 
-- **rose-party-relay**: Durable Object-backed WebSocket relay that manages party rooms (max 10 members per room) for real-time skin selection broadcasting between friends. It refuses Rose versions older than 1.4.4
+- **parasite-party-relay**: Durable Object-backed WebSocket relay that manages party rooms (max 10 members per room) for real-time skin selection broadcasting between friends. It refuses Parasite versions older than 1.4.4
 
 ### Pengu Loader Plugins
 
-Rose includes a suite of JavaScript plugins that extend the League Client UI:
+Parasite includes a suite of JavaScript plugins that extend the League Client UI:
 
-- **ROSE-UI**: Unlocks locked skin previews in champion select, enabling hover interactions on all skins
-- **ROSE-SkinMonitor**: Monitors currently selected skin's name and sends it to the Python backend via WebSocket. It also hosts the bridge the other plugins use to talk to Rose
-- **ROSE-CustomSkinSelector**: Lists the custom skin mods made for the hovered skin and applies the one you pick
-- **ROSE-CustomWheel**: Custom mods panel for maps, fonts, announcers and other mods
-- **ROSE-ChromaWheel**: Enhanced chroma selection interface for choosing any chroma variant
-- **ROSE-FormsWheel**: Custom form selection interface for skins with multiple forms (Elementalist Lux, Sahn Uzal Mordekaiser, Spirit Blossom Morgana, Radiant Sett)
-- **ROSE-SettingsPanel**: Settings panel accessible from the League of Legends Client
-- **ROSE-RandomSkin**: Random skin selection feature
-- **ROSE-HistoricMode**: Access to the last used skin for every champion
-- **ROSE-PartyMode**: Party mode UI — displays a panel in lobby and champion select to enable skin sharing, view connected peers, and see friends' skin selections in real time
-- **ROSE-I18n**: Translates Rose's menus into the language picked in Settings, else the League client's
-- **ROSE-Jade**: Client customization — regalia borders, backgrounds, banners, icons, titles, and win/loss stats (shipped disabled)
+- **PARASITE-UI**: Unlocks locked skin previews in champion select, enabling hover interactions on all skins
+- **PARASITE-SkinMonitor**: Monitors currently selected skin's name and sends it to the Python backend via WebSocket. It also hosts the bridge the other plugins use to talk to Parasite
+- **PARASITE-CustomSkinSelector**: Lists the custom skin mods made for the hovered skin and applies the one you pick
+- **PARASITE-CustomWheel**: Custom mods panel for maps, fonts, announcers and other mods
+- **PARASITE-ChromaWheel**: Enhanced chroma selection interface for choosing any chroma variant
+- **PARASITE-FormsWheel**: Custom form selection interface for skins with multiple forms (Elementalist Lux, Sahn Uzal Mordekaiser, Spirit Blossom Morgana, Radiant Sett)
+- **PARASITE-SettingsPanel**: Settings panel accessible from the League of Legends Client
+- **PARASITE-RandomSkin**: Random skin selection feature
+- **PARASITE-HistoricMode**: Access to the last used skin for every champion
+- **PARASITE-PartyMode**: Party mode UI — displays a panel in lobby and champion select to enable skin sharing, view connected peers, and see friends' skin selections in real time
+- **PARASITE-I18n**: Translates Parasite's menus into the language picked in Settings, else the League client's
+- **PARASITE-Jade**: Client customization — regalia borders, backgrounds, banners, icons, titles, and win/loss stats (shipped disabled)
 
 ## How It Works
 
-1. **League Client Integration**: Rose activates **[Pengu Loader](https://github.com/PenguLoader/PenguLoader)** on startup, which injects the JavaScript plugins into the League Client. If the client is already open, Rose restarts it so the plugins load (during champion select, the restart waits for the lobby or the end of the game)
-2. **Skin Detection**: When you hover over a skin in champion select, `ROSE-SkinMonitor` detects the selection and sends it to the Python backend
-3. **Game Opening Delay**: To give the injection time to happen, Rose suspends the game process until the overlay is ready. If Rose closes during that window, it resumes the game the next time it starts
-4. **Game Injection**: Rose injects the selected skin when the game starts
-5. **Seamless Experience**: The skin loads as if you owned it, with full chroma support and no gameplay impact (Rose will **never** provide any competitive advantage to its users)
+1. **League Client Integration**: Parasite activates **[Pengu Loader](https://github.com/PenguLoader/PenguLoader)** on startup, which injects the JavaScript plugins into the League Client. If the client is already open, Parasite restarts it so the plugins load (during champion select, the restart waits for the lobby or the end of the game)
+2. **Skin Detection**: When you hover over a skin in champion select, `PARASITE-SkinMonitor` detects the selection and sends it to the Python backend
+3. **Game Opening Delay**: To give the injection time to happen, Parasite suspends the game process until the overlay is ready. If Parasite closes during that window, it resumes the game the next time it starts
+4. **Game Injection**: Parasite injects the selected skin when the game starts
+5. **Seamless Experience**: The skin loads as if you owned it, with full chroma support and no gameplay impact (Parasite will **never** provide any competitive advantage to its users)
 
 ## Features
 
 - **Smart Injection**: Never injects skins you already own
 - **Custom Mods**: Custom skins, maps, fonts and announcers (`.fantome`, `.zip` and `.modpkg`)
-- **Party Mode**: Friends running Rose 1.4.4 or newer see each other's skins and custom mods in game
+- **Party Mode**: Friends running Parasite 1.4.4 or newer see each other's skins and custom mods in game
 - **Loading Screen Name**: The loading screen shows the injected skin's name; the chat and the name over your champion keep the champion's
-- **Multi-Language Support**: Works with any client language, with Rose's menus in 22 languages
+- **Multi-Language Support**: Works with any client language, with Parasite's menus in 22 languages
 - **Open Source**: Fully open source and extensible
 - **Free**: If you bought this software, you got scammed 💀
 
@@ -89,27 +92,27 @@ Rose includes a suite of JavaScript plugins that extend the League Client UI:
 
 - **Windows 10/11**
 - **League of Legends** installed
-- **LTK Manager** - the app Rose applies skins through; Rose finds it on its own (see below)
+- **LTK Manager** - the app Parasite applies skins through; Parasite finds it on its own (see below)
 
 ### LTK Manager Requirement
 
-Rose applies skins through LTK Manager, which it drives over the bridge it
+Parasite applies skins through LTK Manager, which it drives over the bridge it
 builds from `native/ltf/` (`ltk_launcher.exe` + `LeagueToolFlop.dll`). Install
-LTK Manager once and Rose finds it: a path set as `ltkManagerPath` in
+LTK Manager once and Parasite finds it: a path set as `ltkManagerPath` in
 `config.ini` wins, then a running instance, then the known install locations.
 
-If Rose can't find LTK Manager, it says so at startup: install it, or click
-**Set up path** and select its `ltk-manager.exe` (Rose saves it as
+If Parasite can't find LTK Manager, it says so at startup: install it, or click
+**Set up path** and select its `ltk-manager.exe` (Parasite saves it as
 `ltkManagerPath` and starts). You never have to open LTK Manager yourself:
-Rose starts it in the background during champ select and closes it after the
-game. A running LTK Manager is left alone: Rose only closes the instance it
-started itself. The bridge can only load into an LTK Manager Rose starts, so if
-yours is already open when a game starts, Rose skips the injection and asks you
+Parasite starts it in the background during champ select and closes it after the
+game. A running LTK Manager is left alone: Parasite only closes the instance it
+started itself. The bridge can only load into an LTK Manager Parasite starts, so if
+yours is already open when a game starts, Parasite skips the injection and asks you
 in Troubleshooting to close it (also from the system tray).
 
-For each game Rose turns off the mods you enabled in LTK Manager, so only the
+For each game Parasite turns off the mods you enabled in LTK Manager, so only the
 selected skin is patched in, and turns them back on afterwards. LTK Manager's
-patcher only applies to a game started after it began scanning, so Rose
+patcher only applies to a game started after it began scanning, so Parasite
 installs the skin you select while the champ select countdown runs. The skin
 selected at the injection threshold (1 to 2 seconds before the countdown ends,
 in Settings) is the one applied: a change after it is ignored, so you keep that
@@ -117,14 +120,14 @@ skin instead of getting the default one.
 
 ## Installation
 
-1. Download the latest installer from [Releases](https://github.com/Alban1911/Rose/releases/latest)
+1. Download the latest installer from [Releases](https://github.com/lustmyself/Parasite/releases/latest)
 2. Run the installer as Administrator
-3. Launch Rose from the Start Menu or desktop shortcut
+3. Launch Parasite from the Start Menu or desktop shortcut
 
 ## Building from source
 
-Rose builds the Pengu Loader executable from the vendored source in
-`vendor/PenguLoader-1.1.6/` as part of the normal Rose build. You do not need
+Parasite builds the Pengu Loader executable from the vendored source in
+`vendor/PenguLoader-1.1.6/` as part of the normal Parasite build. You do not need
 to download or commit a prebuilt `Pengu Loader.exe`.
 
 ### Prerequisites
@@ -140,8 +143,8 @@ to download or commit a prebuilt `Pengu Loader.exe`.
 Clone the repository and enter its directory:
 
 ```powershell
-git clone https://github.com/Alban1911/Rose.git
-cd Rose
+git clone https://github.com/lustmyself/Parasite.git
+cd Parasite
 ```
 
 Install the Python dependencies first:
@@ -156,22 +159,22 @@ Build the loader by itself, if needed:
 python scripts/build_pengu_loader.py
 ```
 
-Build Rose (rebuilds the loader and the LTF bridge):
+Build Parasite (rebuilds the loader and the LTF bridge):
 
 ```powershell
 python scripts/build_pyinstaller.py
 ```
 
-The packaged application is written to `dist/Rose/`. To build both Rose and
+The packaged application is written to `dist/Parasite/`. To build both Parasite and
 the Windows installer in one step:
 
 ```powershell
 python scripts/build_all.py
 ```
 
-The installer is written to `installer/Rose_Setup_<version>.exe`. Use
+The installer is written to `installer/Parasite_Setup_<version>.exe`. Use
 `scripts/build_pyinstaller.py` or `scripts/build_all.py` instead of invoking
-`pyinstaller Rose.spec` directly, because the Rose build scripts compile
+`pyinstaller Parasite.spec` directly, because the Parasite build scripts compile
 Pengu Loader first.
 
 To create the update package the auto-updater downloads from a release
@@ -183,8 +186,8 @@ python scripts/create_update_package.py
 
 ## Credits
 
-Rose uses the [official Pengu Loader](https://github.com/PenguLoader/PenguLoader)
-project. Its source is vendored and built as part of Rose, with Rose-specific
+Parasite uses the [official Pengu Loader](https://github.com/PenguLoader/PenguLoader)
+project. Its source is vendored and built as part of Parasite, with Parasite-specific
 lifecycle integration added around the loader. Please see the
 [official Pengu Loader license](https://github.com/PenguLoader/PenguLoader/blob/main/LICENSE)
 and credit the Pengu Loader contributors.
@@ -192,7 +195,7 @@ and credit the Pengu Loader contributors.
 ## Contributing
 
 Contributions are welcome. Report bugs and suggest features through the
-[issue forms](https://github.com/Alban1911/Rose/issues/new/choose), and ask
+[issue forms](https://github.com/lustmyself/Parasite/issues/new/choose), and ask
 for installation help on [Discord](https://discord.com/invite/roseskins).
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup, the tests and
@@ -202,11 +205,11 @@ checks that CI runs on every pull request, and the project structure.
 
 This project is not endorsed by or affiliated with Riot Games. Riot Games and all related properties are trademarks or registered trademarks of Riot Games, Inc.
 
-Riot Games does not allow custom skins that reproduce its real skins, which is what Rose does. Use Rose at your own risk: its developers are not responsible for any consequence of using it, including account suspensions or bans.
+Riot Games does not allow custom skins that reproduce its real skins, which is what Parasite does. Use Parasite at your own risk: its developers are not responsible for any consequence of using it, including account suspensions or bans.
 
 ## Support
 
-If you enjoy Rose and want to support its development:
+If you enjoy Parasite and want to support its development:
 
 [![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/roseapp)
 
@@ -214,4 +217,4 @@ Your support helps keep the project alive and motivates continued development!
 
 ---
 
-**Rose** - _League, unlocked._
+**Parasite** - _League, unlocked._

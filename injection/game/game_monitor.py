@@ -60,8 +60,8 @@ def make_game_ended_callback(state) -> Callable[[], bool]:
 
 
 def resume_orphaned_game() -> int:
-    """Resume a game left suspended: by a Rose that died while it held the
-    game for the patcher (at startup), or held when Rose exits (cleanup).
+    """Resume a game left suspended: by a Parasite that died while it held the
+    game for the patcher (at startup), or held when Parasite exits (cleanup).
 
     Without it the game stays frozen until the user kills it.
     Returns how many game processes were resumed.

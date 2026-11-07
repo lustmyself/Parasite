@@ -17,7 +17,7 @@ from utils.core.logging import get_logger
 
 try:
     import psutil
-except ImportError:  # pragma: no cover - psutil ships with Rose
+except ImportError:  # pragma: no cover - psutil ships with Parasite
     psutil = None
 
 log = get_logger()

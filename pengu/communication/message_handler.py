@@ -100,9 +100,9 @@ def _choose_mod_file() -> Optional[Path]:
         except Exception:
             pass
         selected = filedialog.askopenfilename(
-            title="Select a Rose mod file",
+            title="Select a Parasite mod file",
             filetypes=[
-                ("Rose mods", "*.fantome *.zip *.modpkg"),
+                ("Parasite mods", "*.fantome *.zip *.modpkg"),
                 ("Fantome mods", "*.fantome"),
                 ("ZIP mods", "*.zip"),
                 ("Mod packages", "*.modpkg"),
@@ -535,7 +535,7 @@ class MessageHandler:
             log.error(f"[SkinMonitor] Failed to handle settings request: {e}")
 
     def _handle_diagnostics_clear(self, payload: dict) -> None:
-        """Clear rose_diagnostics.txt (Diagnostics)"""
+        """Clear parasite_diagnostics.txt (Diagnostics)"""
         try:
             ok = clear_issues()
             response_payload = {
@@ -570,7 +570,7 @@ class MessageHandler:
 
     def _handle_diagnostics_clear_category(self, payload: dict) -> None:
         """
-        Clear only a diagnostics category from rose_diagnostics.txt.
+        Clear only a diagnostics category from parasite_diagnostics.txt.
         Categories:
           - injection_threshold
           - monitor_timeout
@@ -663,11 +663,11 @@ class MessageHandler:
                 log.debug('[SkinMonitor] Could not send diagnostics failure response: %s', send_error)
 
     def _clear_issues_categories(self, categories: set[str]) -> bool:
-        """Remove matching diagnostics entries from rose_diagnostics.txt (best-effort)."""
+        """Remove matching diagnostics entries from parasite_diagnostics.txt (best-effort)."""
         try:
             if not categories:
                 return False
-            p = get_user_data_dir() / "rose_diagnostics.txt"
+            p = get_user_data_dir() / "parasite_diagnostics.txt"
             if not p.exists():
                 return True
 
@@ -719,7 +719,7 @@ class MessageHandler:
 
     def _handle_diagnostics_request(self, payload: dict) -> None:
         """
-        Return a compact, user-friendly list of recent errors, derived from rose_diagnostics.txt.
+        Return a compact, user-friendly list of recent errors, derived from parasite_diagnostics.txt.
         Also includes base skin confirmation stats from the tracker.
         The goal is "what to change" rather than raw logs.
         """
@@ -737,7 +737,7 @@ class MessageHandler:
             response_payload = {
                 "type": "diagnostics-data",
                 "errors": out,
-                "path": str(get_user_data_dir() / "rose_diagnostics.txt"),
+                "path": str(get_user_data_dir() / "parasite_diagnostics.txt"),
                 "baseSkinStats": tracker_stats,
             }
             self._send_response(json.dumps(response_payload))
@@ -749,7 +749,7 @@ class MessageHandler:
                 log.debug('[SkinMonitor] Could not send diagnostics failure response: %s', send_error)
 
     def _compute_diagnostics_errors(self, delete_keys: Optional[set[str]] = None) -> list[dict]:
-        """Compute compact diagnostics error list from rose_diagnostics.txt (never raises).
+        """Compute compact diagnostics error list from parasite_diagnostics.txt (never raises).
 
         With delete_keys, first removes every report whose summary key is in it.
         """
@@ -934,7 +934,7 @@ class MessageHandler:
                         'text': 'Low Disk Space -> free up space',
                     }
 
-                # Category: LTF session (Rose's bridge driving LTK Manager).
+                # Category: LTF session (Parasite's bridge driving LTK Manager).
                 # The overlay manager's import messages and hints are the
                 # markers: a mod name or an error text names nothing reliable
                 is_import_failure = (
@@ -947,7 +947,7 @@ class MessageHandler:
                 )
                 if is_ltf_report:
                     if 'bridge files are missing' in ml:
-                        return {'code': 'LTF_MISSING', 'text': 'LTF bridge files missing -> reinstall Rose'}
+                        return {'code': 'LTF_MISSING', 'text': 'LTF bridge files missing -> reinstall Parasite'}
                     if 'ltk manager is not installed' in ml:
                         return {'code': 'LTK_MANAGER_MISSING', 'text': 'LTK Manager missing -> install it'}
                     detail = msg.split('Injection failed:', 1)[-1].strip()
@@ -2664,7 +2664,7 @@ class MessageHandler:
             log.debug(f"[SkinMonitor] Traceback: {traceback.format_exc()}")
 
     def _handle_request_category_mods(self, payload: dict) -> None:
-        """Return the list of mods for a specific top-level category under %LOCALAPPDATA%\\Rose\\mods."""
+        """Return the list of mods for a specific top-level category under %LOCALAPPDATA%\\Parasite\\mods."""
         if not self.mod_storage:
             return
 
@@ -2733,7 +2733,7 @@ class MessageHandler:
             log.error(f"[SkinMonitor] Failed to launch Pengu Loader UI: {e}")
     
     def _handle_language_save(self, payload: dict) -> None:
-        """Save the language of Rose's menus ("auto": the client's) and tell the plugins"""
+        """Save the language of Parasite's menus ("auto": the client's) and tell the plugins"""
         from utils.core.i18n import AUTO, LANGUAGES
         language = payload.get("language")
         if language != AUTO and language not in LANGUAGES:

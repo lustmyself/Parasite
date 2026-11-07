@@ -101,7 +101,7 @@ class FantomeNameTests(unittest.TestCase):
         self.root = Path(temp_dir.name)
 
     def test_the_info_json_name_wins(self):
-        folder = self.root / "ROSE-LoadingName"
+        folder = self.root / "PARASITE-LoadingName"
         (folder / "META").mkdir(parents=True)
         (folder / "META" / "info.json").write_text(
             json.dumps({"Name": "Loading screen name"}), encoding="utf-8"

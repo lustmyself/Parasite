@@ -909,7 +909,7 @@ static bool TokenMatches(const std::string& given) {
     return diff == 0;
 }
 // The port goes everywhere a client looks for it; the token only where the
-// user's own processes (and an elevated Rose) can read it: the user's
+// user's own processes (and an elevated Parasite) can read it: the user's
 // registry hive and local app data, never the Public folder
 static void BroadcastPort(int port) {
     char portText[16];
@@ -1075,7 +1075,7 @@ static mj::JVal CmdImport(const mj::JVal& req) {
     std::string dataB64 = req.get("data_b64") ? req.get("data_b64")->asStr() : "";
     std::string customName = req.get("name") ? req.get("name")->asStr() : "ImportedMod.fantome";
 
-    // The archive goes to LTK Manager as Rose packed it. UTF-8, as LTK
+    // The archive goes to LTK Manager as Parasite packed it. UTF-8, as LTK
     // Manager's install command receives it
     std::string installPath = path;
     // Created for an archive sent as bytes, removed once LTK Manager has
@@ -1105,7 +1105,7 @@ static mj::JVal CmdImport(const mj::JVal& req) {
         fs::path source = PathFromUtf8(path);
         if (GetFileAttributesW(source.c_str()) == INVALID_FILE_ATTRIBUTES) {
             DWORD err = GetLastError();
-            // Rose sends the bytes instead when this process cannot read
+            // Parasite sends the bytes instead when this process cannot read
             // the file (overlay_manager.py)
             if (err == ERROR_FILE_NOT_FOUND || err == ERROR_PATH_NOT_FOUND)
                 return ImportError("not found: " + path);

@@ -3,7 +3,7 @@
 """
 Create the update package the launcher downloads from a GitHub release
 
-Zips dist/Rose (Rose.exe and _internal/ at the root of the archive, as the
+Zips dist/Parasite (Parasite.exe and _internal/ at the root of the archive, as the
 updater extracts it) into installer/update_package_<version>.zip. Run it on
 the signed build, next to the installer.
 """
@@ -14,7 +14,7 @@ import zipfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-DIST = ROOT / "dist" / "Rose"
+DIST = ROOT / "dist" / "Parasite"
 OUTPUT_DIR = ROOT / "installer"
 # Downloaded by the launcher from the release on its own (see update_sequence),
 # and left out of the installer too
@@ -42,15 +42,15 @@ def packaged_files():
     for path in sorted(DIST.rglob("*")):
         if not path.is_file() or path.name.lower() in EXCLUDED_NAMES:
             continue
-        # A package left in dist/Rose by hand isn't part of the build
+        # A package left in dist/Parasite by hand isn't part of the build
         if path.parent == DIST and path.suffix.lower() == ".zip":
             continue
         yield path
 
 
 def create_update_package() -> Path:
-    if not (DIST / "Rose.exe").is_file():
-        raise SystemExit(f"{DIST / 'Rose.exe'} not found: build Rose first")
+    if not (DIST / "Parasite.exe").is_file():
+        raise SystemExit(f"{DIST / 'Parasite.exe'} not found: build Parasite first")
 
     version = app_version()
     OUTPUT_DIR.mkdir(exist_ok=True)

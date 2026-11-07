@@ -1,1 +1,1 @@
-"""Rose test package."""
+"""Parasite test package."""

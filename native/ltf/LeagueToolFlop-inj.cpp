@@ -19,7 +19,7 @@
 // made by lol123love
 static const char* kLogPath = "C:\\Users\\Public\\ltk_launcher.log";
 
-// Exit codes Rose reads (injection/overlay/overlay_manager.py)
+// Exit codes Parasite reads (injection/overlay/overlay_manager.py)
 enum LauncherExit {
     kExitOk = 0,
     kExitDllMissing = 1,
@@ -146,7 +146,7 @@ static bool IsElevated()
 }
 
 // The desktop user's unelevated token, taken from the shell (explorer).
-// LTK Manager refuses to patch while elevated, and an elevated Rose starts
+// LTK Manager refuses to patch while elevated, and an elevated Parasite starts
 // this launcher elevated.
 static HANDLE ShellUserToken()
 {
@@ -474,7 +474,7 @@ int wmain(int argc, wchar_t** argv)
     wchar_t exePath[MAX_PATH] = {};
     wchar_t pidFile[MAX_PATH] = {};
     bool    noHide = false;
-    // --quiet: no message boxes (Rose runs the launcher hidden, so a dialog
+    // --quiet: no message boxes (Parasite runs the launcher hidden, so a dialog
     // would block it until a timeout)
     bool    quiet = false;
     // Internal: this copy was started with the desktop user's token by an
@@ -732,7 +732,7 @@ int wmain(int argc, wchar_t** argv)
         Log("[launch] pid=%lu is alive and running!", livePid);
     }
 
-    // Rose waits for the bridge of this process, not just any
+    // Parasite waits for the bridge of this process, not just any
     if (!asUserChild) {
         printf("LTK_MANAGER_PID=%lu\n", livePid);
         fflush(stdout);
