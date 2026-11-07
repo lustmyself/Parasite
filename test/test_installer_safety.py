@@ -20,7 +20,7 @@ class InstallerSafetyTests(unittest.TestCase):
                       'injection\\mods', '--uninstall --silent', '/Delete /TN Parasite /F',
                       '_CleanupStartupRegistry();', '_RemoveDeadPenguIfeo();'):
             self.assertIn(entry, self.script)
-        self.assertRegex(self.script, r'(?m)^AppId=\{\{A1B2C3D4-E5F6-7890-ABCD-EF1234567890\}\}')
+        self.assertRegex(self.script, r'(?m)^AppId=\{\{D0EF746D-DCEE-4F08-BD14-FB226CB630F3\}\}')
 
     def test_inno_owns_the_apps_entry_and_legacy_cleanup_is_guarded(self):
         self.assertNotRegex(self.script, r'(?i)RegWrite(?:String|DWord)Value\s*\(')

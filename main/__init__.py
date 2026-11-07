@@ -562,7 +562,7 @@ def _update_registry_version() -> None:
     except ImportError:
         return
     uninstall = r"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall"
-    for name in ("{A1B2C3D4-E5F6-7890-ABCD-EF1234567890}}_is1", "Parasite"):
+    for name in ("{D0EF746D-DCEE-4F08-BD14-FB226CB630F3}}_is1", "Parasite"):
         try:
             with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, rf"{uninstall}\{name}", 0, winreg.KEY_SET_VALUE) as key:
                 winreg.SetValueEx(key, "DisplayVersion", 0, winreg.REG_SZ, APP_VERSION)
