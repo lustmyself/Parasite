@@ -23,7 +23,7 @@ class LtkManagerDialogTests(unittest.TestCase):
         self.manager.parent.mkdir()
         self.manager.write_bytes(b"exe")
         for patcher in (
-            # Never this PC's own config.ini
+            # Never this PC's own cf.ini
             patch("config.set_config_option"),
             patch.object(ctypes.windll.user32, "MessageBoxW", return_value=1),
             patch("subprocess.run"),
@@ -51,7 +51,7 @@ class LtkManagerDialogTests(unittest.TestCase):
         self.assertEqual(action, "Set up path")
         self.assertIn("never have to open it yourself", body)
         self.assertIn(parasite_main.LTK_MANAGER_DOWNLOAD_URL, steps)
-        self.assertNotIn("config.ini", steps)
+        self.assertNotIn("cf.ini", steps)
 
     def test_web_addresses_become_links_without_the_closing_parenthesis(self):
         linked = parasite_main._with_links("Install it (https://example.com/releases), then restart.")

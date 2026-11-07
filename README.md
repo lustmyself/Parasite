@@ -99,7 +99,7 @@ Parasite includes a suite of JavaScript plugins that extend the League Client UI
 Parasite applies skins through LTK Manager, which it drives over the bridge it
 builds from `native/ltf/` (`ltk_launcher.exe` + `LeagueToolFlop.dll`). Install
 LTK Manager once and Parasite finds it: a path set as `ltkManagerPath` in
-`config.ini` wins, then a running instance, then the known install locations.
+`cf.ini` wins, then a running instance, then the known install locations.
 
 If Parasite can't find LTK Manager, it says so at startup: install it, or click
 **Set up path** and select its `ltk-manager.exe` (Parasite saves it as

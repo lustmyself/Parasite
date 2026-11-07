@@ -94,7 +94,7 @@ class ToolsManager:
 
     @staticmethod
     def _configured_ltk_manager() -> Optional[Path]:
-        """The LTK Manager path from config.ini, when it points at a real file."""
+        """The LTK Manager path from cf.ini, when it points at a real file."""
         from config import get_config_option
 
         configured = (get_config_option("General", "ltkManagerPath") or "").strip().strip('"')
@@ -102,9 +102,9 @@ class ToolsManager:
             return None
         candidate = Path(configured)
         if candidate.is_file():
-            log.info(f"[INJECT] LTK Manager taken from config.ini: {candidate}")
+            log.info(f"[INJECT] LTK Manager taken from cf.ini: {candidate}")
             return candidate
-        log.warning(f"[INJECT] ltkManagerPath in config.ini does not exist: {configured}")
+        log.warning(f"[INJECT] ltkManagerPath in cf.ini does not exist: {configured}")
 
     @staticmethod
     def _running_ltk_manager() -> Optional[Path]:

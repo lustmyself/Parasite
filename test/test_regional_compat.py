@@ -131,7 +131,7 @@ class PathsAndEncodingTests(unittest.TestCase):
         self.addCleanup(self.tmp.cleanup)
         self.root = Path(self.tmp.name)
         self.manager = ConfigManager()
-        self.manager._config_path = self.root / 'config.ini'
+        self.manager._config_path = self.root / 'cf.ini'
 
     def make_layout(self, regional=True, alternate=False):
         game = self.root / 'Game'

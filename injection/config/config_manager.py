@@ -22,13 +22,13 @@ class ConfigManager:
         self._config_path = None
     
     def _get_config_path(self) -> Path:
-        """Get the path to the config.ini file"""
+        """Get the path to the cf.ini file"""
         if self._config_path is None:
             self._config_path = get_config_file_path()
         return self._config_path
     
     def load_league_path(self) -> Optional[str]:
-        """Load league path (League of Legends.exe directory) from config.ini file"""
+        """Load league path (League of Legends.exe directory) from cf.ini file"""
         config_path = self._get_config_path()
         if not config_path.exists():
             log.debug("Config file not found, will create one")
@@ -47,7 +47,7 @@ class ConfigManager:
         return None
     
     def load_client_path(self) -> Optional[str]:
-        """Load client path (LeagueClient.exe directory) from config.ini file"""
+        """Load client path (LeagueClient.exe directory) from cf.ini file"""
         config_path = self._get_config_path()
         if not config_path.exists():
             return None
@@ -65,7 +65,7 @@ class ConfigManager:
         return None
     
     def save_league_path(self, league_path: str):
-        """Save league path to config.ini file"""
+        """Save league path to cf.ini file"""
         config_path = self._get_config_path()
         try:
             config = configparser.ConfigParser(interpolation=None)
@@ -89,7 +89,7 @@ class ConfigManager:
             log.warning(f"Failed to save config file: {e}")
     
     def save_client_path(self, client_path: str):
-        """Save client path to config.ini file"""
+        """Save client path to cf.ini file"""
         config_path = self._get_config_path()
         try:
             config = configparser.ConfigParser(interpolation=None)
@@ -113,7 +113,7 @@ class ConfigManager:
             log.warning(f"Failed to save config file: {e}")
     
     def save_paths(self, league_path: str, client_path: str):
-        """Save both league and client paths to config.ini file"""
+        """Save both league and client paths to cf.ini file"""
         config_path = self._get_config_path()
         try:
             config = configparser.ConfigParser(interpolation=None)

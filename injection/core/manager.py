@@ -98,7 +98,7 @@ class InjectionManager:
                         log_success(log, "Injection system initialized successfully", "")
                     else:
                         log.error("[INJECT] Cannot initialize injection system - League game directory not found")
-                        log.error("[INJECT] Please ensure League Client is running or manually set the path in config.ini")
+                        log.error("[INJECT] Please ensure League Client is running or manually set the path in cf.ini")
                         report_issue(
                             "LEAGUE_DIR_NOT_FOUND",
                             "error",
@@ -543,7 +543,7 @@ class InjectionManager:
         # Don't attempt injection if system isn't properly initialized
         if not self._initialized or self.injector is None or self.injector.game_dir is None:
             log.error("[INJECT] Cannot inject - League game directory not found")
-            log.error("[INJECT] Please ensure League Client is running or manually set the path in config.ini")
+            log.error("[INJECT] Please ensure League Client is running or manually set the path in cf.ini")
             return False
 
         # Check if injection already in progress

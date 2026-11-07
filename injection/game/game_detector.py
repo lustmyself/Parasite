@@ -63,7 +63,7 @@ class GameDetector:
             return detected_league_path, detected_client_path
         
         # No fallbacks - if we can't detect it, return None
-        log.warning("Could not detect League of Legends paths. Please ensure League Client is running or manually set the paths in config.ini")
+        log.warning("Could not detect League of Legends paths. Please ensure League Client is running or manually set the paths in cf.ini")
         return None, None
     
     def detect_game_dir(self) -> Optional[Path]:

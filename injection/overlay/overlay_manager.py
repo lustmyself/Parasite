@@ -672,7 +672,7 @@ class OverlayManager:
                     "LTK_MANAGER_MISSING",
                     "error",
                     "Injection failed: LTK Manager is not installed.",
-                    hint="Install LTK Manager, or set ltkManagerPath in config.ini to its "
+                    hint="Install LTK Manager, or set ltkManagerPath in cf.ini to its "
                          "ltk-manager.exe, then retry.",
                 )
             return None
@@ -1409,7 +1409,7 @@ class OverlayManager:
         """
         if self.game_dir is None:
             log.error("[INJECTOR] Cannot create overlay - League game directory not found")
-            log.error("[INJECTOR] Please ensure League Client is running or manually set the path in config.ini")
+            log.error("[INJECTOR] Please ensure League Client is running or manually set the path in cf.ini")
             return 127
 
         if self.process_manager:
@@ -2106,7 +2106,7 @@ class OverlayManager:
         """Install the mods into LTK Manager without starting its patcher - for testing"""
         if self.game_dir is None:
             log.error("[INJECTOR] Cannot create overlay - League game directory not found")
-            log.error("[INJECTOR] Please ensure League Client is running or manually set the path in config.ini")
+            log.error("[INJECTOR] Please ensure League Client is running or manually set the path in cf.ini")
             return 127
 
         if self.process_manager:

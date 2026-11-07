@@ -5110,7 +5110,7 @@
             title: t('LTK Manager is not installed'),
             details: [
               t('What it means: Parasite applies skins through LTK Manager, which was not found on this PC.'),
-              t("Fix: install LTK Manager, or set ltkManagerPath in Parasite's config.ini to its ltk-manager.exe, then restart Parasite."),
+              t("Fix: install LTK Manager, or set ltkManagerPath in Parasite's cf.ini to its ltk-manager.exe, then restart Parasite."),
             ],
           };
         }

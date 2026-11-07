@@ -64,7 +64,7 @@ python scripts/create_update_package.py
 ```
 
 To test Parasite itself, you also need LTK Manager installed: Parasite finds it on its
-own (`ltkManagerPath` in `config.ini` wins, then a running instance, then the
+own (`ltkManagerPath` in `cf.ini` wins, then a running instance, then the
 known install locations) and starts it through the bridge built into
 `injection/tools/`.
 

@@ -361,7 +361,7 @@ def _set_up_ltk_manager_path(tools_dir) -> Optional[bool]:
     if ToolsManager(tools_dir).detect_ltk_manager() is None:
         ctypes.windll.user32.MessageBoxW(
             0,
-            "Parasite could not save the path in its config.ini.\n\nCheck that Parasite can write to "
+            "Parasite could not save the path in its cf.ini.\n\nCheck that Parasite can write to "
             "%LOCALAPPDATA%\\Parasite, then try again.",
             "Parasite - LTK Manager Missing",
             message_flags,
@@ -502,11 +502,11 @@ def _setup_pengu_and_injection(lcu, injection_manager, activate_pengu: bool = Tr
         log.warning("Could not detect League paths, skipping setup")
         return
 
-    # Save paths to config.ini
-    log.info("Saving League paths to config.ini: league=%s, client=%s", league_path, client_path)
+    # Save paths to cf.ini
+    log.info("Saving League paths to cf.ini: league=%s, client=%s", league_path, client_path)
     config_manager.save_paths(str(league_path), str(client_path))
 
-    # Verify paths are written to config.ini (with retries)
+    # Verify paths are written to cf.ini (with retries)
     max_verify_attempts = 5
     verify_interval = 0.2
     paths_verified = False
@@ -524,14 +524,14 @@ def _setup_pengu_and_injection(lcu, injection_manager, activate_pengu: bool = Tr
 
             if saved_league_normalized == league_normalized and saved_client_normalized == client_normalized:
                 paths_verified = True
-                log.info("Paths verified in config.ini")
+                log.info("Paths verified in cf.ini")
                 break
 
         if attempt < max_verify_attempts - 1:
             time.sleep(verify_interval)
 
     if not paths_verified:
-        log.warning("Could not verify paths in config.ini, continuing anyway")
+        log.warning("Could not verify paths in cf.ini, continuing anyway")
 
     # Set client path in Pengu Loader and activate (skip on reconnection)
     if activate_pengu:
@@ -539,7 +539,7 @@ def _setup_pengu_and_injection(lcu, injection_manager, activate_pengu: bool = Tr
         if not pengu_loader.activate_on_start(str(client_path)):
             _warn_pengu_activation_failed()
 
-    # Initialize injection system now (with detected paths already in config.ini)
+    # Initialize injection system now (with detected paths already in cf.ini)
     log.info("Initializing injection system...")
     injection_manager.initialize_when_ready()
 

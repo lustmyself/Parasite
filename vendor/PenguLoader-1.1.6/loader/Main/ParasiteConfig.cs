@@ -6,10 +6,10 @@ using System.Runtime.InteropServices;
 namespace PenguLoader.Main
 {
     // Parasite-only adapter: the loader remains official, but Parasite needs the core
-    // activation state mirrored into its existing config.ini.
+    // activation state mirrored into its existing cf.ini.
     internal static class ParasiteConfig
     {
-        // Parasite passes its config.ini: the desktop user's, which core.dll reads in
+        // Parasite passes its cf.ini: the desktop user's, which core.dll reads in
         // the League client. This process runs elevated, and when Parasite was
         // elevated with another account, LocalApplicationData is that account's.
         private static string ConfigPath
@@ -23,7 +23,7 @@ namespace PenguLoader.Main
                 return Path.Combine(
                     Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
                     "Parasite",
-                    "config.ini");
+                    "cf.ini");
             }
         }
 
@@ -47,7 +47,7 @@ namespace PenguLoader.Main
             if (!WritePrivateProfileString("General", "disabled", active ? "0" : "1", ConfigPath) ||
                 !WritePrivateProfileString("General", "loaderpath", loaderPath, ConfigPath))
             {
-                throw new Win32Exception(Marshal.GetLastWin32Error(), "Could not update Parasite config.ini.");
+                throw new Win32Exception(Marshal.GetLastWin32Error(), "Could not update Parasite cf.ini.");
             }
         }
     }

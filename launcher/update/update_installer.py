@@ -38,7 +38,7 @@ if defined PID (
     powershell -NoProfile -NonInteractive -Command "Wait-Process -Id %PID% -Timeout 30 -ErrorAction SilentlyContinue" >nul 2>&1
 )
 echo [%date% %time%] Mirroring files >> "%LOG%"
-robocopy "%SOURCE%" "%DEST%" /MIR /R:5 /W:2 /NFL /NDL /NJH /NJS /XD __pycache__ "%SOURCE%\Pengu Loader\plugins" /XF config.ini hashes.game.txt >> "%LOG%" 2>&1
+robocopy "%SOURCE%" "%DEST%" /MIR /R:5 /W:2 /NFL /NDL /NJH /NJS /XD __pycache__ "%SOURCE%\Pengu Loader\plugins" /XF cf.ini hashes.game.txt >> "%LOG%" 2>&1
 set "RC=%ERRORLEVEL%"
 echo [%date% %time%] robocopy exit code %RC% >> "%LOG%"
 if %RC% GEQ 8 goto :robofail

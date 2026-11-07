@@ -30,8 +30,8 @@ class PenguLoaderIntegrationTests(unittest.TestCase):
         self.pengu_dir = state_dir / 'Pengu Loader'
         self.pengu_exe = self.pengu_dir / 'Pengu Loader.exe'
         self.pengu_log = self.pengu_dir / 'pengu.log'
-        # Never write the developer's real config.ini
-        self.config_file = state_dir / 'config.ini'
+        # Never write the developer's real cf.ini
+        self.config_file = state_dir / 'cf.ini'
         self.paths = patch.multiple(
             pengu_loader,
             _SESSION_FILE=self.session_file,
@@ -349,7 +349,7 @@ class PenguLoaderIntegrationTests(unittest.TestCase):
     @patch.object(pengu_loader, '_is_league_running', return_value=False)
     @patch.object(pengu_loader, 'activate')
     def test_active_hook_is_switched_on_in_config_ini(self, activate, _running, _status, _available):
-        # Left off, e.g. by the loader writing another account's config.ini
+        # Left off, e.g. by the loader writing another account's cf.ini
         self.config_file.write_text(
             '[General]\ninjection_threshold = 0.5\ndisabled=1\nloaderpath=\n', encoding='mbcs'
         )
@@ -395,7 +395,7 @@ class PenguLoaderIntegrationTests(unittest.TestCase):
     @patch.object(pengu_loader, '_is_available', return_value=True)
     @patch.object(pengu_loader.subprocess, 'run')
     def test_deactivate_leaves_another_loaders_hook_on(self, run, _available):
-        # --uninstall would still switch off the config.ini that loader's core.dll reads
+        # --uninstall would still switch off the cf.ini that loader's core.dll reads
         other_core = Path(self.temp_dir.name) / 'Other Parasite' / 'core.dll'
         with patch.object(pengu_loader, '_registered_pengu_core', return_value=other_core):
             self.assertTrue(pengu_loader.deactivate())
@@ -488,15 +488,15 @@ class RuntimeLoaderSyncTests(unittest.TestCase):
         self.assertEqual((self.runtime / 'plugins' / 'PARASITE-UI' / 'index.js').read_text(encoding='utf-8'), 'new plugin')
 
 
-@unittest.skipUnless(sys.platform == 'win32', 'config.ini is shared through the Windows INI API')
+@unittest.skipUnless(sys.platform == 'win32', 'cf.ini is shared through the Windows INI API')
 class ConfigIniTests(unittest.TestCase):
-    """config.ini is read by core.dll and written by the Pengu loader through
+    """cf.ini is read by core.dll and written by the Pengu loader through
     the Windows INI API (ANSI code page), and by Parasite in Python"""
 
     def setUp(self):
         temp_dir = tempfile.TemporaryDirectory()
         self.addCleanup(temp_dir.cleanup)
-        self.config_file = Path(temp_dir.name) / 'config.ini'
+        self.config_file = Path(temp_dir.name) / 'cf.ini'
         paths = patch.object(config, 'get_config_file_path', return_value=self.config_file)
         paths.start()
         self.addCleanup(paths.stop)

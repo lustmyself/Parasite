@@ -13,7 +13,7 @@ class ConfigTestCase(unittest.TestCase):
     def setUp(self):
         temp_dir = tempfile.TemporaryDirectory()
         self.addCleanup(temp_dir.cleanup)
-        self.path = Path(temp_dir.name) / 'config.ini'
+        self.path = Path(temp_dir.name) / 'cf.ini'
         patcher = patch.object(config, 'get_config_file_path', return_value=self.path)
         patcher.start()
         self.addCleanup(patcher.stop)

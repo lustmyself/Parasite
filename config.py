@@ -23,7 +23,7 @@ log = logging.getLogger(__name__)
 # APPLICATION METADATA
 # =============================================================================
 
-APP_VERSION = "1.5.3"                           # Application version
+APP_VERSION = "1.5.4"                           # Application version
 APP_USER_AGENT = f"Parasite/{APP_VERSION}"  # User-Agent header for HTTP requests
 GAME_EXECUTABLE_NAMES = ("League of Legends.exe", "League of Legends (TM) Client.exe")
 
@@ -31,16 +31,16 @@ GAME_EXECUTABLE_NAMES = ("League of Legends.exe", "League of Legends (TM) Client
 _CONFIG = configparser.ConfigParser(interpolation=None)
 # Reloads build a new parser and swap it in, so readers never see a half-read one
 _CONFIG_LOCK = threading.Lock()
-_CONFIG_MTIME: float = 0.0  # Last known modification time of config.ini
+_CONFIG_MTIME: float = 0.0  # Last known modification time of cf.ini
 
 
 def get_config_file_path() -> Path:
     config_dir = get_user_data_dir()
     config_dir.mkdir(parents=True, exist_ok=True)
-    return config_dir / "config.ini"
+    return config_dir / "cf.ini"
 
 
-# config.ini is shared with the Pengu loader and core.dll, which use the Windows
+# cf.ini is shared with the Pengu loader and core.dll, which use the Windows
 # INI API: a file without BOM is read and written in the ANSI code page. Writing
 # UTF-8 garbled non-ASCII paths for core.dll (loaderpath under C:\Users\José),
 # which then found no plugins.
@@ -48,7 +48,7 @@ _CONFIG_ENCODING = "mbcs" if sys.platform == "win32" else "utf-8"
 
 
 def _decode_config(data: bytes) -> str:
-    """Decode config.ini, including lines older Parasite versions wrote as UTF-8."""
+    """Decode cf.ini, including lines older Parasite versions wrote as UTF-8."""
     if data.startswith(b"\xff\xfe"):
         return data.decode("utf-16")
     if data.startswith(b"\xef\xbb\xbf"):
@@ -64,7 +64,7 @@ def _decode_config(data: bytes) -> str:
 
 
 def read_config_file(config: configparser.ConfigParser, path: Path) -> None:
-    """Read config.ini into config (nothing if it doesn't exist)."""
+    """Read cf.ini into config (nothing if it doesn't exist)."""
     try:
         data = path.read_bytes()
     except FileNotFoundError:
@@ -73,7 +73,7 @@ def read_config_file(config: configparser.ConfigParser, path: Path) -> None:
 
 
 def write_config_file(config: configparser.ConfigParser, path: Path) -> None:
-    """Write config.ini in the ANSI code page, atomically: League processes read
+    """Write cf.ini in the ANSI code page, atomically: League processes read
     it through core.dll at any time and must never see a half-written file."""
     text = io.StringIO()
     config.write(text)
@@ -94,7 +94,7 @@ def _reload_config() -> None:
 
     # One-time migration of legacy config
     if not config_path.exists():
-        legacy_path = Path("config.ini")
+        legacy_path = Path("cf.ini")
         if legacy_path.exists():
             try:
                 shutil.copy2(legacy_path, config_path)

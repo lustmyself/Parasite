@@ -39,7 +39,7 @@ _SESSION_FILE = get_state_dir() / 'pengu_session.json'
 # core.dll reads its hook switch (disabled, loaderpath) from this file
 _CONFIG_FILE = get_config_file_path()
 # The loader runs elevated: when Parasite was elevated with another account's
-# credentials, its own LocalApplicationData isn't the desktop user's config.ini
+# credentials, its own LocalApplicationData isn't the desktop user's cf.ini
 os.environ['PARASITE_CONFIG_PATH'] = str(_CONFIG_FILE)
 
 _ACTIVE_FLAG = get_state_dir() / "pengu_active.flag"
@@ -554,7 +554,7 @@ def deactivate() -> bool:
         other = _hook_of_another_loader()
         if other is not None:
             # --uninstall only removes a hook that runs our core.dll, but it would
-            # still switch off the config.ini the other loader's core.dll reads
+            # still switch off the cf.ini the other loader's core.dll reads
             log.info('The Pengu hook runs another loader (%s); leaving it on.', other)
             return True
         _close_loader_menu()
@@ -629,12 +629,12 @@ def _same_path(a: Optional[str], b: str) -> bool:
 
 
 def _ensure_loader_config() -> None:
-    """Make config.ini enable the hook for this loader.
+    """Make cf.ini enable the hook for this loader.
 
     core.dll skips hooking unless disabled=0 and loads plugins from
     loaderpath. The loader writes both on --install only, so an active hook
     can be left switched off (another account's loader wrote its own
-    config.ini, an older Parasite garbled loaderpath, or another Parasite's loader
+    cf.ini, an older Parasite garbled loaderpath, or another Parasite's loader
     deactivated while ours held the hook).
     """
     loader_dir = str(PENGU_DIR)
