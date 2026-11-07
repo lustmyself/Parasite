@@ -301,6 +301,12 @@ def _resolve_pengu_dir() -> Path:
                 shutil.copy2(bundled_datastore, runtime_datastore)
             except Exception as exc:
                 log.debug("Failed to seed Pengu Loader datastore: %s", exc)
+        # Parasite plugins a newer Parasite no longer ships stay here otherwise (the copy keeps extras)
+        try:
+            from launcher.parasite_cleanup import clean_retired_plugins
+            clean_retired_plugins(runtime_dir / "plugins")
+        except Exception as exc:
+            log.debug("Could not remove retired Parasite plugins: %s", exc)
         log.info("Synced Pengu Loader to runtime directory (preserving user files): %s", runtime_dir)
 
         # Restore plugin enable/disable state after the overlay sync.
@@ -535,6 +541,15 @@ def get_status() -> PenguStatus:
     return PenguStatus.UNKNOWN
 
 
+def _clear_stale_activation_issue() -> None:
+    """Pengu is active now: drop an earlier "could not be activated" report."""
+    try:
+        from utils.core.issue_reporter import remove_issues
+        remove_issues(lambda line, fix: "Pengu Loader could not be activated" in line)
+    except Exception as e:
+        log.debug('Could not clear the old Pengu activation report: %s', e)
+
+
 def activate() -> bool:
     with _operation_lock:
         _close_loader_menu()
@@ -546,6 +561,7 @@ def activate() -> bool:
         if status is not PenguStatus.ACTIVE:
             log.error('Pengu activation command succeeded, but status is %s.', status.value)
             return False
+        _clear_stale_activation_issue()
         return True
 
 
@@ -940,10 +956,44 @@ def activate_on_start(league_path: Optional[str] = None) -> bool:
                                 else _process_ids(('LeagueClientUx.exe',)))
             if _restart_pending:
                 log.info('Parasite Loader enabled; client restart deferred until the client is ready.')
+        _clear_stale_activation_issue()
         return True
 
 
+# Parasite: a restart (the hub's Restart or an update) keeps Pengu on. Switching it off made the
+# next Parasite unable to switch it back on while League was open ("close the running League
+# Client"), and the PARASITE tab was gone until League restarted. The next Parasite adopts it.
+RESTART_KEEP_S = 120
+
+
+def _keep_flag() -> Path:
+    return get_user_data_dir() / "pengu_keep_for_restart"
+
+
+def keep_on_for_restart() -> None:
+    """Parasite is about to restart: leave Pengu on when this process exits."""
+    import time
+    try:
+        _keep_flag().write_text(str(time.time()), encoding="utf-8")
+    except OSError as exc:
+        log.debug("Could not mark the restart for Pengu: %s", exc)
+
+
+def _restarting() -> bool:
+    import time
+    flag = _keep_flag()
+    try:
+        fresh = time.time() - flag.stat().st_mtime < RESTART_KEEP_S
+        flag.unlink()
+        return fresh
+    except OSError:
+        return False
+
+
 def restore_after_parasite() -> bool:
+    if _restarting():
+        log.info("Parasite is restarting: Pengu stays on and the next Parasite adopts it.")
+        return True
     with _operation_lock:
         session = _read_session()
         legacy = _ACTIVE_FLAG.exists()

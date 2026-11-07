@@ -1,0 +1,238 @@
+name: Follow Rose releases
+
+# Every few hours: if Rose has a release Parasite doesn't, rebuild Parasite from it
+# (parasite/sync.py), test, build the installer and publish a Parasite release.
+# Parasite's auto-update then delivers it to users.
+
+on:
+  schedule:
+    - cron: "17 */3 * * *"
+  workflow_dispatch:
+    inputs:
+      rose_tag:
+        description: "Rose tag to build (empty = latest release)"
+        required: false
+        default: ""
+      dry_run:
+        description: "Build and test only: no push, no release"
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: rose-sync
+  cancel-in-progress: false
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  PYTHONUTF8: "1"
+  PIP_DISABLE_PIP_VERSION_CHECK: "1"
+  ROSE_REPO: Alban1911/Rose
+
+jobs:
+  sync:
+    name: Sync, build and release
+    runs-on: windows-latest
+    timeout-minutes: 90
+    permissions:
+      contents: write
+      issues: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Find the Rose release to follow
+        id: rose
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          INPUT_TAG: ${{ inputs.rose_tag }}
+          DRY_RUN: ${{ inputs.dry_run }}
+        run: |
+          tag="$INPUT_TAG"
+          if [ -z "$tag" ]; then
+            tag=$(gh release view --repo "$ROSE_REPO" --json tagName --jq .tagName)
+          fi
+          if [[ ! "$tag" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::Unexpected Rose tag '$tag'"
+            exit 1
+          fi
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          # Parasite's own patch number while it follows this Rose release (parasite/parasite_patch.txt)
+          version="$tag"
+          read -r patch_rose patch < parasite/parasite_patch.txt || true
+          patch="${patch%$'\r'}"
+          if [ "${patch_rose:-}" = "$tag" ] && [ "${patch:-0}" -gt 0 ]; then
+            version="$tag.$patch"
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          if [ "$DRY_RUN" != "true" ] && gh release view "v$version" --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1; then
+            echo "Parasite v$version is already released; nothing to do"
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "Following Rose $tag"
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        if: steps.rose.outputs.skip == 'false'
+        with:
+          python-version: "3.12"
+
+      - name: Rebuild the Parasite tree from Rose
+        if: steps.rose.outputs.skip == 'false'
+        shell: bash
+        env:
+          TAG: ${{ steps.rose.outputs.tag }}
+          VERSION: ${{ steps.rose.outputs.version }}
+        run: |
+          git fetch --no-tags "https://github.com/$ROSE_REPO.git" "refs/tags/$TAG:refs/rose/$TAG"
+          python parasite/sync.py "refs/rose/$TAG"
+          version=$(grep -oP '^APP_VERSION = "\K[^"]+' config.py)
+          if [ "$version" != "$VERSION" ]; then
+            echo "::error::Expected APP_VERSION $VERSION after syncing Rose $TAG, got $version"
+            exit 1
+          fi
+
+      - name: Install dependencies
+        if: steps.rose.outputs.skip == 'false'
+        run: python -m pip install -r requirements.txt
+
+      # The prebuilt PyInstaller bootloader is shared with countless other exes, malware
+      # included, so antivirus engines distrust it. One compiled here doesn't carry that.
+      - name: Compile PyInstaller's bootloader
+        if: steps.rose.outputs.skip == 'false'
+        shell: bash
+        env:
+          PYINSTALLER_COMPILE_BOOTLOADER: "1"
+        run: |
+          version=$(python -c "import PyInstaller; print(PyInstaller.__version__)")
+          python -m pip install --force-reinstall --no-deps --no-binary pyinstaller "pyinstaller==$version"
+
+      - name: Party relay config
+        if: steps.rose.outputs.skip == 'false'
+        shell: bash
+        env:
+          PARASITE_RELAY_URL: ${{ secrets.PARASITE_RELAY_URL }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        # Parasite's relay (parasite/relay): empty without its Cloudflare account, and skin sharing stays off
+        run: python parasite/relay/write_config.py
+
+      - name: Plugins (JS syntax)
+        if: steps.rose.outputs.skip == 'false'
+        shell: bash
+        run: git ls-files -z 'Pengu Loader/plugins/*.js' | xargs -0 -n1 node --check
+
+      - name: Unit tests
+        if: steps.rose.outputs.skip == 'false'
+        shell: pwsh
+        run: |
+          $suites = @('test') + (Get-ChildItem -Directory | ForEach-Object { Join-Path $_.Name 'tests' } | Where-Object { Test-Path $_ })
+          $failed = @()
+          foreach ($suite in $suites) {
+            python -m unittest discover -s $suite -t .
+            if ($LASTEXITCODE -ne 0) { $failed += $suite }
+          }
+          if ($failed) { Write-Host "::error::Failing suites: $($failed -join ', ')"; exit 1 }
+
+      - name: Install Inno Setup
+        if: steps.rose.outputs.skip == 'false'
+        shell: pwsh
+        run: |
+          if (-not (Test-Path "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe")) {
+            choco install innosetup -y --no-progress
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          }
+
+      - name: Build Parasite.exe, installer and update package
+        if: steps.rose.outputs.skip == 'false'
+        shell: bash
+        env:
+          VERSION: ${{ steps.rose.outputs.version }}
+        run: |
+          python scripts/build_all.py
+          python scripts/create_update_package.py
+          test -f "installer/Parasite_Setup_$VERSION.exe"
+          test -f "installer/update_package_$VERSION.zip"
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: steps.rose.outputs.skip == 'false'
+        with:
+          name: parasite-${{ steps.rose.outputs.version }}
+          path: installer/
+          retention-days: 14
+
+      - name: Commit the synced source
+        if: steps.rose.outputs.skip == 'false' && inputs.dry_run != true
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.rose.outputs.tag }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          # The build regenerates the icon; only the synced source belongs in the commit
+          git restore assets/icon.ico 2>/dev/null || true
+          git add -A
+          if git diff --cached --quiet; then
+            echo "Source already matches Rose $TAG"
+          else
+            git commit -q -m "Sync with Rose $TAG"
+            git push "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" HEAD:main
+          fi
+
+      - name: Publish the Parasite release
+        if: steps.rose.outputs.skip == 'false' && inputs.dry_run != true
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.rose.outputs.tag }}
+          VERSION: ${{ steps.rose.outputs.version }}
+        run: |
+          # Releases are named Parasite v1.1, v1.2, ... in order. The tag is the version the
+          # updater compares (Rose's, plus Parasite's patch number), so only the title is numbered.
+          last=$(gh release list --repo "$GITHUB_REPOSITORY" --limit 1000 --json name \
+            --jq '[.[].name | select(test("^Parasite v1[.][0-9]+$")) | ltrimstr("Parasite v1.") | tonumber] | max // 0')
+          name="Parasite v1.$(( last + 1 ))"
+          news="Pengu Loader/plugins/PARASITE-News/whats-new.json"
+          changes=""
+          if [ -f "$news" ] && [ "$(jq -r .version "$news")" = "$VERSION" ]; then
+            changes="**What's new**
+          $(jq -r '.en[] | "- " + .' "$news")
+          "
+          fi
+          notes="$name ($VERSION), built automatically from [Rose $TAG](https://github.com/$ROSE_REPO/releases/tag/$TAG).
+
+          $changes
+          **Install:** download \`Parasite_Setup_$VERSION.exe\` below. Existing installs update themselves."
+          gh release create "v$VERSION" \
+            "installer/Parasite_Setup_$VERSION.exe" \
+            "installer/update_package_$VERSION.zip" \
+            --repo "$GITHUB_REPOSITORY" \
+            --target "$(git rev-parse HEAD)" \
+            --title "$name" \
+            --notes "$notes"
+
+      - name: Report the failure as an issue
+        if: failure() && inputs.dry_run != true
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.rose.outputs.tag }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          title="Automatic update to Rose ${TAG:-?} failed"
+          if [ -n "$(gh issue list --repo "$GITHUB_REPOSITORY" --state open --search "$title in:title" --json number --jq '.[0].number')" ]; then
+            echo "An issue is already open for this"
+            exit 0
+          fi
+          gh issue create --repo "$GITHUB_REPOSITORY" --title "$title" --body "Nothing was released; users stay on the previous Parasite version.
+
+          Run log: $RUN_URL
+
+          Most likely Rose changed code that parasite/sync.py edits. Fix parasite/sync.py (or parasite/overlay), push, then re-run this workflow."

@@ -100,14 +100,13 @@ htmlcov/
 *.backup
 
 license.dat
-config.ini
 cf.ini
 injection/tools/hashes.game.txt
 Pengu Loader/datastore
 injection/tools/.hashes_state.json
 
 chroma_issue.txt
-CLAUDE.md
+# CLAUDE.md: Parasite keeps its notes for Claude Code in the repo (parasite/overlay/CLAUDE.md)
 # Built from native/ltf by scripts/build_ltf.py
 injection/tools/ltk_launcher.exe
 injection/tools/LeagueToolFlop.dll

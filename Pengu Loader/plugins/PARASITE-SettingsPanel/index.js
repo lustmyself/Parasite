@@ -3097,20 +3097,7 @@
     const linksSection = document.createElement("div");
     linksSection.className = "settings-links";
 
-    const discordLink = document.createElement("a");
-    discordLink.className = "settings-link";
-    discordLink.href = DISCORD_INVITE_URL;
-    discordLink.target = "_blank";
-    discordLink.textContent = "Discord";
-    linksSection.appendChild(discordLink);
-
-    const kofiLink = document.createElement("a");
-    kofiLink.className = "settings-link";
-    kofiLink.href = KOFI_URL;
-    kofiLink.target = "_blank";
-    kofiLink.textContent = "Ko-Fi";
-    linksSection.appendChild(kofiLink);
-
+    // Parasite: the GitHub link only
     const githubLink = document.createElement("a");
     githubLink.className = "settings-link";
     githubLink.href = GITHUB_URL;
@@ -5379,6 +5366,11 @@
       document.querySelector(
         "lol-uikit-navigation-item.menu_item_Golden.Parasite"
       );
+    const panelOpen = settingsPanel && document.getElementById(PANEL_ID);
+    if (navItem && !panelOpen && !e.detail?.parasiteCore && typeof window.parasiteOpenHub === "function") {
+      window.parasiteOpenHub();
+      return;
+    }
     if (navItem) {
       // Toggle: if panel is already open, close it
       if (settingsPanel && document.getElementById(PANEL_ID)) {

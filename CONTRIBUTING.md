@@ -1,6 +1,6 @@
 # Contributing to Parasite
 
-Contributions are welcome! Report bugs or suggest features through the [issue forms](https://github.com/lustmyself/Parasite/issues/new/choose), submit pull requests, or join our [Discord](https://discord.com/invite/roseskins) for discussions and installation help.
+Contributions are welcome! Report bugs or suggest features through the [issue forms](https://github.com/lustmyself/Parasite/issues/new/choose), or submit pull requests.
 
 ## Reporting bugs
 

@@ -60,15 +60,11 @@ class AnalyticsClientTests(unittest.TestCase):
 
     @patch("analytics.core.analytics_client.get_install_id", return_value="00000000-0000-4000-8000-000000000000")
     @patch("analytics.core.analytics_client.requests.post")
-    def test_missing_config_option_follows_the_default(self, post, get_install_id):
-        # Parasite ships with analytics off (ANALYTICS_ENABLED in config.py)
+    def test_parasite_sends_nothing_by_default(self, post, get_install_id):
         post.return_value = Mock(status_code=204)
-        with patch("analytics.core.analytics_client.get_config_option", return_value=None), \
-                patch("analytics.core.analytics_client.ANALYTICS_ENABLED", True):
-            self.assertTrue(AnalyticsClient().send_ping("1.2.14"))
-        with patch("analytics.core.analytics_client.get_config_option", return_value=None), \
-                patch("analytics.core.analytics_client.ANALYTICS_ENABLED", False):
+        with patch("analytics.core.analytics_client.get_config_option", return_value=None):
             self.assertFalse(AnalyticsClient().send_ping("1.2.14"))
+        post.assert_not_called()
 
     def test_presence_interval_is_15_minutes(self):
         self.assertEqual(ANALYTICS_PING_INTERVAL_S, 900)

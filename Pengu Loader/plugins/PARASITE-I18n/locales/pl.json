@@ -1,4 +1,6 @@
 {
+  "What happened: this LTK patcher only runs inside LTK Manager, so it refused Parasite and the game started without skins.": "What happened: this LTK patcher only runs inside LTK Manager, so it refused Parasite and the game started without skins.",
+  "Fix: download ltk_patcher.zip (www.mediafire.com/file/g0lzcgpr97jd9r3/ltk_patcher.zip/file, shared in the Rose Discord #tutorial) into your Downloads folder and restart Parasite: it checks the League Toolkit signature and installs it. Or put both files in %LOCALAPPDATA%\\Parasite\\ltk-patcher.": "Fix: download ltk_patcher.zip (www.mediafire.com/file/g0lzcgpr97jd9r3/ltk_patcher.zip/file, shared in the Rose Discord #tutorial) into your Downloads folder and restart Parasite: it checks the League Toolkit signature and installs it. Or put both files in %LOCALAPPDATA%\\Parasite\\ltk-patcher.",
   "Base Skin": "Skórka podstawowa",
   "Disable custom skin mod": "Wyłącz moda skórki",
   "Custom Skin {number}": "Własna skórka {number}",

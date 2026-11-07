@@ -36,6 +36,7 @@ import os
 injection_binaries = [
     'injection/tools/ltk_launcher.exe',
     'injection/tools/LeagueToolFlop.dll',
+    'injection/tools/ParasiteOffline.exe',  # built by parasite/offline/build_offline.py
 ]
 # Data files (text files, etc.)
 injection_data_files = [
@@ -86,6 +87,14 @@ try:
         print(f"[OK] Collected {len(pillow_datas)} Pillow data files")
 except Exception as e:
     print(f"[WARNING] Could not collect Pillow data files: {e}")
+
+# pywebview's WebView2 DLLs for the desktop hub window
+try:
+    webview_datas = collect_data_files('webview')
+    datas += webview_datas
+    print(f"[OK] Collected {len(webview_datas)} pywebview data files")
+except Exception as e:
+    print(f"[WARNING] Could not collect pywebview data files: {e}")
 
 # Include the source-built Pengu Loader runtime used for Parasite activation/deactivation
 # Runtime-generated files (logs, per-user state) must be excluded so they don't
@@ -182,6 +191,7 @@ hiddenimports = [
     'lcu.features.lcu_skin_selection',
     'lcu.features.lcu_game_mode',
     'lcu.features.lcu_swiftplay',
+    'lcu.features.lobby_reveal',
     'pengu',
     'pengu.core',
     'pengu.core.skin_monitor',
@@ -203,6 +213,7 @@ hiddenimports = [
     'threads.core.phase_thread',
     'threads.core.websocket_thread',
     'threads.core.lcu_monitor_thread',
+    'threads.core.lobby_reveal_thread',
     'threads.handlers',
     'threads.handlers.champ_thread',
     'threads.handlers.champion_lock_handler',
@@ -263,6 +274,43 @@ hiddenimports = [
     # Launcher module
     'launcher',
     'launcher.core',
+    'launcher.parasite_autoupdate',
+    'launcher.parasite_cleanup',
+    'launcher.parasite_hero',
+    'launcher.parasite_hub_server',
+    'launcher.parasite_hub_shell',
+    'launcher.parasite_hub_web',
+    'launcher.parasite_rose',
+    'webview',
+    'webview.platforms.edgechromium',
+    'webview.platforms.winforms',
+    'clr',
+    'clr_loader',
+    'pengu.communication.parasite_custom_skins',
+    'launcher.parasite_hub',
+    'launcher.parasite_settings',
+    'launcher.parasite_media',
+    'launcher.parasite_perf',
+    'winrt.windows.foundation',
+    'winrt.windows.foundation.collections',
+    'winrt.windows.media.control',
+    'winrt.windows.storage.streams',
+    'comtypes',
+    'pycaw.pycaw',
+    'launcher.parasite_hub_window',
+    'launcher.parasite_spotify',
+    'tkinter',
+    'launcher.parasite_offline',
+    'launcher.parasite_maps',
+    'launcher.parasite_fonts',
+    'launcher.parasite_client',
+    'launcher.parasite_auto',
+    'launcher.parasite_wallpaper',
+    'launcher.parasite_discord',
+    'launcher.parasite_profile',
+    'launcher.parasite_icon',
+    'launcher.autostart_default',
+    'pengu.communication.parasite_assets',
     'launcher.core.launcher',
     'launcher.sequences',
     'launcher.sequences.hash_check_sequence',
@@ -310,6 +358,8 @@ hiddenimports = [
     'party.discovery.skin_collector',
     'party.integration',
     'party.integration.injection_hook',
+    'party.network.relay_config',
+    'launcher.parasite_share',
     'certifi',
     
     # System tray
@@ -408,6 +458,30 @@ a = Analysis(
 
 pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
 
+# Parasite: version info for Parasite.exe (antivirus heuristics distrust exes without any)
+import re as _re
+from PyInstaller.utils.win32.versioninfo import (
+    VSVersionInfo, FixedFileInfo, StringFileInfo, StringTable, StringStruct, VarFileInfo, VarStruct,
+)
+_parasite_version = _re.search(r'APP_VERSION = "([^"]+)"', Path('config.py').read_text(encoding='utf-8')).group(1)
+_parasite_numbers = tuple((list(map(int, _re.findall(r'\d+', _parasite_version))) + [0, 0, 0, 0])[:4])
+parasite_version_info = VSVersionInfo(
+    ffi=FixedFileInfo(filevers=_parasite_numbers, prodvers=_parasite_numbers),
+    kids=[
+        StringFileInfo([StringTable('040904B0', [
+            StringStruct('CompanyName', 'Parasite Team'),
+            StringStruct('FileDescription', 'Parasite'),
+            StringStruct('FileVersion', _parasite_version),
+            StringStruct('InternalName', 'Parasite'),
+            StringStruct('LegalCopyright', 'Parasite Team, MIT License'),
+            StringStruct('OriginalFilename', 'Parasite.exe'),
+            StringStruct('ProductName', 'Parasite'),
+            StringStruct('ProductVersion', _parasite_version),
+        ])]),
+        VarFileInfo([VarStruct('Translation', [1033, 1200])]),
+    ],
+)
+
 exe = EXE(
     pyz,
     a.scripts,
@@ -425,6 +499,7 @@ exe = EXE(
     codesign_identity=None,
     entitlements_file=None,
     icon='assets/icon.ico',
+    version=parasite_version_info,
     uac_admin=True,  # Request admin rights (required for injection)
 )
 

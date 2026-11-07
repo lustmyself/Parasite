@@ -598,6 +598,14 @@ class InjectionTrigger:
             log.error("=" * LOG_SEPARATOR_WIDTH)
             return
         
+        # Parasite: skins switched off in the hub's settings: the game starts without mods
+        try:
+            from launcher.parasite_settings import enabled as _parasite_setting
+            if not _parasite_setting("skins"):
+                log.info("[Settings] Skins are off in the hub: nothing is injected")
+                return
+        except Exception as e:
+            log.debug(f"[Settings] Could not read the skins switch: {e}")
         # Check if custom mod is selected for this skin (before logging)
         locked_champ_id = self.state.locked_champ_id or self.state.hovered_champ_id
         selected_chroma_id = getattr(self.state, 'selected_chroma_id', None)
@@ -661,6 +669,27 @@ class InjectionTrigger:
             lcu_skin_id = self.state.selected_skin_id
             owned_skin_ids = self.state.owned_skin_ids
             
+            # Parasite custom skins: the one switched on for this champion plays on the skin picked
+            # (a chroma counts as its skin, so the mod targets the skin and the chroma rides along)
+            if not selected_custom_mod:
+                try:
+                    from pengu.communication.parasite_custom_skins import custom_mod_for
+                    _parasite_skin = effective_skin_id or ui_skin_id
+                    _parasite_chromas = getattr(getattr(self.skin_scraper, "cache", None), "chroma_id_map", None) or {}
+                    try:
+                        _parasite_skin = int(_parasite_chromas[_parasite_skin]["skinId"])
+                    except (KeyError, TypeError, ValueError):
+                        pass
+                    parasite_custom_skin = custom_mod_for(
+                        self.state.locked_champ_id or self.state.hovered_champ_id,
+                        _parasite_skin,
+                    )
+                    if parasite_custom_skin:
+                        self.state.selected_custom_mod = parasite_custom_skin
+                        selected_custom_mod = parasite_custom_skin
+                except Exception as e:
+                    log.warning(f"[CustomSkins] Could not pick a custom skin: {e}")
+
             # Auto-select previously used custom mods (so users don't need to open the Custom Mods UI)
             # - Skin custom mod: stored per champion in utils.core.historic as a "path:..."
             # - Map/font/announcer/other: stored globally in utils.core.mod_historic (mod_historic.json)

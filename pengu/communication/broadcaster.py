@@ -364,6 +364,12 @@ class Broadcaster:
 
         self._send_message(json.dumps(payload))
 
+    def broadcast_lobby_reveal(self, payload: dict) -> None:
+        """Broadcast revealed champ select teammates to the LobbyReveal plugin"""
+        if not self.websocket_server.loop or not self.websocket_server.connections:
+            return
+        self._send_message(json.dumps({"type": "lobby-reveal", **payload}))
+
     def _send_message(self, message: str) -> None:
         """Send message to all connected clients"""
         try:

@@ -236,6 +236,29 @@ class MessageHandler:
 
     def _route(self, payload_type: Optional[str], payload: dict) -> None:
         # Route to appropriate handler
+        if payload_type == "parasite-cutoffs":
+            def _reply_cutoffs(request=payload):
+                from launcher.parasite_hero import cutoffs_for
+                self._send_response(json.dumps({"type": "parasite-cutoffs", "requestId": request.get("requestId"),
+                                                "cutoff": cutoffs_for(str(request.get("region") or ""))}))
+            threading.Thread(target=_reply_cutoffs, daemon=True, name="ParasiteCutoffs").start()
+            return
+        if payload_type == "parasite-custom-skins":
+            from pengu.communication.parasite_custom_skins import handle as _handle_custom_skins
+            self._send_response(json.dumps(_handle_custom_skins(payload)))
+            return
+        if payload_type == "parasite-profile-icon":
+            from launcher.parasite_icon import bridge_reply as _parasite_icon_reply
+            self._send_response(json.dumps(_parasite_icon_reply()))
+            return
+        if payload_type == "parasite-wallpaper":
+            from launcher.parasite_wallpaper import bridge_reply as _parasite_wallpaper_reply
+            self._send_response(json.dumps(_parasite_wallpaper_reply(payload)))
+            return
+        if payload_type == "parasite-assets":
+            from pengu.communication.parasite_assets import handle as _handle_parasite_assets
+            self._send_response(json.dumps(_handle_parasite_assets(payload)))
+            return
         if payload_type in {"chroma-log", "plugin-log"}:
             self._handle_chroma_log(payload)
         elif payload_type == "request-local-preview":

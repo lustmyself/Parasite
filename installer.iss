@@ -2,8 +2,8 @@
 ; This creates a proper Windows installer that registers the app
 
 #define MyAppName "Parasite"
-#define MyAppVersion "1.5.4"
-#define MyAppVersionInfo "1.5.4.0"
+#define MyAppVersion "1.5.3.1"
+#define MyAppVersionInfo "1.5.3.1"
 #define MyAppPublisher "Parasite Team"
 #define MyAppURL "https://github.com/lustmyself/Parasite"
 #define MyAppExeName "Parasite.exe"
@@ -15,6 +15,7 @@
 ; NOTE: The value of AppId uniquely identifies this application.
 ; Do not use the same AppId value in installers for other applications.
 AppId={{D0EF746D-DCEE-4F08-BD14-FB226CB630F3}}
+UsePreviousAppDir=no
 AppName={#MyAppName}
 AppVersion={#MyAppVersion}
 AppVerName={#MyAppName} {#MyAppVersion}

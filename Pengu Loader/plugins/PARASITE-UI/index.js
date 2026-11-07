@@ -201,6 +201,37 @@
       position: relative;
     }
 
+    /* The nav item shows the word PARASITE where Rose had its golden rose */
+    lol-uikit-navigation-item.menu_item_Golden\\ Parasite .menu-item-icon-wrapper {
+      width: auto;
+      padding: 0 6px;
+    }
+
+    lol-uikit-navigation-item.menu_item_Golden\\ Parasite .parasite-nav-label {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 100%;
+      font-family: "Beaufort for LOL", serif;
+      font-weight: 700;
+      font-size: 15px;
+      letter-spacing: 1.5px;
+      color: #c8aa6e;
+      transition: color 0.15s, text-shadow 0.15s;
+      cursor: pointer;
+      user-select: none;
+    }
+
+    lol-uikit-navigation-item.menu_item_Golden\\ Parasite:hover .parasite-nav-label {
+      color: #f0e6d2;
+      text-shadow: 0 0 6px rgba(200, 170, 110, 0.8);
+    }
+
+    /* Parasite: everything is in the desktop app, no PARASITE tab in the client */
+    lol-uikit-navigation-item.menu_item_Golden.Parasite {
+      display: none !important;
+    }
+
     /* Prevent active state styling for Golden Parasite */
     lol-uikit-navigation-item.menu_item_Golden\\ Parasite .section.active::before,
     lol-uikit-navigation-item.menu_item_Golden\\ Parasite .section.active::after,
@@ -766,17 +797,7 @@
           (e) => {
             e.stopPropagation();
             e.preventDefault();
-
-            // Dispatch event to open settings panel
-            const event = new CustomEvent("parasite-open-settings", {
-              detail: { navItem: navItem },
-              bubbles: true,
-              cancelable: true,
-            });
-            window.dispatchEvent(event);
-            log.info(
-              "Dispatched parasite-open-settings event from Golden Parasite section"
-            );
+            // The nav item's capture listener already toggled the settings panel
 
             // Prevent active class
             section.classList.remove("active");
@@ -840,9 +861,9 @@
       return false;
     }
 
-    // Check if Golden Parasite item already exists by checking for the golden_parasite.png image
+    // Check if Golden Parasite item already exists by checking for its PARASITE label
     const existingItem = rightNavMenu.querySelector(
-      'lol-uikit-navigation-item .menu-item-icon[style*="golden_parasite.png"]'
+      "lol-uikit-navigation-item .parasite-nav-label"
     );
     if (existingItem) {
       const navItem = existingItem.closest("lol-uikit-navigation-item");
@@ -866,8 +887,8 @@
     glow.className = "menu-item-glow";
 
     const icon = document.createElement("div");
-    icon.className = "menu-item-icon";
-    icon.style.webkitMaskImage = `url(http://127.0.0.1:${window.__parasiteBridge ? window.__parasiteBridge.port : 50000}/asset/golden_parasite.png)`;
+    icon.className = "parasite-nav-label";
+    icon.textContent = "PARASITE";
 
     iconWrapper.appendChild(glow);
     iconWrapper.appendChild(icon);
@@ -996,6 +1017,15 @@
       // Subscribe to skip-base-skin messages from the shared bridge
       bridge.subscribe("skip-base-skin", handleSkipBaseSkin);
       bridge.subscribe("phase-change", handlePhaseChangeFromPython);
+      // Parasite: the desktop app opens the client panel (the PARASITE tab is hidden)
+      bridge.subscribe("parasite-open-hub", () => {
+        if (typeof window.parasiteOpenHub === "function") {
+          window.parasiteOpenHub();
+          return;
+        }
+        const navItem = document.querySelector("lol-uikit-navigation-item.menu_item_Golden.Parasite");
+        window.dispatchEvent(new CustomEvent("parasite-open-settings", { detail: { navItem } }));
+      });
       setupPenguWelcomeBadgeFix();
 
       interceptChampSelectWebsocket();

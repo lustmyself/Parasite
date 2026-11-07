@@ -616,6 +616,10 @@ def _schedule_restart() -> bool:
             creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
         )
         log.info(f"Restart scheduled via {batch_path}")
+        try:
+            pengu_loader.keep_on_for_restart()
+        except Exception as e:
+            log.debug(f"Could not keep Pengu on for the restart: {e}")
         return True
     except Exception as e:
         log.error(f"Failed to schedule restart: {e}")
@@ -651,6 +655,14 @@ def run_league_unlock(args: Optional[argparse.Namespace] = None,
     # Check initial status (will show locked until all components are ready)
     app_status.update_status(force=True)
     
+    # Start with Windows is on by default, set once on the first run
+    from launcher.autostart_default import apply_autostart_default
+    apply_autostart_default()
+
+    # Open League through Parasite Offline so the player can appear offline
+    from launcher.parasite_offline import start_league_through_parasite_offline
+    start_league_through_parasite_offline()
+
     # Initialize core components
     lcu, skin_scraper, state, injection_manager = initialize_core_components(args, injection_threshold)
     
@@ -742,6 +754,10 @@ def run_league_unlock(args: Optional[argparse.Namespace] = None,
             timeout_thread.start()
 
         tray_manager.restart_callback = updated_tray_restart_callback
+
+        # The desktop hub takes over from the launcher and uses the tray's quit and restart
+        from launcher.parasite_hub import attach as attach_hub
+        attach_hub(tray_manager)
     
     # Initialize threads (this starts the WebSocket server)
     thread_manager, t_phase, t_ui, t_ws, t_lcu_monitor = initialize_threads(
@@ -779,6 +795,10 @@ def run_league_unlock(args: Optional[argparse.Namespace] = None,
 
 def main() -> None:
     """Program entry point that prepares and launches Parasite."""
+    # The desktop hub window runs as a second Parasite process (pywebview needs a main thread)
+    from launcher.parasite_hub_shell import main_if_window
+    if main_if_window():
+        return
     args = setup_arguments()
     # Update before checking the DLL: a Parasite that refuses to start still
     # receives the version that fixes its check

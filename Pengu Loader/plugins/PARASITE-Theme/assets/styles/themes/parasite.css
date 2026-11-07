@@ -1,0 +1,154 @@
+/* By Parasite */
+/* Meow~~~ */
+
+/* test */
+@import url("./rcp-fe-lol-activity-center.css");
+@import url("./rcp-fe-lol-clash-full.css");
+@import url("./rcp-fe-lol-event-hub.css");
+@import url("./rcp-fe-lol-loot.css");
+@import url("./rcp-fe-lol-navigation-screen.css");
+@import url("./rcp-fe-lol-parties.css");
+@import url("./rcp-fe-lol-postgame.css");
+@import url("./rcp-fe-lol-profiles-main.css");
+@import url("./rcp-fe-viewport-sidebar.css");
+@import url("./rcp-fe-lol-collections.css");
+@import url("./rcp-fe-viewport-main.css");
+@import url("./theme-background-controllers.css");
+@import url("./theme-parasite-trigger.css");
+@import url("./theme-hide-friendlist.css");
+@import url("./theme-hide-navbar.css");
+@import url("./theme-settings.css");
+@import url("./theme-wallpapers.css");
+
+/*_________________________________________________________________________________________________________________________________*/
+:root {
+	--font-display: 'Custom', 'LoL Display', 'Parasite', 'Times New Roman', Times, Baskerville, Georgia, serif !important;
+	--font-body: 'Custom', 'LoL Body', 'Parasite', Arial, 'Helvetica Neue', Helvetica, sans-serif !important; 
+}
+/*_________________________________________________________________________________________________________________________________*/
+
+
+
+/*_________________________________________________________________________________________________________________________________*/
+html {
+	overflow: hidden !important;
+}
+
+.basic-button .play-button-container,
+.npe-header-league-logo, .animated-progress-bar.patching {
+    filter: var(--play-button-filter) !important;
+}
+
+.stats-backdrop {
+	opacity: 0.3!important;
+	mix-blend-mode: difference !important;
+}
+
+#rcp-fe-viewport-root {
+	overflow: unset !important;
+}
+
+#rcp-fe-lol-home-error {
+	display: none !important
+}
+
+html:not(.parasite-league-bg) #background-ambient {
+	display: none !important;
+}
+
+html:not(.parasite-league-bg) .store-backdrop {
+	background-image: unset !important;
+}
+
+html:not(.parasite-league-bg) .background {
+	background-image: unset !important;
+}
+
+html:not(.parasite-league-bg) .rcp-fe-lol-game-in-progress {
+	background-image: unset !important;
+	background-color: unset !important;
+}
+
+html:not(.parasite-league-bg) .loading-tab::after {
+	background-image: none !important
+}
+
+html:not(.parasite-league-bg) .yourshop-root {
+    background-image: none !important;
+}
+
+html:not(.parasite-league-bg) .npe-root-component {
+    background-image: none !important;
+}
+
+html:not(.parasite-league-bg) div > div > .rcp-fe-lol-tft-application-background {
+	background-image: none !important; 
+}
+
+.item-page-items-container-wrapper.purchase-history-page-content-wrapper {
+	background: unset !important;
+}
+
+.store-loading {
+	background-color: transparent !important;
+}
+
+.menu-item-icon {
+	background-color: #f0e6d2 !important;
+	color: #f0e6d2 !important;
+}
+
+.main-navigation-menu .section .section-text {
+	color: #f0e6d2 !important;
+}
+
+.challenge-banner-title-container {
+	color: #f3d3d3 !important;
+    text-shadow: -1px 0 black, 0 1px black, 1px 0 black, 0 -1px black !important;
+}
+
+.collections-application {
+	background: rgba(0, 0, 0, 0) !important;
+}
+
+.item-sets-table-row {
+	background: #0000007a !important;
+}
+
+.inventory-search {
+	background: #00000085 !important;
+}
+
+lol-uikit-navigation-item > .section::after {
+	background-image: linear-gradient(0deg, rgb(210 195 149 / 32%) 0%, rgb(0 0 0 / 10%) 55%);
+}
+
+.hover-card-backdrop {
+	height: 75% !important;
+}
+
+/* Dodge button */
+.dodge-button-container {
+	position: absolute;
+	right: 20px;
+	bottom: 19px;
+	display: flex;
+	align-items: flex-end
+}
+
+/* Loading screen */
+.lol-loading-screen-container.lol-loading-screen-default-state {
+	backdrop-filter: blur(20px) brightness(0.7);
+	background: #0000004f !important;
+}
+
+.lol-loading-screen-progress-bar-container {
+	width: 500px !important;
+	top: 8px !important;
+}
+
+.loading-content div > div > .loading-text {
+	display: none !important;
+}
+/*_________________________________________________________________________________________________________________________________*/
+/* End */	
