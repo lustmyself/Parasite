@@ -51,11 +51,14 @@ def _dll_dialog_text(reason: str, detail: str = ""):
     if reason == "no_manager":
         return (
             "Parasite - LTK Manager Missing",
-            "Parasite can't find LTK Manager",
-            "Parasite applies skins through LTK Manager. It only has to be installed: Parasite "
+            "Parasite couldn't install LTK Manager",
+            "Parasite applies skins through LTK Manager and tried to install it for you, but the "
+            "download or the installation did not finish (no internet, or the Windows prompt was "
+            "declined). It only has to be installed once: Parasite "
             "opens it in the background during champ select and closes it after the game, "
             "so you never have to open it yourself.",
-            f"1. Install LTK Manager ({LTK_MANAGER_DOWNLOAD_URL}), then restart Parasite.\n"
+            "1. Restart Parasite to try again, and click Yes on the Windows prompt. Or install "
+            f"LTK Manager yourself ({LTK_MANAGER_DOWNLOAD_URL}).\n"
             "2. Already installed in another folder? Click Set up path and select its "
             "ltk-manager.exe: Parasite remembers it and starts right away.",
             "Set up path",
@@ -408,8 +411,19 @@ def _check_dll_present() -> bool:
     missing = [name for name in (LTF_LAUNCHER, LTF_BRIDGE_DLL) if not (tools_dir / name).exists()]
     if missing:
         return _show_dll_dialog(tools_dir, reason="missing", detail=" and ".join(missing))
-    if ToolsManager(tools_dir).detect_ltk_manager() is None:
-        return _show_dll_dialog(tools_dir, reason="no_manager")
+    manager = ToolsManager(tools_dir)
+    if manager.detect_ltk_manager() is None:
+        from config import set_config_option
+        from injection.tools.ltk_manager_install import install_ltk_manager, registered_ltk_manager
+
+        found = registered_ltk_manager()
+        if found is not None:
+            log.info(f"[DLL] LTK Manager found in the installed programs: {found}")
+        else:
+            found = install_ltk_manager(manager.detect_ltk_manager)
+        if found is None:
+            return _show_dll_dialog(tools_dir, reason="no_manager")
+        set_config_option("General", "ltkManagerPath", str(found))
     return True
 
 

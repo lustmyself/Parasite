@@ -1017,6 +1017,50 @@ EDITS += [
     (GH_CLIENT, "from typing import Optional\n", "import re\nfrom typing import Optional\n"),
 ]
 
+# Parasite's release tags start with "v" (v1.5.3.1) but its update packages do not
+# (update_package_1.5.3.1.zip): the redirect check drops the "v" before naming the package
+EDITS += [
+    (GH_CLIENT,
+     "            name = UPDATE_PACKAGE_NAME.format(version=tag)\n",
+     "            name = UPDATE_PACKAGE_NAME.format(version=tag.lstrip(\"vV\"))\n"),
+]
+
+
+# LTK Manager installs itself: when Parasite can't find it, it looks in Windows' list of
+# installed programs, then downloads LTK Manager's official installer and runs it
+# (injection/tools/ltk_manager_install.py). The dialog is only left for when that fails.
+EDITS += [
+    ("main/__init__.py",
+     "    if ToolsManager(tools_dir).detect_ltk_manager() is None:\n"
+     "        return _show_dll_dialog(tools_dir, reason=\"no_manager\")\n"
+     "    return True\n",
+     "    manager = ToolsManager(tools_dir)\n"
+     "    if manager.detect_ltk_manager() is None:\n"
+     "        from config import set_config_option\n"
+     "        from injection.tools.ltk_manager_install import install_ltk_manager, registered_ltk_manager\n"
+     "\n"
+     "        found = registered_ltk_manager()\n"
+     "        if found is not None:\n"
+     "            log.info(f\"[DLL] LTK Manager found in the installed programs: {found}\")\n"
+     "        else:\n"
+     "            found = install_ltk_manager(manager.detect_ltk_manager)\n"
+     "        if found is None:\n"
+     "            return _show_dll_dialog(tools_dir, reason=\"no_manager\")\n"
+     "        set_config_option(\"General\", \"ltkManagerPath\", str(found))\n"
+     "    return True\n"),
+    ("main/__init__.py",
+     "            \"Parasite can't find LTK Manager\",\n"
+     "            \"Parasite applies skins through LTK Manager. It only has to be installed: Parasite \"\n",
+     "            \"Parasite couldn't install LTK Manager\",\n"
+     "            \"Parasite applies skins through LTK Manager and tried to install it for you, but the \"\n"
+     "            \"download or the installation did not finish (no internet, or the Windows prompt was \"\n"
+     "            \"declined). It only has to be installed once: Parasite \"\n"),
+    ("main/__init__.py",
+     "            f\"1. Install LTK Manager ({LTK_MANAGER_DOWNLOAD_URL}), then restart Parasite.\\n\"\n",
+     "            \"1. Restart Parasite to try again, and click Yes on the Windows prompt. Or install \"\n"
+     "            f\"LTK Manager yourself ({LTK_MANAGER_DOWNLOAD_URL}).\\n\"\n"),
+]
+
 
 # Silent updates (launcher/parasite_autoupdate.py): a package downloaded in the background is
 # installed as it is, without downloading it again

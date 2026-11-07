@@ -40,7 +40,7 @@ internal static class Utils
             httpClient.DefaultRequestHeaders.UserAgent.Add(new ProductInfoHeaderValue("Parasite", DeceiveVersion));
 
             var response =
-                await httpClient.GetAsync("https://api.github.com/repos/molenzwiebel/Lust/releases/latest");
+                await httpClient.GetAsync("https://api.github.com/repos/molenzwiebel/Parasite/releases/latest");
             var content = await response.Content.ReadAsStringAsync();
             var release = JsonSerializer.Deserialize<JsonNode>(content);
             var latestVersion = release?["tag_name"]?.ToString();

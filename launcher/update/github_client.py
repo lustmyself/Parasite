@@ -91,7 +91,7 @@ class GitHubClient:
             tag = unquote(location.rsplit("/releases/tag/", 1)[1].split("?", 1)[0].strip("/"))
             if not tag:
                 return None
-            name = UPDATE_PACKAGE_NAME.format(version=tag)
+            name = UPDATE_PACKAGE_NAME.format(version=tag.lstrip("vV"))
             url = RELEASE_DOWNLOAD_URL.format(tag=quote(tag), name=quote(name))
             # The package must exist under that name; its size drives the progress bar
             head = requests.head(url, allow_redirects=True, timeout=self.timeout, headers=headers)
