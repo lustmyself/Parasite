@@ -1,10 +1,16 @@
-"""Auto Accept, Auto Ban, Auto Pick and Auto Requeue from the desktop app.
+"""Auto Accept, Auto Ban, Auto Pick, Auto Requeue and dodging from the desktop app.
 
 While League is open a small thread watches the client (LCU): it accepts the ready check,
 in champ select it bans and picks for the player when their turn comes, taking the first
 champion of their list that is still free, and after a matchmade game it goes back to the
 lobby and starts the queue again. Each switch and both lists are the player's own, kept in
 Parasite's data folder as parasite-auto.json.
+
+Bans and picks can wait for the last seconds of the turn (ban_at / pick_at seconds left; the
+champion is hovered right away so teammates see it). The queue can start again a while after
+the game (requeue_delay), after a champ select someone dodged (requeue_dodge), and searching
+starts over once it runs well past the estimated time (requeue_refresh). A dodge can be armed
+for the last second of champ select.
 """
 
 from __future__ import annotations
@@ -21,8 +27,18 @@ log = get_logger()
 
 FILE = "parasite-auto.json"
 MAX_CHOICES = 5
-SWITCHES = ("accept", "ban", "pick", "requeue")
-DEFAULTS = {"accept": False, "ban": False, "pick": False, "requeue": False, "bans": [], "picks": []}
+SWITCHES = ("accept", "ban", "pick", "requeue", "requeue_dodge", "requeue_refresh")
+# Seconds left in the turn when the ban or pick locks in (0: right away)
+AT_CHOICES = (0, 1, 3, 5, 10)
+DELAY_CHOICES = (0, 10, 30, 60, 120)
+DEFAULTS = {"accept": False, "ban": False, "pick": False, "requeue": False, "requeue_dodge": False,
+            "requeue_refresh": False, "ban_at": 0, "pick_at": 0, "requeue_delay": 0, "bans": [], "picks": []}
+LAST_SECOND_MS = 1200   # "the last second": what is left when the lock-in is sent
+DODGE_AT_MS = 1500      # the armed dodge goes this long before champ select ends
+FAST_S = 0.25           # polling near a deadline
+DODGE_REQUEUE_S = 15 * 60  # a dodge penalty can keep the queue closed this long
+REFRESH_OVER_S = 60.0   # a search this far past its estimate starts over
+REFRESH_EVERY_S = 300.0
 IDLE_S = 3.0   # League closed or nothing to do
 BUSY_S = 1.0   # ready check or champ select
 CREDS_TTL_S = 30.0
@@ -35,7 +51,9 @@ _cache: Optional[dict] = None
 _thread: Optional[threading.Thread] = None
 _creds: dict = {"at": 0.0, "value": None}
 _done: dict = {}  # action id -> tries in this champ select
-_requeue: dict = {"game": None, "until": 0.0}  # the game already requeued; queue again until this time
+_hovered: dict = {}  # action id -> champion hovered while waiting for the last seconds
+_requeue: dict = {"game": None, "until": 0.0, "not_before": 0.0}  # the game already requeued; queue again until this time
+_refresh: dict = {"at": 0.0}
 
 
 # ---- settings ----
@@ -46,6 +64,9 @@ def clean(data) -> dict:
         return out
     for key in SWITCHES:
         if isinstance(data.get(key), bool):
+            out[key] = data[key]
+    for key, choices in (("ban_at", AT_CHOICES), ("pick_at", AT_CHOICES), ("requeue_delay", DELAY_CHOICES)):
+        if data.get(key) in choices and not isinstance(data.get(key), bool):
             out[key] = data[key]
     for key in ("bans", "picks"):
         values = data.get(key) if isinstance(data.get(key), list) else []
@@ -107,9 +128,11 @@ def _reveal() -> dict:
 
 
 def listing() -> dict:
-    from launcher import parasite_skins
+    from launcher import parasite_counters, parasite_skins
     return dict(settings(), champions=[{"id": c["id"], "name": c["name"]} for c in parasite_skins.champions()],
-                max=MAX_CHOICES, reveal=_reveal())
+                max=MAX_CHOICES, reveal=_reveal(), counters=parasite_counters.board(),
+                dodge={"armed": _dodge["armed"], "state": _dodge["state"]}, atChoices=AT_CHOICES,
+                delayChoices=DELAY_CHOICES)
 
 
 def dumps_listing() -> bytes:
@@ -210,10 +233,24 @@ def _accept() -> None:
             log.info("[Auto] Ready check accepted")
 
 
-def _champ_select(config: dict) -> None:
+def _wait_ms(config: dict, kind: str, timer: dict) -> float:
+    """How long the ban or pick should still wait: until ban_at / pick_at seconds are left in the
+    turn (never later than the last second). 0 when it goes now."""
+    seconds = config.get(f"{kind}_at") or 0
+    left = timer.get("adjustedTimeLeftInPhase")
+    if not seconds or timer.get("phase") != "BAN_PICK" or not isinstance(left, (int, float)):
+        return 0.0
+    return max(0.0, left - max(seconds * 1000.0, LAST_SECOND_MS))
+
+
+def _champ_select(config: dict) -> float:
+    """Ban or pick for the player when their turn comes; returns how soon to look again."""
     session = _lcu("GET", "/lol-champ-select/v1/session")
     if not isinstance(session, dict):
-        return
+        return BUSY_S
+    _dodge_check(session)
+    if not (config["ban"] or config["pick"]):
+        return FAST_S if _dodge["armed"] else BUSY_S
     pickable = _lcu("GET", "/lol-champ-select/v1/pickable-champion-ids") if config["pick"] else None
     bannable = _lcu("GET", "/lol-champ-select/v1/bannable-champion-ids") if config["ban"] else None
     found = choose(session, config, set(pickable) if isinstance(pickable, list) and pickable else None,
@@ -230,19 +267,28 @@ def _champ_select(config: dict) -> None:
               f"pick {'on' if config['pick'] else 'off'} {config['picks']}, "
               f"taken {sorted(_taken(session))}, teammates want {friends}, "
               f"timer {(session.get('timer') or {}).get('phase')}")
-        return
+        return BUSY_S
     action_id, champion, kind = found
+    timer = session.get("timer") or {}
+    wait_ms = _wait_ms(config, kind, timer)
+    if wait_ms > 0:
+        # Hover now so teammates see it; lock in during the last seconds of the turn
+        if _hovered.get(action_id) != champion:
+            if _lcu("PATCH", f"/lol-champ-select/v1/session/actions/{action_id}", {"championId": champion}) is not None:
+                _hovered[action_id] = champion
+                log.info(f"[Auto] {kind} {champion} hovered; locking in with {config[kind + '_at']}s left")
+        return FAST_S if wait_ms < 3000 else BUSY_S
     # Ranked opens with a planning phase where the ban already shows as in progress but the
     # client won't take it yet: wait for the ban phase instead of using up the tries
     if (session.get("timer") or {}).get("phase") == "PLANNING":
         _note("planning", "[Auto] Planning phase: waiting for the ban phase")
-        return
+        return BUSY_S
     # The client may answer OK and still leave the action open (seen with bans), so an
     # action counts as done only once the session shows it completed: try again until then
     tries = _done.get(action_id, 0)
     if tries >= MAX_TRIES:
         _note(f"gave-up-{action_id}", f"[Auto] Gave up on {kind} {champion} (action {action_id})")
-        return
+        return BUSY_S
     _done[action_id] = tries + 1
     path = f"/lol-champ-select/v1/session/actions/{action_id}"
     # Hover, then lock in. The client answers OK and still keeps the turn open at times, so the
@@ -258,6 +304,51 @@ def _champ_select(config: dict) -> None:
         log.info(f"[Auto] {kind} {champion} sent")
     elif tries % 10 == 0:
         log.info(f"[Auto] {kind} {champion} still open after {tries} tries, trying again")
+    return FAST_S if _dodge["armed"] else BUSY_S
+
+
+# ---- dodging ----
+
+DODGE_PATH = ('/lol-login/v1/session/invoke?destination=lcdsServiceProxy&method=call'
+              '&args=["","teambuilder-draft","quitV2",""]')
+_dodge: dict = {"armed": False, "state": "", "game": None}
+
+
+def dodge_now() -> str:
+    """Leave champ select without restarting the client (the usual dodge penalty applies)."""
+    if _lcu("GET", "/lol-gameflow/v1/gameflow-phase") != "ChampSelect":
+        return "Şu an şampiyon seçiminde değilsin"
+    _dodge["armed"] = False
+    if _lcu("POST", DODGE_PATH, {}) is None:
+        return "Dodge atılamadı"
+    log.info("[Auto] Dodged")
+    _dodge["state"] = "dodged"
+    return "Dodge atıldı"
+
+
+def arm_dodge(on: bool) -> str:
+    """Dodge in the last second of champ select (on) or not (off)."""
+    if on and _lcu("GET", "/lol-gameflow/v1/gameflow-phase") != "ChampSelect":
+        return "Şu an şampiyon seçiminde değilsin"
+    _dodge.update(armed=bool(on), state="")
+    if on:
+        start(force=True)
+        log.info("[Auto] Last second dodge armed")
+        return "Son saniyede dodge atılacak"
+    return "Son saniye dodge iptal"
+
+
+def _dodge_check(session: dict) -> None:
+    """The armed dodge goes when champ select is about to end."""
+    if not _dodge["armed"]:
+        return
+    timer = session.get("timer") or {}
+    left = timer.get("adjustedTimeLeftInPhase")
+    if timer.get("phase") == "FINALIZATION" and isinstance(left, (int, float)) and left <= DODGE_AT_MS:
+        _dodge["armed"] = False
+        ok = _lcu("POST", DODGE_PATH, {}) is not None
+        _dodge["state"] = "dodged" if ok else "failed"
+        log.info(f"[Auto] Last second dodge {'sent' if ok else 'failed'} ({left:.0f} ms left)")
 
 
 # ---- queue again after a game ----
@@ -289,14 +380,19 @@ def _after_game(phase) -> bool:
         if _lcu("POST", "/lol-lobby/v2/play-again") is None:
             log.warning("[Auto] Could not go back to the lobby after the game")
             return False
-        _requeue["until"] = now + REQUEUE_WAIT_S
-        log.info(f"[Auto] Game {game} over: back to the lobby to queue again")
+        delay = settings().get("requeue_delay") or 0
+        _requeue["not_before"] = now + delay
+        _requeue["until"] = now + REQUEUE_WAIT_S + delay
+        log.info(f"[Auto] Game {game} over: back to the lobby to queue again"
+                 + (f" in {delay}s" if delay else ""))
         return True
     if phase in END_PHASES:
         return True  # honor vote and stats come first
     if phase != "Lobby" or now >= _requeue["until"]:
         _requeue["until"] = 0.0
         return False
+    if now < _requeue["not_before"]:
+        return True
     lobby = _lcu("GET", "/lol-lobby/v2/lobby")
     if not isinstance(lobby, dict):
         return True  # the lobby is still opening
@@ -325,22 +421,61 @@ def _note(key: str, text: str) -> None:
         log.info(text)
 
 
+def after_dodge(before, phase) -> bool:
+    """Champ select ended back in the lobby: someone dodged."""
+    return before == "ChampSelect" and phase == "Lobby"
+
+
+def _queue_refresh() -> None:
+    """A search well past its estimated time starts over (at most every REFRESH_EVERY_S)."""
+    search = _lcu("GET", "/lol-lobby/v2/lobby/matchmaking/search-state")
+    if not isinstance(search, dict) or search.get("searchState") != "Searching":
+        return
+    waited, estimate = search.get("timeInQueue"), search.get("estimatedQueueTime")
+    if not isinstance(waited, (int, float)) or not isinstance(estimate, (int, float)) or estimate <= 0:
+        return
+    now = time.monotonic()
+    if waited < estimate + REFRESH_OVER_S or now - _refresh["at"] < REFRESH_EVERY_S:
+        return
+    _refresh["at"] = now
+    if _lcu("DELETE", "/lol-lobby/v2/lobby/matchmaking/search") is None:
+        return
+    time.sleep(1.0)
+    if _lcu("POST", "/lol-lobby/v2/lobby/matchmaking/search") is not None:
+        log.info(f"[Auto] Search restarted ({waited:.0f}s, estimated {estimate:.0f}s)")
+
+
 def _tick() -> float:
     config = settings()
-    if not _any_on(config):
+    if not _any_on(config) and not _dodge["armed"]:
         return IDLE_S
     phase = _lcu("GET", "/lol-gameflow/v1/gameflow-phase")
-    if phase != _last["phase"]:
+    before = _last["phase"]
+    if phase != before:
         _last["phase"] = phase
         _notes.clear()  # a new phase may say something new
+        _hovered.clear()
         log.info(f"[Auto] Phase {phase}")
+        if before == "ChampSelect":
+            _dodge.update(armed=False)
+        if phase == "ChampSelect":
+            _dodge.update(state="")
+        if config["requeue_dodge"] and after_dodge(before, phase):
+            now = time.monotonic()
+            delay = config.get("requeue_delay") or 0
+            _requeue.update(not_before=now + delay, until=now + DODGE_REQUEUE_S + delay)
+            log.info("[Auto] Champ select dodged: queueing again" + (f" in {delay}s" if delay else ""))
     if phase == "ReadyCheck" and config["accept"]:
         _accept()
         return BUSY_S
-    if phase == "ChampSelect" and (config["ban"] or config["pick"]):
-        _champ_select(config)
-        return BUSY_S
+    if phase == "ChampSelect" and (config["ban"] or config["pick"] or _dodge["armed"]):
+        return _champ_select(config)
     _done.clear()
+    if phase == "Matchmaking" and config["requeue_refresh"]:
+        _queue_refresh()
+        return BUSY_S
+    if config["requeue_dodge"] and phase == "Lobby" and _requeue["until"] and _after_game(phase):
+        return BUSY_S
     if config["requeue"] and _after_game(phase):
         return BUSY_S
     return IDLE_S
@@ -353,10 +488,10 @@ def _any_on(config) -> bool:
 def _run() -> None:
     global _thread
     while True:
-        if not _any_on(settings()):
+        if not _any_on(settings()) and not _dodge["armed"]:
             with _lock:
                 # A switch turned on just now keeps this thread instead of starting another
-                if not _any_on(_cache):
+                if not _any_on(_cache) and not _dodge["armed"]:
                     _thread = None
                     return
         try:
@@ -367,10 +502,10 @@ def _run() -> None:
         time.sleep(delay)
 
 
-def start() -> None:
-    """Watch the client while any switch is on (the thread ends when all are off)."""
+def start(force: bool = False) -> None:
+    """Watch the client while any switch is on or a dodge is armed (the thread ends when all are off)."""
     global _thread
-    if not _any_on(settings()):
+    if not force and not _any_on(settings()):
         return
     with _lock:
         if _thread is not None:

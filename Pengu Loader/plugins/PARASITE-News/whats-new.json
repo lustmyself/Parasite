@@ -1,19 +1,15 @@
 {
-  "version": "2.2",
+  "version": "2.3",
   "en": [
-    "Fixed: skins didn't apply because League opened as administrator. Parasite Offline now opens League as you",
-    "Parasite now has the desktop hub, the PARASITE client theme, wallpapers and Lobby Reveal",
-    "Built on Rose 1.5.3: skins are applied through LTK Manager, as in Rose",
-    "Lobby Reveal follows reveal v1.6.1: new op.gg links and region fixes (EUW, EUNE, LAN, LAS, OCE...)",
-    "No Rose welcome pop-up and no rose icon while the client loads",
-    "LTK Manager installs itself: Parasite finds it, or downloads and installs it on first start"
+    "Reveal page in the desktop app: Master+ counters for every enemy pick with leads at 15 minutes, and links to U.GG, Lolalytics, LadderEye and League of Graphs",
+    "Last-second bans and picks, a dodge button and last-second dodge",
+    "Queue again after a dodge, wait before queueing again, and restart a search that runs too long",
+    "Fixed: skins didn't apply because League opened as administrator. Parasite Offline now opens League as you"
   ],
   "tr": [
-    "Düzeltildi: League yönetici olarak açıldığı için skinler uygulanmıyordu. Parasite Offline artık League'i normal kullanıcı olarak açıyor",
-    "Parasite'ta artık masaüstü hub, PARASITE istemci teması, duvar kağıtları ve Lobby Reveal var",
-    "Rose 1.5.3 üzerine kurulu: skinler Rose'daki gibi LTK Manager ile uygulanıyor",
-    "Lobby Reveal, reveal v1.6.1'i takip ediyor: yeni op.gg linkleri ve bölge düzeltmeleri (EUW, EUNE, LAN, LAS, OCE...)",
-    "Client açılırken Rose bildirimi ve gül simgesi yok",
-    "LTK Manager kendiliğinden kuruluyor: Parasite onu buluyor ya da ilk açılışta indirip kuruyor"
+    "Masaüstü uygulamada Reveal sayfası: her rakip şampiyona karşı Master+ counter'lar, 15. dakika farkları ve U.GG, Lolalytics, LadderEye, League of Graphs linkleri",
+    "Son saniye ban ve pick, dodge düğmesi ve son saniye dodge",
+    "Dodge sonrası tekrar sıraya girme, sıraya girmeden önce bekleme ve uzayan aramayı yenileme",
+    "Düzeltildi: League yönetici olarak açıldığı için skinler uygulanmıyordu. Parasite Offline artık League'i normal kullanıcı olarak açıyor"
   ]
 }

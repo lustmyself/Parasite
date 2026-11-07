@@ -307,7 +307,8 @@ def _profile():
 
 
 LINK_HOSTS = ("https://www.op.gg/", "https://op.gg/", "https://u.gg/", "https://porofessor.gg/",
-              "https://www.leagueoflegends.com/")
+              "https://www.leagueoflegends.com/", "https://lolalytics.com/", "https://laddereye.com/",
+              "https://www.leagueofgraphs.com/")
 
 
 def _open_link(url: str) -> str:
@@ -609,6 +610,8 @@ ACTIONS: dict[str, Callable[[dict], str]] = {
     "open_data": lambda body: _open_data(),
     "client_panel": lambda body: _client_panel(),
     "auto_set": lambda body: _auto().update(body.get("changes") or {}),
+    "dodge_now": lambda body: _auto().dodge_now(),
+    "dodge_last": lambda body: _auto().arm_dodge(bool(body.get("on"))),
     "wallpaper_set": lambda body: _wallpaper().choose(body.get("name") if isinstance(body.get("name"), str) else None),
     "wallpaper_delete": lambda body: _wallpaper().delete(str(body.get("name") or "")),
     "wallpaper_folder": lambda body: _wallpaper().open_folder(),

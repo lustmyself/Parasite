@@ -107,7 +107,7 @@ def _game(game_id=42, queue=420, custom=False, kind="RANKED_SOLO_5x5"):
 
 class RequeueTests(unittest.TestCase):
     def setUp(self):
-        parasite_auto._requeue.update(game=None, until=0.0)
+        parasite_auto._requeue.update(game=None, until=0.0, not_before=0.0)
 
     def _run(self, phases, session=None, lobby=None, search_ok=True):
         calls = []
@@ -153,6 +153,65 @@ class RequeueTests(unittest.TestCase):
     def test_requeue_alone_keeps_the_thread(self):
         self.assertTrue(parasite_auto._any_on(parasite_auto.clean({"requeue": True})))
         self.assertFalse(parasite_auto._any_on(parasite_auto.clean({})))
+
+
+class LastSecondTests(unittest.TestCase):
+    def setUp(self):
+        parasite_auto._done.clear()
+        parasite_auto._hovered.clear()
+        parasite_auto._dodge.update(armed=False, state="")
+
+    def _run(self, session, config):
+        calls = []
+
+        def lcu(method, path, body=None):
+            calls.append((method, path, body))
+            return session if path.endswith("/session") else {}
+        with mock.patch.object(parasite_auto, "_lcu", side_effect=lcu):
+            delay = parasite_auto._champ_select(config)
+        return [c for c in calls if c[0] != "GET"], delay
+
+    def test_the_settings_keep_known_choices_only(self):
+        out = parasite_auto.clean({"ban_at": 3, "pick_at": 7, "requeue_delay": 30, "requeue_dodge": True})
+        self.assertEqual((out["ban_at"], out["pick_at"], out["requeue_delay"], out["requeue_dodge"]), (3, 0, 30, True))
+        self.assertEqual(parasite_auto.clean({"ban_at": True})["ban_at"], 0)
+
+    def test_waits_for_the_last_seconds_and_hovers_meanwhile(self):
+        session = dict(_session("pick"), timer={"phase": "BAN_PICK", "adjustedTimeLeftInPhase": 20000})
+        sent, delay = self._run(session, dict(ON, pick_at=3))
+        self.assertEqual(sent, [("PATCH", "/lol-champ-select/v1/session/actions/7", {"championId": 103})])
+        self.assertEqual(delay, parasite_auto.BUSY_S)
+        # Hovered once only
+        sent, _ = self._run(session, dict(ON, pick_at=3))
+        self.assertEqual(sent, [])
+
+    def test_locks_in_once_the_time_has_come(self):
+        session = dict(_session("pick"), timer={"phase": "BAN_PICK", "adjustedTimeLeftInPhase": 2900})
+        sent, _ = self._run(session, dict(ON, pick_at=3))
+        self.assertIn(("POST", "/lol-champ-select/v1/session/actions/7/complete", None), sent)
+
+    def test_the_last_second_is_never_later_than_1_2s(self):
+        timer = {"phase": "BAN_PICK", "adjustedTimeLeftInPhase": 1500}
+        self.assertGreater(parasite_auto._wait_ms(dict(ON, ban_at=1), "ban", timer), 0)
+        timer["adjustedTimeLeftInPhase"] = 1100
+        self.assertEqual(parasite_auto._wait_ms(dict(ON, ban_at=1), "ban", timer), 0)
+        self.assertEqual(parasite_auto._wait_ms(dict(ON, ban_at=0), "ban", {"phase": "BAN_PICK", "adjustedTimeLeftInPhase": 9000}), 0)
+
+    def test_an_armed_dodge_goes_at_the_end_of_champ_select(self):
+        parasite_auto._dodge["armed"] = True
+        early = {"phase": "FINALIZATION", "adjustedTimeLeftInPhase": 9000}
+        sent, delay = self._run(dict(_session("pick"), timer=early), dict(ON, ban=False, pick=False))
+        self.assertEqual(sent, [])
+        self.assertEqual(delay, parasite_auto.FAST_S)
+        late = {"phase": "FINALIZATION", "adjustedTimeLeftInPhase": 1000}
+        sent, _ = self._run(dict(_session("pick"), timer=late), dict(ON, ban=False, pick=False))
+        self.assertEqual(sent, [("POST", parasite_auto.DODGE_PATH, {})])
+        self.assertFalse(parasite_auto._dodge["armed"])
+
+    def test_back_in_the_lobby_from_champ_select_is_a_dodge(self):
+        self.assertTrue(parasite_auto.after_dodge("ChampSelect", "Lobby"))
+        self.assertFalse(parasite_auto.after_dodge("ChampSelect", "InProgress"))
+        self.assertFalse(parasite_auto.after_dodge("Matchmaking", "Lobby"))
 
 
 if __name__ == "__main__":

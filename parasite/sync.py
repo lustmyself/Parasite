@@ -1324,6 +1324,11 @@ EDITS += [
      "    'party.integration.injection_hook',\n    'party.network.relay_config',\n    'launcher.parasite_share',\n"),
 ]
 
+# Reveal's counters board in the hub (launcher/parasite_counters.py, imported by parasite_auto)
+EDITS += [
+    ("Parasite.spec", "    'launcher.parasite_auto',\n", "    'launcher.parasite_auto',\n    'launcher.parasite_counters',\n"),
+]
+
 # Parasite keeps Rose's skin injection as it is: Rose 1.5.3 and newer inject through LTK
 # Manager (the LTF bridge), so Lust's LTK patcher fixes don't apply to it. These edits stay
 # out; everything else (hub, theme, wallpaper, lobby reveal...) is applied.

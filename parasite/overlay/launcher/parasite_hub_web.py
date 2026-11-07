@@ -918,6 +918,41 @@ PAGE = r"""<!doctype html>
   .au-sug:empty { display: none; }
   .au-sug div { display: flex; align-items: center; gap: 10px; padding: 7px 12px; cursor: pointer; }
   .au-sug div:hover { background: rgba(109, 93, 252, .25); }
+  /* Reveal: dodge, the enemy picks' counters, timing and queue options */
+  .rv-dodge { margin-top: 14px; display: flex; align-items: center; gap: 10px; padding: 12px 16px; border-radius: 16px;
+    background: rgba(120, 20, 40, .28); border: 1px solid rgba(244, 63, 94, .3); }
+  .rv-dodge > div { margin-right: auto; } .rv-dodge b { display: block; font-size: 14px; } .rv-dodge span { color: var(--sub); font-size: 12px; }
+  .rv-dodge .btn.armed { background: #e11d48; color: #fff; box-shadow: 0 0 14px rgba(244, 63, 94, .55); }
+  .rv-board { margin-top: 14px; padding: 14px 16px; border-radius: 16px; background: rgba(22, 28, 78, .55); border: 1px solid rgba(255, 255, 255, .07); }
+  .rv-patch { margin-left: auto; color: var(--faint); font-size: 11px; }
+  .rv-wait { color: var(--sub); font-size: 12.5px; margin-top: 10px; }
+  .rv-enemies { display: grid; grid-template-columns: repeat(auto-fill, minmax(330px, 1fr)); gap: 10px; margin-top: 10px; }
+  .rv-en { padding: 10px 12px; border-radius: 12px; background: rgba(255, 255, 255, .04); min-width: 0; }
+  .rv-en-h { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; }
+  .rv-en-h img { width: 36px; height: 36px; border-radius: 10px; flex: none; }
+  .rv-en-h b { display: block; font-size: 14px; } .rv-en-h small { color: var(--sub); font-size: 11.5px; }
+  .rv-links { flex-basis: 100%; display: flex; flex-wrap: wrap; gap: 4px; padding-left: 46px; }
+  .rv-links button { border: 1px solid var(--line); background: none; color: var(--sub); font: inherit; font-size: 10.5px; font-weight: 600;
+    padding: 3px 7px; border-radius: 99px; cursor: pointer; }
+  .rv-links button:hover { color: var(--text); border-color: var(--accent); }
+  .rv-ally { margin-top: 8px; font-size: 12px; color: var(--sub); cursor: pointer; }
+  .rv-ally b { color: var(--text); }
+  .rv-cs { margin-top: 8px; display: flex; flex-direction: column; gap: 3px; }
+  .rv-c { display: grid; grid-template-columns: 24px minmax(0, 1fr) auto auto; align-items: center; gap: 8px; padding: 4px 6px; border-radius: 8px;
+    cursor: pointer; font-size: 12px; }
+  .rv-c:hover { background: rgba(255, 255, 255, .07); }
+  .rv-c img { width: 24px; height: 24px; border-radius: 6px; }
+  .rv-c b { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .rv-c .wr { font-weight: 700; color: #4ade80; } .rv-c .wr.lo { color: var(--sub); }
+  .rv-c .ld { color: var(--faint); font-size: 11px; white-space: nowrap; }
+  .rv-c .ld i { font-style: normal; } .rv-c .ld .up { color: #86efac; } .rv-c .ld .dn { color: #fca5a5; }
+  .rv-opts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-top: 14px; }
+  .rv-opt { padding: 12px 14px; border-radius: 14px; background: rgba(22, 28, 78, .55); border: 1px solid rgba(255, 255, 255, .07); }
+  .rv-opt b { display: block; font-size: 13px; margin-bottom: 8px; } .rv-opt span { color: var(--sub); font-size: 11.5px; }
+  .rv-opt .seg { margin-left: 0; display: inline-flex; flex-wrap: wrap; }
+  .rv-opt .seg button { padding: 5px 11px; font-size: 12px; }
+  .rv-sw { display: flex; align-items: center; gap: 12px; cursor: pointer; } .rv-sw b { margin-bottom: 2px; } .rv-sw .switch { margin-left: auto; flex: none; }
+  @media (max-width: 760px) { .rv-opts { grid-template-columns: 1fr; } }
 
   /* Patch notes page */
 
@@ -1389,7 +1424,7 @@ PAGE = r"""<!doctype html>
     </div>
     <div class="ht" data-go="auto" id="tile-auto" style="--i:7;--c:244, 63, 94">
       <div class="ht-bg" id="t-auto-bg"></div><div class="ht-ov"></div><div class="ht-cs" id="t-auto-draft"></div>
-      <div class="ht-in"><b class="ht-ttl">Champ select</b><span class="ht-st" id="t-auto"></span></div>
+      <div class="ht-in"><b class="ht-ttl">Reveal</b><span class="ht-st" id="t-auto"></span></div>
     </div>
     <div class="ht" data-go="settings" id="tile-settings" style="--i:8;--c:167, 139, 250">
       <div class="ht-bg" id="t-settings-bg"></div><div class="ht-ov"></div><div class="ht-gear"><svg viewBox="0 0 200 200"><circle cx="100" cy="100" r="74" fill="none" stroke="currentColor" stroke-width="26" stroke-dasharray="22 16.75"/><circle cx="100" cy="100" r="58" fill="none" stroke="currentColor" stroke-width="14"/><circle cx="100" cy="100" r="22" fill="none" stroke="currentColor" stroke-width="10"/></svg></div><div class="ht-sw"><i class="on"></i><i></i><i class="on"></i></div><i class="ht-haz"></i>
@@ -1532,13 +1567,33 @@ PAGE = r"""<!doctype html>
       <div class="au-team-h"><div class="section">Takımın</div><button class="btn" id="au-multi">op.gg'de hepsi</button></div>
       <div class="au-players" id="au-players"></div>
     </div>
+    <div class="rv-dodge" id="rv-dodge" hidden>
+      <div><b>Dodge</b><span>Client'ı yeniden başlatmadan şampiyon seçiminden çık (normal dodge cezası uygulanır)</span></div>
+      <button class="btn" id="rv-dodge-last" title="Şampiyon seçiminin son saniyesinde dodge atar">Son saniye dodge</button>
+      <button class="btn danger" id="rv-dodge-now">Şimdi dodge</button>
+    </div>
+    <div class="rv-board" id="rv-board" hidden>
+      <div class="au-team-h"><div class="section">Rakipler ve counter'ları</div><small class="rv-patch" id="rv-patch"></small></div>
+      <div class="rv-wait" id="rv-wait" hidden></div>
+      <div class="rv-enemies" id="rv-enemies"></div>
+      <div class="note">Master+ maçlar, bütün bölgeler, Ranked Solo/Duo. Kazanma oranı Lolalytics'ten (yoksa U.GG), 15. dakika altın, CS ve kill farkları U.GG'den;
+        Δ, beklenenden kaç puan iyi olduğu. Bir counter'a tıklayınca U.GG'de o eşleşme açılır.</div>
+    </div>
     <div class="au-lists">
       <div class="au-list" data-list="bans"><div class="section">Ban listesi</div><div class="au-chips" id="au-bans"></div>
         <input type="search" placeholder="Banlanacak şampiyon ekle" autocomplete="off"><div class="au-sug"></div></div>
       <div class="au-list" data-list="picks"><div class="section">Pick listesi</div><div class="au-chips" id="au-picks"></div>
         <input type="search" placeholder="Seçilecek şampiyon ekle" autocomplete="off"><div class="au-sug"></div></div>
     </div>
-    <div class="note">Sıra sana gelince listendeki ilk boş şampiyon seçilir; banlanmış, alınmış ya da takım arkadaşının istediği şampiyon atlanır.
+    <div class="rv-opts">
+      <div class="rv-opt"><b>Ban zamanı</b><div class="seg" data-opt="ban_at"></div></div>
+      <div class="rv-opt"><b>Pick zamanı</b><div class="seg" data-opt="pick_at"></div></div>
+      <div class="rv-opt"><b>Tekrar sıraya girmeden önce bekle</b><div class="seg" data-opt="requeue_delay"></div></div>
+      <div class="rv-opt rv-sw" data-sw="requeue_dodge"><div><b>Dodge sonrası tekrar sıraya gir</b><span>Lobiye dönünce, ceza varsa bitince sırayı yeniden başlatır</span></div><i class="switch"></i></div>
+      <div class="rv-opt rv-sw" data-sw="requeue_refresh"><div><b>Uzayan aramayı yenile</b><span>Tahmini süreyi 1 dakika geçen aramayı baştan başlatır</span></div><i class="switch"></i></div>
+    </div>
+    <div class="note">Ban ve pick zamanı "son N sn" ise şampiyon hemen işaretlenir (takımın görür), sıranın son saniyelerinde kilitlenir.
+      Sıra sana gelince listendeki ilk boş şampiyon seçilir; banlanmış, alınmış ya da takım arkadaşının istediği şampiyon atlanır.
       Auto Requeue yalnızca eşleşmeli maçlardan sonra çalışır (özel oyun ve antrenman aracı hariç); grupta sırayı lider başlatır.
       Parasite bunları LoL istemcisi üzerinden yapar, League açıkken çalışır.</div>
   </section>
@@ -2023,7 +2078,7 @@ async function poll() {
 }
 // ---- pages: the home tiles lead to each one, Esc or the back button comes home ----
 const PAGES = { home: "", lol: "Profil", spotify: "Spotify", maps: "Skinler ve Haritalar", fonts: "Fontlar", skins: "Skinler ve Haritalar",
-  profile: "Profil arka planı", icon: "Profil simgesi", settings: "Ayarlar", wallpaper: "Duvar kağıdı", auto: "Champ select" };
+  profile: "Profil arka planı", icon: "Profil simgesi", settings: "Ayarlar", wallpaper: "Duvar kağıdı", auto: "Reveal" };
 let page = "home";
 function showPage(name) {
   if (!(name in PAGES)) name = "home";
@@ -2271,13 +2326,13 @@ homeMedia();
 // ---- champ select: Auto Accept, Ban, Pick and Lobby Reveal ----
 async function loadAuto() {
   try { auto = await api("/api/auto"); } catch (e) { return; }
-  drawAuto();
+  drawAuto(); drawRevealOptions();
   drawTiles();
 }
 setInterval(() => { if (page === "auto" && awake()) loadAuto(); }, 2000);
 function saveAuto(changes) {
   Object.assign(auto, changes);
-  drawAuto(); drawTiles();
+  drawAuto(); drawRevealOptions(); drawTiles();
   act("auto_set", { changes });
 }
 function drawAuto() {
@@ -2319,7 +2374,114 @@ function drawAuto() {
       return el;
     }));
   }
+  drawReveal();
 }
+const RV_SITES = [["ugg", "U.GG"], ["lolalytics", "Lolalytics"], ["laddereye", "LadderEye"], ["log", "LoG"]];
+const signed = (v, digits = 0) => v == null ? "" : `${v > 0 ? "+" : ""}${Number(v).toFixed(digits)}`;
+function rvLead(label, v, digits) {
+  if (v == null) return null;
+  return Object.assign(document.createElement("i"), { className: v > 0 ? "up" : v < 0 ? "dn" : "", textContent: `${label} ${signed(v, digits)}` });
+}
+function drawReveal() {
+  const c = auto.counters || {}, d = auto.dodge || {};
+  const inSelect = c.phase === "ChampSelect";
+  $("rv-dodge").hidden = !inSelect;
+  $("rv-dodge-last").classList.toggle("armed", !!d.armed);
+  $("rv-dodge-last").textContent = d.armed ? "Son saniye dodge: açık" : "Son saniye dodge";
+  const enemies = c.enemies || [];
+  $("rv-board").hidden = !(inSelect && (enemies.length || c.status === "loading"));
+  $("rv-patch").textContent = c.patch ? `Yama ${c.patch}` : "";
+  const wait = c.status === "loading" ? "Counter'lar yükleniyor…"
+    : c.status === "error" ? "Counter verisi şu an alınamadı; sitelerin kendi sayfaları aşağıda." : "";
+  $("rv-wait").hidden = !wait; $("rv-wait").textContent = wait;
+  const key = JSON.stringify(enemies);
+  if ($("rv-enemies").dataset.key === key) return;
+  $("rv-enemies").dataset.key = key;
+  $("rv-enemies").replaceChildren(...enemies.map((e) => {
+    const card = document.createElement("div");
+    card.className = "rv-en";
+    const head = document.createElement("div");
+    head.className = "rv-en-h";
+    const title = document.createElement("div");
+    title.append(Object.assign(document.createElement("b"), { textContent: e.name || `#${e.id}` }),
+      Object.assign(document.createElement("small"), { textContent: e.roleLabel || "" }));
+    const sites = document.createElement("div");
+    sites.className = "rv-links";
+    RV_SITES.forEach(([k, label]) => {
+      if (!(e.links || {})[k]) return;
+      const b = Object.assign(document.createElement("button"), { textContent: label, title: `${label}: ${e.name} counter'ları` });
+      b.addEventListener("click", () => act("open_link", { url: e.links[k] }));
+      sites.append(b);
+    });
+    head.append(Object.assign(document.createElement("img"), { src: CHAMP_ICON(e.id), alt: "" }), title, sites);
+    card.append(head);
+    if (e.ally) {
+      const a = document.createElement("div");
+      a.className = "rv-ally";
+      a.append("Takımından ", Object.assign(document.createElement("b"), { textContent: e.ally.name }),
+        e.ally.winRate != null ? `: %${e.ally.winRate} kazanıyor (${e.ally.games} maç${e.ally.delta != null ? `, Δ ${signed(e.ally.delta, 1)}` : ""})`
+          : ": bu eşleşmede yeterli maç yok");
+      if (e.ally.link) a.addEventListener("click", () => act("open_link", { url: e.ally.link }));
+      card.append(a);
+    }
+    const list = document.createElement("div");
+    list.className = "rv-cs";
+    (e.counters || []).forEach((k) => {
+      const row = document.createElement("div");
+      row.className = "rv-c";
+      row.title = `${k.name}: %${k.winRate} (${k.games} maç)${k.delta != null ? `, Δ ${signed(k.delta, 1)}` : ""}`;
+      const leads = document.createElement("span");
+      leads.className = "ld";
+      [rvLead("altın", k.gold15, 0), rvLead("CS", k.cs15, 1), rvLead("kill", k.kills15, 2)].filter(Boolean)
+        .forEach((x, n) => { if (n) leads.append(" · "); leads.append(x); });
+      row.append(Object.assign(document.createElement("img"), { src: CHAMP_ICON(k.id), alt: "" }),
+        Object.assign(document.createElement("b"), { textContent: k.name }), leads,
+        Object.assign(document.createElement("span"), { className: `wr${k.winRate < 50 ? " lo" : ""}`, textContent: `%${k.winRate}` }));
+      if (k.link) row.addEventListener("click", () => act("open_link", { url: k.link }));
+      list.append(row);
+    });
+    card.append(list);
+    return card;
+  }));
+}
+function drawRevealOptions() {
+  if (!auto) return;
+  document.querySelectorAll(".rv-opt .seg").forEach((seg) => {
+    const k = seg.dataset.opt;
+    const choices = k === "requeue_delay" ? (auto.delayChoices || [0]) : (auto.atChoices || [0]);
+    const sig = JSON.stringify([choices, auto[k]]);
+    if (seg.dataset.key === sig) return;
+    seg.dataset.key = sig;
+    seg.replaceChildren(...choices.map((v) => {
+      const b = Object.assign(document.createElement("button"), {
+        textContent: k === "requeue_delay" ? (v ? `${v} sn` : "Bekleme") : (v ? `Son ${v} sn` : "Hemen") });
+      b.classList.toggle("on", auto[k] === v);
+      b.addEventListener("click", () => saveAuto({ [k]: v }));
+      return b;
+    }));
+  });
+  document.querySelectorAll(".rv-sw").forEach((row) => row.querySelector(".switch").classList.toggle("on", !!auto[row.dataset.sw]));
+}
+document.querySelectorAll(".rv-sw").forEach((row) => row.addEventListener("click", () => auto && saveAuto({ [row.dataset.sw]: !auto[row.dataset.sw] })));
+let rvDodgeArmedUntil = 0;
+$("rv-dodge-now").addEventListener("click", () => {
+  if (Date.now() > rvDodgeArmedUntil) {
+    rvDodgeArmedUntil = Date.now() + 3000;
+    $("rv-dodge-now").textContent = "Emin misin? Tekrar tıkla";
+    setTimeout(() => { if (Date.now() > rvDodgeArmedUntil) $("rv-dodge-now").textContent = "Şimdi dodge"; }, 3100);
+    return;
+  }
+  rvDodgeArmedUntil = 0;
+  $("rv-dodge-now").textContent = "Şimdi dodge";
+  act("dodge_now");
+});
+$("rv-dodge-last").addEventListener("click", () => {
+  if (!auto) return;
+  const on = !(auto.dodge || {}).armed;
+  auto.dodge = Object.assign({}, auto.dodge, { armed: on });
+  drawReveal();
+  act("dodge_last", { on });
+});
 document.querySelectorAll(".au").forEach((card) => card.addEventListener("click", () => {
   if (!auto) return;
   const k = card.dataset.auto;
