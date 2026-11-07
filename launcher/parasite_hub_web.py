@@ -2533,7 +2533,7 @@ function drawReveal() {
     $("cs-rows").replaceChildren(...rows.map((row) => {
       const e = enemies[row.position];
       const el = mk("div", `cs-row${row.me ? " me" : ""}${e && row.position === csPick ? " sel" : ""}`);
-      el.append(mk("span", `cs-lane${row.offRole ? " off" : ""}`, (CS_LANES[row.position] || "–") + (row.offRole ? "?" : "")));
+      el.append(mk("span", `cs-lane${row.offRole ? " off" : ""}`, (CS_LANES[row.position] || "–") + (row.guessed ? "?" : "")));
       const pl = mk("div", "cs-pl");
       pl.append(Object.assign(mk("img"), { src: row.iconId != null ? ICON_IMG(row.iconId) : (row.championId ? CHAMP_ICON(row.championId) : ICON_IMG(29)), alt: "" }));
       const box = mk("div"), nm = mk("div", "cs-nm");

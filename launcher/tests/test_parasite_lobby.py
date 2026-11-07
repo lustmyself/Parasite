@@ -57,6 +57,19 @@ class TeamTests(unittest.TestCase):
         self.assertEqual(rows[1]["position"], "jungle")
         self.assertTrue(rows[1]["me"])
 
+    def test_hidden_lanes_go_to_the_players_who_play_them(self):
+        session = {"localPlayerCellId": 2, "myTeam": [
+            {"cellId": 0, "puuid": "x0", "assignedPosition": "top"},
+            {"cellId": 1, "puuid": "x1", "assignedPosition": "middle"},
+            {"cellId": 2, "puuid": "me", "assignedPosition": "bottom"},
+        ]}
+        revealed = [{"puuid": p, "gameName": p} for p in ("me", "mid", "top")]
+        roles = {"mid": {"middle": 15, "top": 1}, "top": {"top": 12}}
+        rows = lobby.team_rows(session, revealed, roles)
+        self.assertEqual([(r["position"], r["gameName"], r["guessed"]) for r in rows],
+                         [("top", "top", True), ("middle", "mid", True), ("bottom", "me", False)])
+        self.assertFalse(any(lobby.off_role(r["position"], roles.get(r["puuid"], {})) for r in rows))
+
     def test_history_keeps_one_entry_per_champ_select(self):
         lobby_a = {"gameId": 7, "queueName": "Ranked Solo/Duo", "links": {}, "rows": [
             {"gameName": "A", "gameTag": "1", "position": "top", "championId": 0, "me": False}]}

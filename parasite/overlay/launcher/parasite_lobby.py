@@ -12,7 +12,9 @@ kept for a few minutes per player, so the page's polling never waits on them.
 
 from __future__ import annotations
 
+import itertools
 import json
+import math
 import threading
 import time
 from collections import Counter
@@ -116,26 +118,57 @@ def rank_text(rank: Optional[dict]) -> str:
 
 # ---- the team ----
 
-def team_rows(session: dict, revealed: list) -> list:
-    """The teammates in pick order, with names from Lobby Reveal where League hides them."""
+def _fit(roles: dict, position: str) -> float:
+    total = sum((roles or {}).values())
+    return math.log(((roles or {}).get(position, 0) + 0.5) / (total + 0.5 * len(ROLES)))
+
+
+def guess_lanes(positions: list, players: list, roles: dict) -> list:
+    """Ranked hides which teammate is in which lane: give each hidden lane the revealed player
+    whose recent games fit it best. Returns, per lane, an index into *players* or None."""
+    count = min(len(positions), len(players))
+    best, best_score = None, None
+    for slots in itertools.permutations(range(len(positions)), count):
+        score = sum(_fit(roles.get(players[i].get("puuid"), {}), positions[slot]) for i, slot in enumerate(slots))
+        if best_score is None or score > best_score + 1e-9:
+            best, best_score = slots, score
+    out = [None] * len(positions)
+    for i, slot in enumerate(best or ()):
+        out[slot] = i
+    return out
+
+
+def team_rows(session: dict, revealed: list, roles: Optional[dict] = None) -> list:
+    """The teammates in pick order, with names from Lobby Reveal where League hides them.
+
+    Names League shows match by puuid. In ranked the other four are hidden: their lanes go to
+    the revealed players by their usual roles (*roles*: puuid -> {role: games}), marked guessed."""
     members = sorted((session or {}).get("myTeam") or [], key=lambda m: m.get("cellId", 99))
     local = (session or {}).get("localPlayerCellId")
     by_puuid = {p.get("puuid"): p for p in revealed or [] if p.get("puuid")}
-    unmatched = [p for p in revealed or [] if p.get("puuid") not in {m.get("puuid") for m in members}]
+    matched = {m.get("puuid") for m in members if m.get("puuid") in by_puuid}
+    unmatched = [p for p in revealed or [] if p.get("puuid") not in matched]
+    hidden = [i for i, m in enumerate(members) if m.get("puuid") not in by_puuid and not m.get("gameName")]
+    positions = [str(members[i].get("assignedPosition") or "").lower() for i in hidden]
+    guesses = dict(zip(hidden, guess_lanes(positions, unmatched, roles or {})))
     rows = []
-    for member in members:
+    for index, member in enumerate(members):
         puuid = member.get("puuid") or ""
         player = by_puuid.get(puuid)
-        if player is None and not member.get("gameName") and unmatched:
-            player = unmatched.pop(0)
-            puuid = puuid or player.get("puuid") or ""
+        guessed = False
+        if player is None and guesses.get(index) is not None:
+            player = unmatched[guesses[index]]
+            puuid = player.get("puuid") or ""
+            guessed = len(unmatched) > 1
+        elif player is None:
+            puuid = ""
         player = player or {}
         position = str(member.get("assignedPosition") or "").lower()
         champion = member.get("championId") or 0
         intent = member.get("championPickIntent") or 0
         rows.append({
             "cell": member.get("cellId"), "me": member.get("cellId") == local, "puuid": puuid,
-            "position": position if position in ROLES else "",
+            "position": position if position in ROLES else "", "guessed": guessed,
             "gameName": player.get("gameName") or member.get("gameName") or "",
             "gameTag": player.get("gameTag") or member.get("tagLine") or "",
             "championId": champion if isinstance(champion, int) and champion > 0 else
@@ -211,9 +244,11 @@ def snapshot(session: Optional[dict], reveal: dict) -> dict:
         return {"active": False, "rows": []}
     queue = _queue(session)
     queue_type = _ranked_queue(queue)
-    rows = team_rows(session, (reveal or {}).get("players") or [])
+    revealed = (reveal or {}).get("players") or []
+    known = {p.get("puuid"): _stats_for(p.get("puuid"), queue_type) for p in revealed if p.get("puuid")}
+    rows = team_rows(session, revealed, {k: (v or {}).get("roles") or {} for k, v in known.items()})
     for row in rows:
-        stats = _stats_for(row["puuid"], queue_type)
+        stats = known.get(row["puuid"]) if row["puuid"] in known else _stats_for(row["puuid"], queue_type)
         row["loading"] = stats is None and bool(row["puuid"])
         stats = stats or {}
         row.update(rank=stats.get("rank"), iconId=stats.get("iconId"), recentWins=stats.get("recentWins"),
@@ -305,7 +340,8 @@ def lanes(lobby: dict, board: dict) -> list:
             enemies[enemy["role"]] = enemy
     out = []
     for row in (lobby or {}).get("rows") or []:
-        lane = {k: row.get(k) for k in ("puuid", "position", "championId", "hover", "offRole", "mainRole", "me", "rank")}
+        lane = {k: row.get(k) for k in ("puuid", "position", "guessed", "championId", "hover", "offRole", "mainRole",
+                                        "me", "rank")}
         enemy = enemies.get(row.get("position"))
         if enemy:
             lane["enemy"] = {"id": enemy["id"], "name": enemy.get("name", "")}

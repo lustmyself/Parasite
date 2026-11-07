@@ -886,9 +886,13 @@
       return;
     }
 
-    const players = Array.isArray(data.players) ? data.players : [];
+    const laneList = (Array.isArray(data.lanes) ? data.lanes : []).filter((l) => l.puuid);
+    const lanes = new Map(laneList.map((l) => [l.puuid, l]));
+    const laneOrder = new Map(laneList.map((l, i) => [l.puuid, i]));
+    // In lane order (top to support) once the lanes are known
+    const players = (Array.isArray(data.players) ? data.players : []).slice()
+      .sort((a, b) => (laneOrder.has(a.puuid) ? laneOrder.get(a.puuid) : 9) - (laneOrder.has(b.puuid) ? laneOrder.get(b.puuid) : 9));
     players.forEach((player) => loadStats(player.puuid));
-    const lanes = new Map((Array.isArray(data.lanes) ? data.lanes : []).filter((l) => l.puuid).map((l) => [l.puuid, l]));
     root.replaceChildren();
 
     const head = el("div", "parasite-reveal-head");
@@ -919,8 +923,9 @@
 
       const info = el("div", "parasite-reveal-info");
       const top = el("div", "parasite-reveal-line");
-      const role = ROLE_LABELS[player.position];
-      if (role) top.appendChild(el("span", "parasite-reveal-role", role));
+      const laneInfo = lanes.get(player.puuid);
+      const role = ROLE_LABELS[(laneInfo && laneInfo.position) || player.position];
+      if (role) top.appendChild(el("span", "parasite-reveal-role", role + (laneInfo && laneInfo.guessed ? "?" : "")));
 
       const profileSites = {
         opgg: [player.opggUrl, "op.gg"],
