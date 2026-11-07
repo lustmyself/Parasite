@@ -289,3 +289,48 @@ def clear_history() -> str:
     except OSError:
         return "Silinemedi"
     return ""
+
+
+# ---- the League client's Reveal box ----
+
+CLIENT_COUNTERS = 5
+
+
+def lanes(lobby: dict, board: dict) -> list:
+    """Each teammate's lane for the client box: rank, off-role, champion, the enemy in that
+    lane and how the pick does against it."""
+    enemies = {}
+    for enemy in (board or {}).get("enemies") or []:
+        if enemy.get("role") and enemy["role"] not in enemies:
+            enemies[enemy["role"]] = enemy
+    out = []
+    for row in (lobby or {}).get("rows") or []:
+        lane = {k: row.get(k) for k in ("puuid", "position", "championId", "hover", "offRole", "mainRole", "me", "rank")}
+        enemy = enemies.get(row.get("position"))
+        if enemy:
+            lane["enemy"] = {"id": enemy["id"], "name": enemy.get("name", "")}
+            ally = enemy.get("ally") or {}
+            if ally.get("id") == row.get("championId") and ally.get("winRate") is not None:
+                lane["matchup"] = {k: ally.get(k) for k in ("winRate", "games", "kills15", "cs15", "gold15")}
+        out.append(lane)
+    return out
+
+
+def client_counters(board: dict) -> list:
+    """The best few counters of each enemy pick, for the client box."""
+    out = []
+    for enemy in (board or {}).get("enemies") or []:
+        out.append({"id": enemy["id"], "name": enemy.get("name", ""), "role": enemy.get("role"),
+                    "roleLabel": enemy.get("roleLabel", ""),
+                    "counters": [{k: c.get(k) for k in ("id", "name", "winRate", "games", "gold15", "link")}
+                                 for c in (enemy.get("counters") or [])[:CLIENT_COUNTERS]]})
+    return out
+
+
+def enrich(payload: dict) -> dict:
+    """Adds lanes, matchups and counters to Lobby Reveal's message to the client box."""
+    from launcher import parasite_counters
+    board = parasite_counters.board()
+    lobby = snapshot(parasite_counters.session(), payload)
+    return dict(payload, lanes=lanes(lobby, board), counters=client_counters(board),
+                queueName=lobby.get("queueName", ""), countersLoading=board.get("status") == "loading")

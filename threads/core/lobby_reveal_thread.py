@@ -94,6 +94,11 @@ class LobbyRevealThread(threading.Thread):
             "poroUrl": build_porofessor_url(players, self._poro_region),
             "uggUrl": build_ugg_multi_url(players, self._platform),
         }
+        try:
+            from launcher.parasite_lobby import enrich
+            payload = enrich(payload)
+        except Exception as e:  # noqa: BLE001
+            log.debug(f"[Reveal] No lanes or counters for the client box: {e}")
         now = time.monotonic()
         if payload != self._last_payload:
             log.info(f"[Reveal] {len(players)} teammate(s) revealed in champ select")

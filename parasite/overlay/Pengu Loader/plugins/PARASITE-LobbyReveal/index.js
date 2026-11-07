@@ -63,6 +63,15 @@
     "Click again to dodge": "Dodge için tekrar tıkla",
     "Dodging...": "Dodge atılıyor...",
     "Couldn't dodge": "Dodge atılamadı",
+    "OFF-ROLE": "OFF-ROLE",
+    "Usually plays {lane}": "Genelde {lane} oynuyor",
+    "Not picked": "Seçilmedi",
+    "Waiting for the pick": "Seçim bekleniyor",
+    "Not enough games": "Yeterli maç yok",
+    "Counters vs {name}": "{name} counter'ları",
+    "Loading counters...": "Counter'lar yükleniyor...",
+    "Copy names": "İsimleri kopyala",
+    "{games} games, Master+": "{games} maç, Master+",
     "Leave champ select without restarting the client (the usual dodge penalty applies)":
       "Client'ı yeniden başlatmadan şampiyon seçiminden çık (normal dodge cezası uygulanır)",
   };
@@ -84,7 +93,7 @@
       right: 16px;
       bottom: 92px;
       z-index: 99999;
-      width: 296px;
+      width: 330px;
       padding: 12px 12px 10px;
       background: rgba(9, 12, 20, 0.86);
       backdrop-filter: blur(14px);
@@ -304,6 +313,145 @@
 
     #${PANEL_ID} .parasite-reveal-also a:hover {
       color: #f0eef5;
+    }
+
+    #${PANEL_ID} .parasite-reveal-off {
+      flex: 0 0 auto;
+      padding: 0 4px;
+      border-radius: 4px;
+      background: rgba(244, 63, 94, 0.18);
+      font-size: 8.5px;
+      font-weight: 800;
+      line-height: 14px;
+      color: #fda4af;
+    }
+
+    #${PANEL_ID} .parasite-reveal-wl {
+      color: #6f6c78;
+    }
+
+    #${PANEL_ID} .parasite-reveal-vs {
+      margin-top: 3px;
+      font-size: 10.5px;
+      color: #8d8a95;
+      white-space: nowrap;
+    }
+
+    #${PANEL_ID} .parasite-reveal-vs img {
+      width: 16px;
+      height: 16px;
+      border-radius: 4px;
+    }
+
+    #${PANEL_ID} .parasite-reveal-vs .hover {
+      opacity: 0.45;
+    }
+
+    #${PANEL_ID} .parasite-reveal-enemy {
+      color: #fda4af;
+      font-weight: 700;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    #${PANEL_ID} .parasite-reveal-num {
+      margin-left: auto;
+      display: flex;
+      gap: 6px;
+      font-weight: 700;
+    }
+
+    #${PANEL_ID} .up { color: #4ade80; }
+    #${PANEL_ID} .dn { color: #f87171; }
+
+    #${PANEL_ID} .parasite-reveal-counters {
+      margin-top: 8px;
+      padding-top: 8px;
+      border-top: 1px solid rgba(255, 255, 255, 0.06);
+    }
+
+    #${PANEL_ID} .parasite-reveal-enemies {
+      display: flex;
+      gap: 4px;
+      margin-bottom: 6px;
+    }
+
+    #${PANEL_ID} .parasite-reveal-enemies img {
+      width: 24px;
+      height: 24px;
+      border-radius: 6px;
+      cursor: pointer;
+      opacity: 0.5;
+      border: 1px solid transparent;
+    }
+
+    #${PANEL_ID} .parasite-reveal-enemies img.on {
+      opacity: 1;
+      border-color: #fda4af;
+    }
+
+    #${PANEL_ID} .parasite-reveal-ctitle {
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      color: #8d8a95;
+      margin: 0 2px 4px;
+    }
+
+    #${PANEL_ID} .parasite-reveal-ctitle b {
+      color: #fda4af;
+    }
+
+    #${PANEL_ID} .parasite-reveal-crow {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      padding: 3px 4px;
+      border-radius: 7px;
+      font-size: 11.5px;
+      color: #d8d4cc;
+      text-decoration: none;
+    }
+
+    #${PANEL_ID} .parasite-reveal-crow:hover {
+      background: rgba(255, 255, 255, 0.05);
+    }
+
+    #${PANEL_ID} .parasite-reveal-crow img {
+      width: 20px;
+      height: 20px;
+      border-radius: 5px;
+    }
+
+    #${PANEL_ID} .parasite-reveal-crow span:nth-child(2) {
+      flex: 1 1 auto;
+      font-weight: 600;
+    }
+
+    #${PANEL_ID} .parasite-reveal-crow i {
+      font-style: normal;
+      color: #6f6c78;
+      font-size: 10.5px;
+    }
+
+    #${PANEL_ID} .parasite-reveal-copyall {
+      flex: 0 0 auto;
+      padding: 7px 10px;
+      border-radius: 10px;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+      color: #b9b5c2;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      cursor: pointer;
+    }
+
+    #${PANEL_ID} .parasite-reveal-copyall:hover {
+      color: #f0eef5;
+      background: rgba(255, 255, 255, 0.1);
     }
 
     /* Small and tucked to the right so it isn't hit by accident */
@@ -740,6 +888,7 @@
 
     const players = Array.isArray(data.players) ? data.players : [];
     players.forEach((player) => loadStats(player.puuid));
+    const lanes = new Map((Array.isArray(data.lanes) ? data.lanes : []).filter((l) => l.puuid).map((l) => [l.puuid, l]));
     root.replaceChildren();
 
     const head = el("div", "parasite-reveal-head");
@@ -804,7 +953,22 @@
       copy.addEventListener("click", () => copyText(player.riotId || "", copy));
       top.appendChild(copy);
       info.appendChild(top);
-      info.appendChild(statsLine(entry));
+      const lane = lanes.get(player.puuid) || {};
+      if (lane.offRole) {
+        const off = el("span", "parasite-reveal-off", tr("OFF-ROLE"));
+        off.title = tr("Usually plays {lane}", { lane: ROLE_LABELS[lane.mainRole] || "?" });
+        top.insertBefore(off, copy);
+      }
+      const line = statsLine(entry);
+      const rank = lane.rank;
+      if (rank && rank.wins + rank.losses > 0) {
+        const games = rank.wins + rank.losses;
+        line.insertBefore(el("span", "parasite-reveal-wl", `${rank.wins}W ${rank.losses}L · ${Math.round(rank.wins * 100 / games)}%`),
+          line.querySelector(".parasite-reveal-mains"));
+      }
+      info.appendChild(line);
+      const vs = matchupLine(lane);
+      if (vs) info.appendChild(vs);
       row.appendChild(info);
 
       body.appendChild(row);
@@ -815,13 +979,18 @@
 
     // The chosen multi-search site as the button, the others as small links below.
     const chosen = PROVIDERS[settings.provider] ? settings.provider : "opgg";
-    if (data[PROVIDERS[chosen].field]) {
+    const counters = countersBlock(data, lanes);
+    if (counters) body.appendChild(counters);
+    if (data[PROVIDERS[chosen].field] || players.length) {
       const links = el("div", "parasite-reveal-links");
+      const copyAll = el("span", "parasite-reveal-copyall", tr("Copy names"));
+      copyAll.addEventListener("click", () => copyText(players.map((p) => p.riotId).filter(Boolean).join(", "), copyAll));
+      links.appendChild(copyAll);
       const main = el("a", "parasite-reveal-multi", tr("Multi {site}", { site: PROVIDERS[chosen].label }));
-      main.href = data[PROVIDERS[chosen].field];
+      main.href = data[PROVIDERS[chosen].field] || "#";
       main.target = "_blank";
       main.rel = "noreferrer";
-      links.appendChild(main);
+      if (data[PROVIDERS[chosen].field]) links.appendChild(main);
       body.appendChild(links);
     }
     const also = el("div", "parasite-reveal-also");
@@ -839,6 +1008,91 @@
     root.hidden = false;
     placePanel();
     scheduleAutoOpen(data, players.length);
+  }
+
+  const signed = (v, digits) => `${v > 0 ? "+" : ""}${Number(v).toFixed(digits)}`;
+  const champIcon = (id) => `/lol-game-data/assets/v1/champion-icons/${id}.png`;
+
+  // "<pick> vs <enemy>   52.8%  +12cs  +692g" for a teammate's lane
+  function matchupLine(lane) {
+    if (!lane.enemy && !lane.championId) return null;
+    const line = el("div", "parasite-reveal-line parasite-reveal-vs");
+    if (lane.championId) {
+      const own = el("img", lane.hover ? "hover" : "");
+      own.src = champIcon(lane.championId);
+      line.appendChild(own);
+    }
+    line.appendChild(el("span", "", "vs"));
+    if (!lane.enemy) {
+      line.appendChild(el("span", "", tr("Not picked")));
+      return line;
+    }
+    const enemy = el("img");
+    enemy.src = champIcon(lane.enemy.id);
+    line.append(enemy, el("span", "parasite-reveal-enemy", lane.enemy.name));
+    const nums = el("span", "parasite-reveal-num");
+    const m = lane.matchup;
+    if (m) {
+      nums.appendChild(el("span", m.winRate >= 50 ? "up" : "dn", `${Number(m.winRate).toFixed(1)}%`));
+      if (m.cs15 != null) nums.appendChild(el("span", m.cs15 >= 0 ? "up" : "dn", `${signed(m.cs15, 0)}cs`));
+      if (m.gold15 != null) nums.appendChild(el("span", m.gold15 >= 0 ? "up" : "dn", `${signed(m.gold15, 0)}g`));
+      nums.title = tr("{games} games, Master+", { games: m.games });
+    } else {
+      nums.appendChild(el("span", "", lane.championId ? tr("Not enough games") : tr("Waiting for the pick")));
+      nums.style.fontWeight = "400";
+    }
+    line.appendChild(nums);
+    return line;
+  }
+
+  // The enemy picks as small icons; the chosen one's best counters below
+  let counterPick = null;
+  function countersBlock(data, lanes) {
+    const enemies = (Array.isArray(data.counters) ? data.counters : []).filter((e) => e.id);
+    if (!enemies.length) return null;
+    if (!enemies.some((e) => e.id === counterPick)) {
+      const mine = [...lanes.values()].find((l) => l.me);
+      const facing = mine && enemies.find((e) => e.role === mine.position);
+      counterPick = (facing || enemies[0]).id;
+    }
+    const chosen = enemies.find((e) => e.id === counterPick);
+    const block = el("div", "parasite-reveal-counters");
+    const picks = el("div", "parasite-reveal-enemies");
+    for (const enemy of enemies) {
+      const icon = el("img", enemy.id === counterPick ? "on" : "");
+      icon.src = champIcon(enemy.id);
+      icon.title = enemy.name;
+      icon.addEventListener("click", () => {
+        counterPick = enemy.id;
+        queueRender();
+      });
+      picks.appendChild(icon);
+    }
+    block.appendChild(picks);
+    const title = el("div", "parasite-reveal-ctitle");
+    title.innerHTML = "";
+    const [before, after] = tr("Counters vs {name}").split("{name}");
+    title.append(before || "", el("b", "", chosen.name), after || "", chosen.roleLabel ? ` · ${chosen.roleLabel}` : "");
+    block.appendChild(title);
+    if (!chosen.counters.length) {
+      block.appendChild(el("div", "parasite-reveal-empty", data.countersLoading ? tr("Loading counters...") : tr("Not enough games")));
+    }
+    for (const counter of chosen.counters) {
+      const row = el(counter.link ? "a" : "div", "parasite-reveal-crow");
+      if (counter.link) {
+        row.href = counter.link;
+        row.target = "_blank";
+        row.rel = "noreferrer";
+      }
+      const icon = el("img");
+      icon.src = champIcon(counter.id);
+      row.append(icon, el("span", "", counter.name));
+      if (counter.gold15 != null) row.appendChild(el("i", "", `${signed(counter.gold15, 0)}g`));
+      row.appendChild(el("span", counter.winRate >= 50 ? "up" : "", `${Number(counter.winRate).toFixed(1)}%`));
+      row.title = tr("{games} games, Master+", { games: counter.games });
+      block.appendChild(row);
+    }
+    return block;
   }
 
   function detailsBlock(entry) {
