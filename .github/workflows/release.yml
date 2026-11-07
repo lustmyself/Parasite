@@ -1,10 +1,11 @@
 name: Release
 
 # Builds the Windows installer and update package, then publishes them as a
-# GitHub release. Runs when a version tag (for example 1.5.3) is pushed.
+# GitHub release. Runs on every push to main, and builds only when no release
+# exists yet for APP_VERSION in config.py: bump the version to ship a new one.
 on:
   push:
-    tags: ["[0-9]+.[0-9]+.[0-9]+"]
+    branches: [main]
   workflow_dispatch:
 
 permissions:
@@ -26,18 +27,38 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+      - name: Check whether this version is already released
+        id: version
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $version = (Select-String -Path config.py -Pattern '^APP_VERSION\s*=\s*"([^"]+)"').Matches[0].Groups[1].Value
+          "version=$version" >> $env:GITHUB_OUTPUT
+          gh release view $version --repo $env:GITHUB_REPOSITORY *> $null
+          if ($LASTEXITCODE -eq 0) {
+            Write-Host "Release $version already exists: nothing to build"
+            "skip=true" >> $env:GITHUB_OUTPUT
+          } else {
+            "skip=false" >> $env:GITHUB_OUTPUT
+          }
+          exit 0
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        if: steps.version.outputs.skip != 'true'
         with:
           python-version: "3.12"
       - name: Install Python dependencies
+        if: steps.version.outputs.skip != 'true'
         run: python -m pip install -r requirements.txt
       - name: Install Inno Setup
+        if: steps.version.outputs.skip != 'true'
         shell: pwsh
         run: |
           if (-not (Test-Path "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe")) {
             choco install innosetup --no-progress -y
           }
       - name: Write party relay config
+        if: steps.version.outputs.skip != 'true'
         # Party mode needs a relay URL. Set the RELAY_URL repository secret to
         # enable it; without it the build ships with party mode off.
         shell: pwsh
@@ -46,18 +67,17 @@ jobs:
         run: |
           Set-Content -Path party/network/relay_config.py -Value "RELAY_URL = `"$env:RELAY_URL`"" -Encoding utf8
       - name: Build executable and installer
+        if: steps.version.outputs.skip != 'true'
         run: python scripts/build_all.py
       - name: Create update package
+        if: steps.version.outputs.skip != 'true'
         run: python scripts/create_update_package.py
       - name: Publish release
+        if: steps.version.outputs.skip != 'true'
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
-          TAG: ${{ github.ref_name }}
+          TAG: ${{ steps.version.outputs.version }}
         run: |
           $files = @(Get-ChildItem installer -Filter 'Parasite_Setup_*.exe') + @(Get-ChildItem installer -Filter 'update_package_*.zip')
-          if ($env:GITHUB_REF_TYPE -ne 'tag') {
-            Write-Host "Not a tag build: skipping release upload"
-            exit 0
-          }
-          gh release create $env:TAG $files.FullName --title "Parasite $env:TAG" --notes "Parasite $env:TAG. Download Parasite_Setup_$env:TAG.exe and run it to install."
+          gh release create $env:TAG $files.FullName --repo $env:GITHUB_REPOSITORY --target $env:GITHUB_SHA --title "Parasite $env:TAG" --notes "Parasite $env:TAG. Download Parasite_Setup_$env:TAG.exe and run it to install."
