@@ -1615,7 +1615,7 @@ PAGE = r"""<!doctype html>
   </section>
 
   <section class="page" id="page-auto">
-    <div class="cs-tabs seg" id="cs-tabs"><button data-cs="live" class="on">Champ select</button><button data-cs="history">Geçmiş <em id="cs-hcount"></em></button><button data-cs="settings">Ayarlar</button></div>
+    <div class="cs-tabs seg" id="cs-tabs"><button data-cs="settings" class="on">Ayarlar</button><button data-cs="live">Champ select</button><button data-cs="history">Geçmiş <em id="cs-hcount"></em></button></div>
     <div class="cs-pane" data-pane="live">
       <div class="cs-idle" id="cs-idle"><b>Şampiyon seçiminde değilsin</b><span>Maç bulununca takımın, rakiplerin ve counter'lar burada görünür.</span></div>
       <div class="cs-card" id="cs-team" hidden>
@@ -2177,7 +2177,7 @@ function showPage(name) {
   if (name === "profile") loadProfile();
   if (name === "icon") loadIcons();
   if (name === "wallpaper") loadWalls();
-  if (name === "auto") loadAuto();
+  if (name === "auto") { csWasLive = false; csShowTab("settings"); loadAuto(); }
 }
 const awake = () => !document.hidden && !(state && state.resting);
 
@@ -2451,8 +2451,8 @@ function rvLead(label, v, digits) {
 const CS_LANES = { top: "TOP", jungle: "JGL", middle: "MID", bottom: "ADC", utility: "SUP" };
 const CS_LANE_TR = { top: "Üst", jungle: "Orman", middle: "Orta", bottom: "Alt", utility: "Destek" };
 const CS_SITES = [["opgg", "op.gg"], ["porofessor", "Porofessor"], ["ugg", "U.GG"]];
-let csTab = "live", csPick = null;
-try { csTab = localStorage.getItem("cs-tab") || "live"; } catch (e) {}
+// The page opens on its settings; during a champ select, on the live team instead
+let csTab = "settings", csPick = null, csWasLive = false;
 const mk = (tag, cls, text) => { const n = document.createElement(tag); if (cls) n.className = cls; if (text != null) n.textContent = text; return n; };
 const pct = (v) => v == null ? "–" : `${Number(v).toFixed(1)}%`;
 function csNum(v, digits, good) {
@@ -2482,7 +2482,6 @@ function csEnemyByRole() {
 }
 function csShowTab(name) {
   csTab = name;
-  try { localStorage.setItem("cs-tab", name); } catch (e) {}
   document.querySelectorAll("#cs-tabs button").forEach((b) => b.classList.toggle("on", b.dataset.cs === name));
   document.querySelectorAll("#page-auto .cs-pane").forEach((p) => { p.hidden = p.dataset.pane !== name; });
 }
@@ -2492,6 +2491,9 @@ function drawReveal() {
   const c = auto.counters || {}, d = auto.dodge || {}, lobby = auto.lobby || {};
   const inSelect = c.phase === "ChampSelect" || !!lobby.active;
   const rows = lobby.rows || [];
+  const live = inSelect && rows.length > 0;
+  if (live && !csWasLive && csTab === "settings") csShowTab("live");
+  csWasLive = live;
   $("cs-idle").hidden = inSelect && rows.length > 0;
   $("cs-team").hidden = !(inSelect && rows.length);
   $("rv-dodge").hidden = !inSelect;

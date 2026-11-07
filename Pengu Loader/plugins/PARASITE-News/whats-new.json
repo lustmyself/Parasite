@@ -1,6 +1,7 @@
 {
-  "version": "2.6",
+  "version": "2.7",
   "en": [
+    "The Champ select page opens on Settings (Auto Accept, Auto Requeue...), and switches to your team when a champ select starts",
     "Fixed: in ranked, teammates were put in the wrong lanes and everyone showed OFF-ROLE. Hidden lanes now go to the player who usually plays them (marked with ?)",
     "The Reveal box in the League client's champ select shows the same: wins/losses, off-role, each lane's matchup, counters for the enemy picks, and Copy names",
     "Champ select page works like Reveal: your team by lane with Riot ID, rank, LP, wins and losses, off-role warning, and each lane's matchup (win rate, kill, CS and gold leads)",
@@ -9,6 +10,7 @@
     "Auto Accept, Ban, Pick and queue options moved to the page's Settings tab"
   ],
   "tr": [
+    "Champ select sayfası Ayarlar ile açılıyor (Auto Accept, Auto Requeue...); şampiyon seçimi başlayınca takımına geçiyor",
     "Düzeltildi: ranked'de takım arkadaşları yanlış koridora konuyordu ve herkeste OFF-ROLE yazıyordu. Gizli koridorlar artık o koridoru oynayan oyuncuya veriliyor (? ile işaretli)",
     "LoL istemcisinde şampiyon seçimindeki Reveal kutusu da aynısını gösteriyor: galibiyet/mağlubiyet, off-role, her koridorun eşleşmesi, rakiplerin counter'ları ve İsimleri kopyala",
     "Champ select sayfası artık Reveal gibi: takımın koridor koridor, Riot ID, rank, LP, galibiyet/mağlubiyet, off-role uyarısı ve her koridorun eşleşmesi (kazanma oranı, kill, CS ve altın farkı)",
