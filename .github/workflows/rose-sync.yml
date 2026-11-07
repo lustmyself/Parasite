@@ -62,15 +62,27 @@ jobs:
             exit 1
           fi
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
-          # Parasite's own patch number while it follows this Rose release (parasite/parasite_patch.txt)
-          version="$tag"
-          read -r patch_rose patch < parasite/parasite_patch.txt || true
-          patch="${patch%$'\r'}"
-          if [ "${patch_rose:-}" = "$tag" ] && [ "${patch:-0}" -gt 0 ]; then
-            version="$tag.$patch"
+          # Parasite's own version (parasite/parasite_version.txt, e.g. 2.1). Once it is
+          # released, a newer Rose release builds as the next one (2.1 -> 2.2).
+          version=$(tr -d ' \r\n' < parasite/parasite_version.txt)
+          if [[ ! "$version" =~ ^[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::Unexpected Parasite version '$version'"
+            exit 1
+          fi
+          skip=false
+          if gh release view "v$version" --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1; then
+            built_from=$(gh release view "v$version" --repo "$GITHUB_REPOSITORY" --json body --jq .body \
+              | grep -oP "github.com/$ROSE_REPO/releases/tag/\K[0-9.]+" | head -1 || true)
+            if [ "$built_from" = "$tag" ] || [ -n "$INPUT_TAG" ]; then
+              skip=true
+            else
+              version="${version%%.*}.$(( ${version#*.} + 1 ))"
+              echo "$version" > parasite/parasite_version.txt
+              echo "Rose $tag is new: building Parasite v$version"
+            fi
           fi
           echo "version=$version" >> "$GITHUB_OUTPUT"
-          if [ "$DRY_RUN" != "true" ] && gh release view "v$version" --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1; then
+          if [ "$skip" = "true" ] && [ "$DRY_RUN" != "true" ]; then
             echo "Parasite v$version is already released; nothing to do"
             echo "skip=true" >> "$GITHUB_OUTPUT"
           else
@@ -194,11 +206,7 @@ jobs:
           TAG: ${{ steps.rose.outputs.tag }}
           VERSION: ${{ steps.rose.outputs.version }}
         run: |
-          # Releases are named Parasite v1.1, v1.2, ... in order. The tag is the version the
-          # updater compares (Rose's, plus Parasite's patch number), so only the title is numbered.
-          last=$(gh release list --repo "$GITHUB_REPOSITORY" --limit 1000 --json name \
-            --jq '[.[].name | select(test("^Parasite v1[.][0-9]+$")) | ltrimstr("Parasite v1.") | tonumber] | max // 0')
-          name="Parasite v1.$(( last + 1 ))"
+          name="Parasite $VERSION"
           news="Pengu Loader/plugins/PARASITE-News/whats-new.json"
           changes=""
           if [ -f "$news" ] && [ "$(jq -r .version "$news")" = "$VERSION" ]; then
@@ -206,7 +214,7 @@ jobs:
           $(jq -r '.en[] | "- " + .' "$news")
           "
           fi
-          notes="$name ($VERSION), built automatically from [Rose $TAG](https://github.com/$ROSE_REPO/releases/tag/$TAG).
+          notes="$name, built from [Rose $TAG](https://github.com/$ROSE_REPO/releases/tag/$TAG).
 
           $changes
           **Install:** download \`Parasite_Setup_$VERSION.exe\` below. Existing installs update themselves."

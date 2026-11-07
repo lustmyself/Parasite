@@ -37,11 +37,11 @@ python -m ruff check . --select E9,F63,F7,F82
 
 ## Shipping a release
 
-1. Bump `parasite/parasite_patch.txt` (`1.5.3 1` → Parasite 1.5.3.1).
+1. Bump `parasite/parasite_version.txt` (`2.1` → `2.2`).
 2. Add the release's lines at the top of `parasite/overlay/Pengu Loader/plugins/PARASITE-News/whats-new.json`
    (`version`, `en`, `tr`).
 3. Sync, commit, push, then `gh workflow run "Follow Rose releases" -R lustmyself/Parasite`
-   (always pass `-R lustmyself/Parasite`; `upstream` is Rose). CI builds and publishes `v1.5.3.N`.
+   (always pass `-R lustmyself/Parasite`; `upstream` is Rose). CI builds and publishes `v2.N`.
 4. Installed copies update themselves: silently while League is closed (`launcher/parasite_autoupdate.py`).
    The update script that runs is the *old* version's, so an update-script fix helps from the next release on.
 

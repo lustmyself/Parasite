@@ -10,14 +10,14 @@ Everything that makes Parasite different from Rose lives in this folder:
 
 `.github/workflows/rose-sync.yml` runs every 3 hours: when Rose has a release
 Parasite doesn't, it runs `sync.py`, tests, builds the installer and publishes
-`vX.Y.Z` here. Installed copies of Parasite then update themselves.
+`vX.Y` here. Installed copies of Parasite then update themselves.
 
 ## Shipping Parasite fixes between Rose releases
 
-`parasite_patch.txt` holds `<rose version> <patch>`, e.g. `1.5.3 2`: sync then
-stamps Parasite as 1.5.3.2, and the release workflow publishes `v1.5.3.2`, which
-installed copies offer as an update. Raise the patch to ship a fix. A newer
-Rose release builds as its own version again, without a patch number.
+Parasite has its own version numbers, apart from Rose's: `parasite_version.txt`
+holds it (e.g. `2.1`), sync stamps it into Parasite, and the release workflow
+publishes `v2.1`, which installed copies offer as an update. Raise it (`2.2`) to
+ship a fix. When Rose has a new release, the workflow raises it by one itself.
 
 ## Changing Parasite
 

@@ -40,7 +40,7 @@ RST_MASK = (1 << 38) - 1
 # The champion's record points here instead, for the chat and the name over its head. "parasite" is as long as "game",
 # so the record's text keeps its length and the file keeps its layout.
 RECORD_KEY = "game_character_displayname_"
-RECORD_KEY_OWN = "parasite_character_displayname_"
+RECORD_KEY_OWN = "prst_character_displayname_"
 
 
 # --------------------------------------------------------------------------------------

@@ -6,7 +6,7 @@ import requests
 from launcher.update import github_client
 from launcher.update.github_client import GitHubClient
 
-PACKAGE_URL = "https://github.com/lustmyself/Parasite/releases/download/v1.5.3.1/update_package_1.5.3.1.zip"
+PACKAGE_URL = "https://github.com/lustmyself/Parasite/releases/download/v2.1/update_package_2.1.zip"
 
 
 def _redirect(location, code=302):
@@ -28,12 +28,12 @@ class GitHubFallbackTests(unittest.TestCase):
         self.addCleanup(allowed.stop)
 
     def test_the_redirect_names_the_package_without_the_v(self):
-        redirect = _redirect("https://github.com/lustmyself/Parasite/releases/tag/v1.5.3.1")
+        redirect = _redirect("https://github.com/lustmyself/Parasite/releases/tag/v2.1")
         with patch.object(github_client.requests, "get", return_value=redirect), \
                 patch.object(github_client.requests, "head", return_value=_head()) as head:
             release = GitHubClient().get_latest_release()
         client = GitHubClient()
-        self.assertEqual(client.get_release_version(release), "v1.5.3.1")
+        self.assertEqual(client.get_release_version(release), "v2.1")
         self.assertEqual(client.get_zip_asset(release)["browser_download_url"], PACKAGE_URL)
         self.assertEqual(head.call_args.args[0], PACKAGE_URL)
 
@@ -41,11 +41,11 @@ class GitHubFallbackTests(unittest.TestCase):
         no_redirect = _redirect("", 200)
         limited = MagicMock()
         limited.raise_for_status.side_effect = requests.HTTPError("403 rate limit exceeded")
-        redirect = _redirect("https://github.com/lustmyself/Parasite/releases/tag/v1.5.3.1")
+        redirect = _redirect("https://github.com/lustmyself/Parasite/releases/tag/v2.1")
         with patch.object(github_client.requests, "get", side_effect=[no_redirect, limited, redirect]):
             release = GitHubClient().get_latest_release()
         client = GitHubClient()
-        self.assertEqual(client.get_release_version(release), "v1.5.3.1")
+        self.assertEqual(client.get_release_version(release), "v2.1")
         self.assertEqual(client.get_zip_asset(release)["browser_download_url"], PACKAGE_URL)
 
     def test_no_release_when_github_com_gives_no_tag(self):

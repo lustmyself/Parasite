@@ -64,7 +64,10 @@ def rebrand_text(text):
         parts = KEEP_WORDS.split(chunk)
         out.append("".join(p if i % 2 else swap(p) for i, p in enumerate(parts)))
     # core.dll reads %LOCALAPPDATA%\\Parasite\\cf.ini (see patch_core_dll)
-    return REPO_LINK_RE.sub(PARASITE_REPO, "".join(out)).replace("config.ini", "cf.ini")
+    # The loading screen's name record must keep the game key's length
+    # (game_character_displayname_), so Parasite's own key uses a 4-letter prefix
+    return (REPO_LINK_RE.sub(PARASITE_REPO, "".join(out)).replace("config.ini", "cf.ini")
+            .replace("parasite_character_displayname_", "prst_character_displayname_"))
 
 
 def read_text(path):
@@ -1017,8 +1020,8 @@ EDITS += [
     (GH_CLIENT, "from typing import Optional\n", "import re\nfrom typing import Optional\n"),
 ]
 
-# Parasite's release tags start with "v" (v1.5.3.1) but its update packages do not
-# (update_package_1.5.3.1.zip): the redirect check drops the "v" before naming the package
+# Parasite's release tags start with "v" (v2.1) but its update packages do not
+# (update_package_2.1.zip): the redirect check drops the "v" before naming the package
 EDITS += [
     (GH_CLIENT,
      "            name = UPDATE_PACKAGE_NAME.format(version=tag)\n",
@@ -1360,20 +1363,28 @@ EDITS += [
 ]
 
 
-PARASITE_PATCH = ROOT / "parasite" / "parasite_patch.txt"
+PARASITE_VERSION = ROOT / "parasite" / "parasite_version.txt"
 
 
 def parasite_version(rose_version):
-    """Rose's version, plus Parasite's own patch number while Parasite follows that Rose release.
+    """Parasite's own version (parasite_version.txt, e.g. 2.1), apart from Rose's.
 
-    parasite_patch.txt holds "<rose version> <patch>": raise the patch to ship Parasite fixes
-    (1.4.9 -> 1.4.9.1 -> 1.4.9.2). A newer Rose release starts again without one.
+    The release workflow raises it by one (2.1 -> 2.2) when it builds a new Rose
+    release; raise it yourself to ship Parasite fixes.
     """
     try:
-        rose, patch = PARASITE_PATCH.read_text(encoding="utf-8").split()
-    except (OSError, ValueError):
+        version = PARASITE_VERSION.read_text(encoding="utf-8").strip()
+    except OSError:
         return rose_version
-    return f"{rose_version}.{int(patch)}" if rose == rose_version and int(patch) > 0 else rose_version
+    if not re.fullmatch(r"[0-9]+(\.[0-9]+){1,3}", version):
+        raise SystemExit(f"[sync] parasite_version.txt holds no version: {version!r}")
+    return version
+
+
+def version_info(version):
+    """The four-part version Windows shows in the file's properties (2.1 -> 2.1.0.0)."""
+    parts = version.split(".")
+    return ".".join(parts + ["0"] * (4 - len(parts)))
 
 
 def apply_parasite_version(tree):
@@ -1391,7 +1402,7 @@ def apply_parasite_version(tree):
     iss = tree / "installer.iss"
     iss_text = iss.read_text(encoding="utf-8")
     for old, new in [(f'#define MyAppVersion "{rose_version}"', f'#define MyAppVersion "{version}"'),
-                     (f'#define MyAppVersionInfo "{rose_version}.0"', f'#define MyAppVersionInfo "{version}"')]:
+                     (f'#define MyAppVersionInfo "{rose_version}.0"', f'#define MyAppVersionInfo "{version_info(version)}"')]:
         if old not in iss_text:
             raise SystemExit(f"[sync] {old!r} not found in installer.iss")
         iss_text = iss_text.replace(old, new, 1)

@@ -62,5 +62,5 @@ jobs:
           body=$(printf '%s\n\n%s\n\n%s\n' \
             "[$UPSTREAM $latest](https://github.com/$UPSTREAM/releases/tag/$latest) is out; Parasite is built from $known." \
             "$REBUILD" \
-            "Then set \`$VERSION_FILE\` to \`$latest\`, raise \`parasite/parasite_patch.txt\`, push and run the release workflow.")
+            "Then set \`$VERSION_FILE\` to \`$latest\`, raise \`parasite/parasite_version.txt\`, push and run the release workflow.")
           gh issue create --repo "$GITHUB_REPOSITORY" --title "$title" --body "$body"
