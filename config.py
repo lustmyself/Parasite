@@ -23,7 +23,7 @@ log = logging.getLogger(__name__)
 # APPLICATION METADATA
 # =============================================================================
 
-APP_VERSION = "2.7"                           # Application version
+APP_VERSION = "2.8"                           # Application version
 APP_USER_AGENT = f"Parasite/{APP_VERSION}"  # User-Agent header for HTTP requests
 GAME_EXECUTABLE_NAMES = ("League of Legends.exe", "League of Legends (TM) Client.exe")
 

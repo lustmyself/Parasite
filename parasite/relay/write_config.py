@@ -2,8 +2,8 @@
 
 PARASITE_RELAY_URL wins when set. Otherwise the address comes from the Cloudflare account
 the relay is deployed to (CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID): the worker
-parasite-party-relay answers on <account's workers.dev subdomain>. Without either, the
-address is empty and Parasite shares no skins.
+parasite-party-relay answers on <account's workers.dev subdomain>. Without either, Parasite
+uses the relay Lust already runs (same code, DEFAULT_RELAY).
 """
 
 import json
@@ -13,6 +13,8 @@ import urllib.request
 from pathlib import Path
 
 WORKER = "parasite-party-relay"
+# The owner's relay deployed for Lust; Parasite's relay code is the same
+DEFAULT_RELAY = "wss://lust-party-relay.nysperado.workers.dev"
 OUT = Path(__file__).resolve().parents[2] / "party" / "network" / "relay_config.py"
 
 
@@ -32,12 +34,12 @@ def relay_url() -> str:
     token = os.environ.get("CLOUDFLARE_API_TOKEN", "").strip()
     account = os.environ.get("CLOUDFLARE_ACCOUNT_ID", "").strip()
     if not token or not account:
-        return ""
+        return DEFAULT_RELAY
     try:
         return f"wss://{WORKER}.{workers_subdomain(token, account)}.workers.dev"
     except Exception as e:  # noqa: BLE001
         print(f"Could not read the workers.dev subdomain: {e}", file=sys.stderr)
-        return ""
+        return DEFAULT_RELAY
 
 
 if __name__ == "__main__":
