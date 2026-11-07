@@ -47,6 +47,38 @@ class LeagueWithoutProxyTests(unittest.TestCase):
         self.assertFalse(self._check(_proc("RiotClientServices.exe"), _proc("LeagueClient.exe", age=600)))
 
 
+class LaunchTests(unittest.TestCase):
+    """League must not run as administrator: Parasite runs as administrator, so it
+    starts Parasite Offline (which starts League) as the user"""
+
+    def _launch(self, elevated, unelevated_ok=True):
+        with patch.object(parasite_offline, "ensure_localhost_resolution"), \
+                patch.object(parasite_offline, "start_online"), \
+                patch.object(parasite_offline, "_elevated", return_value=elevated), \
+                patch.object(parasite_offline, "_start_unelevated", return_value=unelevated_ok) as unelevated, \
+                patch.object(parasite_offline.subprocess, "Popen") as popen:
+            result = parasite_offline._launch(Path("C:/Parasite/ParasiteOffline.exe"))
+        return result, unelevated, popen
+
+    def test_as_administrator_it_starts_as_the_user(self):
+        result, unelevated, popen = self._launch(elevated=True)
+        self.assertTrue(result)
+        unelevated.assert_called_once()
+        self.assertEqual(unelevated.call_args.args[0][1], "lol")
+        popen.assert_not_called()
+
+    def test_league_still_opens_when_that_fails(self):
+        result, _, popen = self._launch(elevated=True, unelevated_ok=False)
+        self.assertTrue(result)
+        popen.assert_called_once()
+
+    def test_a_user_parasite_starts_it_directly(self):
+        result, unelevated, popen = self._launch(elevated=False)
+        self.assertTrue(result)
+        unelevated.assert_not_called()
+        popen.assert_called_once()
+
+
 if __name__ == "__main__":
     unittest.main()
 

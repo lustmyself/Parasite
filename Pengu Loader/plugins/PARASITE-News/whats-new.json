@@ -1,7 +1,7 @@
 {
-  "version": "2.1",
+  "version": "2.2",
   "en": [
-    "Parasite 2.1: Parasite now has its own version numbers",
+    "Fixed: skins didn't apply because League opened as administrator. Parasite Offline now opens League as you",
     "Parasite now has the desktop hub, the PARASITE client theme, wallpapers and Lobby Reveal",
     "Built on Rose 1.5.3: skins are applied through LTK Manager, as in Rose",
     "Lobby Reveal follows reveal v1.6.1: new op.gg links and region fixes (EUW, EUNE, LAN, LAS, OCE...)",
@@ -9,7 +9,7 @@
     "LTK Manager installs itself: Parasite finds it, or downloads and installs it on first start"
   ],
   "tr": [
-    "Parasite 2.1: Parasite artık kendi sürüm numaralarını kullanıyor",
+    "Düzeltildi: League yönetici olarak açıldığı için skinler uygulanmıyordu. Parasite Offline artık League'i normal kullanıcı olarak açıyor",
     "Parasite'ta artık masaüstü hub, PARASITE istemci teması, duvar kağıtları ve Lobby Reveal var",
     "Rose 1.5.3 üzerine kurulu: skinler Rose'daki gibi LTK Manager ile uygulanıyor",
     "Lobby Reveal, reveal v1.6.1'i takip ediyor: yeni op.gg linkleri ve bölge düzeltmeleri (EUW, EUNE, LAN, LAS, OCE...)",
