@@ -935,11 +935,11 @@ PAGE = r"""<!doctype html>
   .cs-found { margin-left: auto; padding: 4px 10px; border-radius: 8px; background: rgba(109, 93, 252, .2); color: #c4b5fd; font-size: 12px; font-weight: 700; white-space: nowrap; }
   .cs-found.all { background: rgba(74, 222, 128, .14); color: #86efac; }
   .cs-head { color: var(--faint); font-size: 10.5px; font-weight: 700; letter-spacing: .4px; text-transform: uppercase; }
-  .cs-row { display: grid; grid-template-columns: 52px minmax(0, 1.6fr) 34px 22px minmax(0, 1fr) 62px 48px 48px 56px; align-items: center; gap: 8px; padding: 7px 8px; border-radius: 10px; }
-  .cs-row:not(.cs-head) { border-top: 1px solid rgba(255, 255, 255, .05); cursor: pointer; }
-  .cs-row:not(.cs-head):hover { background: rgba(255, 255, 255, .05); }
-  .cs-row.sel { background: rgba(109, 93, 252, .16); }
-  .cs-row.me .cs-lane { color: #c4b5fd; }
+  .csp-row { display: grid; grid-template-columns: 52px minmax(0, 1.6fr) 34px 22px minmax(0, 1fr) 62px 48px 48px 56px; align-items: center; gap: 8px; padding: 7px 8px; border-radius: 10px; }
+  .csp-row:not(.cs-head) { border-top: 1px solid rgba(255, 255, 255, .05); cursor: pointer; }
+  .csp-row:not(.cs-head):hover { background: rgba(255, 255, 255, .05); }
+  .csp-row.sel { background: rgba(109, 93, 252, .16); }
+  .csp-row.me .cs-lane { color: #c4b5fd; }
   .cs-lane { font-size: 11px; font-weight: 700; color: var(--sub); }
   .cs-lane.off { color: #fca5a5; }
   .cs-pl { display: flex; align-items: center; gap: 10px; min-width: 0; }
@@ -985,7 +985,7 @@ PAGE = r"""<!doctype html>
   .cs-hp div { min-width: 0; } .cs-hp b { display: block; font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .cs-hp small { display: block; color: var(--faint); font-size: 10.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .cs-hp.me b { color: #c4b5fd; }
-  @media (max-width: 900px) { .cs-row { grid-template-columns: 44px minmax(0, 1.6fr) 30px 18px minmax(0, 1fr) 56px; } .cs-row > :nth-child(n+7) { display: none; }
+  @media (max-width: 900px) { .csp-row { grid-template-columns: 44px minmax(0, 1.6fr) 30px 18px minmax(0, 1fr) 56px; } .csp-row > :nth-child(n+7) { display: none; }
     .cs-hi-p { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
   .rv-board { margin-top: 14px; padding: 14px 16px; border-radius: 16px; background: rgba(22, 28, 78, .55); border: 1px solid rgba(255, 255, 255, .07); }
   .rv-patch { margin-left: auto; color: var(--faint); font-size: 11px; }
@@ -1620,7 +1620,7 @@ PAGE = r"""<!doctype html>
       <div class="cs-idle" id="cs-idle"><b>Şampiyon seçiminde değilsin</b><span>Maç bulununca takımın, rakiplerin ve counter'lar burada görünür.</span></div>
       <div class="cs-card" id="cs-team" hidden>
         <div class="cs-h"><div><b>Champ Select</b><span class="cs-q" id="cs-queue"></span><small id="cs-ready"></small></div><span class="cs-found" id="cs-found"></span></div>
-        <div class="cs-row cs-head"><span>Koridor</span><span>Takımın</span><span></span><span></span><span>Rakip</span><span>Kazanma</span><span>Kill</span><span>CS</span><span>Altın</span></div>
+        <div class="csp-row cs-head"><span>Koridor</span><span>Takımın</span><span></span><span></span><span>Rakip</span><span>Kazanma</span><span>Kill</span><span>CS</span><span>Altın</span></div>
         <div id="cs-rows"></div>
       </div>
       <div class="cs-card" id="cs-counters" hidden>
@@ -2534,7 +2534,7 @@ function drawReveal() {
     $("cs-rows").dataset.key = sig;
     $("cs-rows").replaceChildren(...rows.map((row) => {
       const e = enemies[row.position];
-      const el = mk("div", `cs-row${row.me ? " me" : ""}${e && row.position === csPick ? " sel" : ""}`);
+      const el = mk("div", `csp-row${row.me ? " me" : ""}${e && row.position === csPick ? " sel" : ""}`);
       el.append(mk("span", `cs-lane${row.offRole ? " off" : ""}`, (CS_LANES[row.position] || "–") + (row.guessed ? "?" : "")));
       const pl = mk("div", "cs-pl");
       pl.append(Object.assign(mk("img"), { src: row.iconId != null ? ICON_IMG(row.iconId) : (row.championId ? CHAMP_ICON(row.championId) : ICON_IMG(29)), alt: "" }));
