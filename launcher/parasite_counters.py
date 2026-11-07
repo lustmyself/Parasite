@@ -51,7 +51,8 @@ ROLE_LABEL = {"top": "Üst", "jungle": "Orman", "middle": "Orta", "bottom": "Alt
 
 _lock = threading.Lock()
 _cache: dict = {}  # url -> (time, json)
-_state: dict = {"key": None, "board": {"status": "idle"}, "checked": 0.0, "busy": False, "phase": None}
+_state: dict = {"key": None, "board": {"status": "idle"}, "checked": 0.0, "busy": False, "phase": None,
+                "session": None}
 
 
 # ---- downloads ----
@@ -248,6 +249,7 @@ def counters_for(enemy: int, role: str, stats, ugg: Optional[dict], lola: Option
             "slug": names.get(champion, {}).get("slug", ""),
             "winRate": main["winRate"], "delta": main["delta"], "games": main["games"],
             "gold15": leads.get("gold15"), "cs15": leads.get("cs15"), "kills15": leads.get("kills15"),
+            "lolaWin": (sides.get("lolalytics") or {}).get("winRate"), "uggWin": leads.get("winRate"),
             "sites": len(sides),
         }))
     ranked.sort(key=lambda item: -item[0])
@@ -330,8 +332,12 @@ def build_board(enemies: list, allies: list) -> dict:
         ally = ally_by_role.get(role)
         if ally:
             row = (lola or {}).get(ally) or (ugg or {}).get(ally)
-            entry["ally"] = {"id": ally, "name": names.get(ally, {}).get("name", f"#{ally}"),
-                             **(_side(dict(row, champion=ally), role, cid, stats) if row else {}),
+            leads = (ugg or {}).get(ally)
+            side = _side(dict(row, champion=ally), role, cid, stats) if row else {}
+            if leads:
+                ugg_side = _side(dict(leads, champion=ally), role, cid, stats)
+                side.update({k: ugg_side[k] for k in ("gold15", "cs15", "kills15")})
+            entry["ally"] = {"id": ally, "name": names.get(ally, {}).get("name", f"#{ally}"), **side,
                              "link": matchup_link(names.get(ally, {}).get("slug", ""), enemy_slug, role)}
         board.append(entry)
     return {"status": "ready", "patch": display_patch(stats["patch"]), "enemies": board}
@@ -367,6 +373,7 @@ def board() -> dict:
         key = (tuple((e["id"], e["role"]) for e in enemies), tuple((a["id"], a["role"]) for a in allies))
         with _lock:
             _state["phase"] = phase if isinstance(phase, str) else None
+            _state["session"] = session if isinstance(session, dict) else None
             if not enemies:
                 _state.update(key=None, board={"status": "idle"})
             elif key != _state["key"]:
@@ -375,3 +382,9 @@ def board() -> dict:
                                  name="ParasiteCounters").start()
     with _lock:
         return dict(_state["board"], phase=_state["phase"])
+
+
+def session() -> Optional[dict]:
+    """The champ select session board() last read."""
+    with _lock:
+        return _state["session"]

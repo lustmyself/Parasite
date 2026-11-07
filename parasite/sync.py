@@ -1326,7 +1326,7 @@ EDITS += [
 
 # Reveal's counters board in the hub (launcher/parasite_counters.py, imported by parasite_auto)
 EDITS += [
-    ("Parasite.spec", "    'launcher.parasite_auto',\n", "    'launcher.parasite_auto',\n    'launcher.parasite_counters',\n"),
+    ("Parasite.spec", "    'launcher.parasite_auto',\n", "    'launcher.parasite_auto',\n    'launcher.parasite_counters',\n    'launcher.parasite_lobby',\n"),
 ]
 
 # Parasite keeps Rose's skin injection as it is: Rose 1.5.3 and newer inject through LTK

@@ -306,6 +306,7 @@ hiddenimports = [
     'launcher.parasite_client',
     'launcher.parasite_auto',
     'launcher.parasite_counters',
+    'launcher.parasite_lobby',
     'launcher.parasite_wallpaper',
     'launcher.parasite_discord',
     'launcher.parasite_profile',

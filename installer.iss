@@ -2,8 +2,8 @@
 ; This creates a proper Windows installer that registers the app
 
 #define MyAppName "Parasite"
-#define MyAppVersion "2.3"
-#define MyAppVersionInfo "2.3.0.0"
+#define MyAppVersion "2.4"
+#define MyAppVersionInfo "2.4.0.0"
 #define MyAppPublisher "Parasite Team"
 #define MyAppURL "https://github.com/lustmyself/Parasite"
 #define MyAppExeName "Parasite.exe"

@@ -352,6 +352,11 @@ def _auto():
     return parasite_auto
 
 
+def _lobby():
+    from launcher import parasite_lobby
+    return parasite_lobby
+
+
 def _client_panel() -> str:
     from launcher import parasite_client
     return parasite_client.open_panel(bool(_cached("league", 2, _league_running)))
@@ -612,6 +617,7 @@ ACTIONS: dict[str, Callable[[dict], str]] = {
     "auto_set": lambda body: _auto().update(body.get("changes") or {}),
     "dodge_now": lambda body: _auto().dodge_now(),
     "dodge_last": lambda body: _auto().arm_dodge(bool(body.get("on"))),
+    "lobby_history_clear": lambda body: _lobby().clear_history(),
     "wallpaper_set": lambda body: _wallpaper().choose(body.get("name") if isinstance(body.get("name"), str) else None),
     "wallpaper_delete": lambda body: _wallpaper().delete(str(body.get("name") or "")),
     "wallpaper_folder": lambda body: _wallpaper().open_folder(),

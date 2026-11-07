@@ -1,15 +1,15 @@
 {
-  "version": "2.3",
+  "version": "2.4",
   "en": [
-    "Reveal page in the desktop app: Master+ counters for every enemy pick with leads at 15 minutes, and links to U.GG, Lolalytics, LadderEye and League of Graphs",
-    "Last-second bans and picks, a dodge button and last-second dodge",
-    "Queue again after a dodge, wait before queueing again, and restart a search that runs too long",
-    "Fixed: skins didn't apply because League opened as administrator. Parasite Offline now opens League as you"
+    "Champ select page works like Reveal: your team by lane with Riot ID, rank, LP, wins and losses, off-role warning, and each lane's matchup (win rate, kill, CS and gold leads)",
+    "Counters table for the enemy you click, with Lolalytics and U.GG win rates side by side",
+    "History of your past lobbies, Copy names, and team search on op.gg, Porofessor or U.GG",
+    "Auto Accept, Ban, Pick and queue options moved to the page's Settings tab"
   ],
   "tr": [
-    "Masaüstü uygulamada Reveal sayfası: her rakip şampiyona karşı Master+ counter'lar, 15. dakika farkları ve U.GG, Lolalytics, LadderEye, League of Graphs linkleri",
-    "Son saniye ban ve pick, dodge düğmesi ve son saniye dodge",
-    "Dodge sonrası tekrar sıraya girme, sıraya girmeden önce bekleme ve uzayan aramayı yenileme",
-    "Düzeltildi: League yönetici olarak açıldığı için skinler uygulanmıyordu. Parasite Offline artık League'i normal kullanıcı olarak açıyor"
+    "Champ select sayfası artık Reveal gibi: takımın koridor koridor, Riot ID, rank, LP, galibiyet/mağlubiyet, off-role uyarısı ve her koridorun eşleşmesi (kazanma oranı, kill, CS ve altın farkı)",
+    "Tıkladığın rakip için counter tablosu, Lolalytics ve U.GG kazanma oranları yan yana",
+    "Geçmiş lobilerin, İsimleri kopyala ve takımı op.gg, Porofessor ya da U.GG'de açma",
+    "Auto Accept, Ban, Pick ve sıra ayarları sayfanın Ayarlar sekmesine taşındı"
   ]
 }

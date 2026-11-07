@@ -31,8 +31,10 @@ SWITCHES = ("accept", "ban", "pick", "requeue", "requeue_dodge", "requeue_refres
 # Seconds left in the turn when the ban or pick locks in (0: right away)
 AT_CHOICES = (0, 1, 3, 5, 10)
 DELAY_CHOICES = (0, 10, 30, 60, 120)
+MULTI_SITES = ("opgg", "porofessor", "ugg")
 DEFAULTS = {"accept": False, "ban": False, "pick": False, "requeue": False, "requeue_dodge": False,
-            "requeue_refresh": False, "ban_at": 0, "pick_at": 0, "requeue_delay": 0, "bans": [], "picks": []}
+            "requeue_refresh": False, "ban_at": 0, "pick_at": 0, "requeue_delay": 0, "multi_site": "opgg",
+            "bans": [], "picks": []}
 LAST_SECOND_MS = 1200   # "the last second": what is left when the lock-in is sent
 DODGE_AT_MS = 1500      # the armed dodge goes this long before champ select ends
 FAST_S = 0.25           # polling near a deadline
@@ -68,6 +70,8 @@ def clean(data) -> dict:
     for key, choices in (("ban_at", AT_CHOICES), ("pick_at", AT_CHOICES), ("requeue_delay", DELAY_CHOICES)):
         if data.get(key) in choices and not isinstance(data.get(key), bool):
             out[key] = data[key]
+    if data.get("multi_site") in MULTI_SITES:
+        out["multi_site"] = data["multi_site"]
     for key in ("bans", "picks"):
         values = data.get(key) if isinstance(data.get(key), list) else []
         ids = []
@@ -127,10 +131,27 @@ def _reveal() -> dict:
     return out
 
 
+def _lobby() -> dict:
+    from launcher import parasite_counters, parasite_lobby
+    from launcher.parasite_settings import enabled
+    try:
+        from threads.core.lobby_reveal_thread import latest
+        team = latest() if enabled("lobby_reveal") else {}
+    except Exception:  # noqa: BLE001
+        team = {}
+    try:
+        return parasite_lobby.snapshot(parasite_counters.session(), team if team.get("active") else {})
+    except Exception as exc:  # noqa: BLE001
+        log.debug(f"[Auto] Lobby failed: {exc}")
+        return {"active": False, "rows": []}
+
+
 def listing() -> dict:
-    from launcher import parasite_counters, parasite_skins
+    from launcher import parasite_counters, parasite_lobby, parasite_skins
+    counters = parasite_counters.board()
     return dict(settings(), champions=[{"id": c["id"], "name": c["name"]} for c in parasite_skins.champions()],
-                max=MAX_CHOICES, reveal=_reveal(), counters=parasite_counters.board(),
+                max=MAX_CHOICES, reveal=_reveal(), counters=counters, lobby=_lobby(),
+                history=parasite_lobby.history(), multiSites=MULTI_SITES,
                 dodge={"armed": _dodge["armed"], "state": _dodge["state"]}, atChoices=AT_CHOICES,
                 delayChoices=DELAY_CHOICES)
 

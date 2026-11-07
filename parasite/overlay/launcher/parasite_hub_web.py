@@ -919,10 +919,74 @@ PAGE = r"""<!doctype html>
   .au-sug div { display: flex; align-items: center; gap: 10px; padding: 7px 12px; cursor: pointer; }
   .au-sug div:hover { background: rgba(109, 93, 252, .25); }
   /* Reveal: dodge, the enemy picks' counters, timing and queue options */
-  .rv-dodge { margin-top: 14px; display: flex; align-items: center; gap: 10px; padding: 12px 16px; border-radius: 16px;
+  .rv-dodge { margin-top: 12px; display: flex; align-items: center; gap: 10px; padding: 12px 16px; border-radius: 16px;
     background: rgba(120, 20, 40, .28); border: 1px solid rgba(244, 63, 94, .3); }
   .rv-dodge > div { margin-right: auto; } .rv-dodge b { display: block; font-size: 14px; } .rv-dodge span { color: var(--sub); font-size: 12px; }
   .rv-dodge .btn.armed { background: #e11d48; color: #fff; box-shadow: 0 0 14px rgba(244, 63, 94, .55); }
+  .cs-tabs { margin: 0 0 14px; display: inline-flex; }
+  .cs-tabs em { font-style: normal; opacity: .7; font-size: 11px; margin-left: 3px; }
+  .cs-idle { padding: 40px 20px; text-align: center; border-radius: 16px; background: rgba(22, 28, 78, .55); border: 1px solid rgba(255, 255, 255, .07); }
+  .cs-idle b { display: block; font-size: 15px; } .cs-idle span { color: var(--sub); font-size: 12.5px; }
+  .cs-card { margin-top: 12px; padding: 14px 16px; border-radius: 16px; background: rgba(22, 28, 78, .55); border: 1px solid rgba(255, 255, 255, .07); }
+  #cs-team { margin-top: 0; }
+  .cs-h { display: flex; align-items: flex-start; gap: 10px; margin-bottom: 10px; }
+  .cs-h b { font-size: 16px; } .cs-h small { display: block; color: var(--sub); font-size: 12px; margin-top: 2px; }
+  .cs-q { margin-left: 8px; padding: 2px 8px; border-radius: 6px; border: 1px solid var(--line); color: var(--sub); font-size: 11px; font-weight: 600; vertical-align: 2px; }
+  .cs-found { margin-left: auto; padding: 4px 10px; border-radius: 8px; background: rgba(109, 93, 252, .2); color: #c4b5fd; font-size: 12px; font-weight: 700; white-space: nowrap; }
+  .cs-found.all { background: rgba(74, 222, 128, .14); color: #86efac; }
+  .cs-head { color: var(--faint); font-size: 10.5px; font-weight: 700; letter-spacing: .4px; text-transform: uppercase; }
+  .cs-row { display: grid; grid-template-columns: 52px minmax(0, 1.6fr) 34px 22px minmax(0, 1fr) 62px 48px 48px 56px; align-items: center; gap: 8px; padding: 7px 8px; border-radius: 10px; }
+  .cs-row:not(.cs-head) { border-top: 1px solid rgba(255, 255, 255, .05); cursor: pointer; }
+  .cs-row:not(.cs-head):hover { background: rgba(255, 255, 255, .05); }
+  .cs-row.sel { background: rgba(109, 93, 252, .16); }
+  .cs-row.me .cs-lane { color: #c4b5fd; }
+  .cs-lane { font-size: 11px; font-weight: 700; color: var(--sub); }
+  .cs-lane.off { color: #fca5a5; }
+  .cs-pl { display: flex; align-items: center; gap: 10px; min-width: 0; }
+  .cs-pl img { width: 36px; height: 36px; border-radius: 50%; flex: none; background: #0d1238; }
+  .cs-pl > div { min-width: 0; }
+  .cs-nm { display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; white-space: nowrap; }
+  .cs-nm b { overflow: hidden; text-overflow: ellipsis; } .cs-nm i { font-style: normal; color: var(--faint); font-weight: 500; }
+  .cs-nm .hid { color: var(--faint); font-weight: 500; font-style: italic; }
+  .cs-off { padding: 1px 6px; border-radius: 5px; background: rgba(244, 63, 94, .18); color: #fda4af; font-size: 9.5px; font-weight: 800; letter-spacing: .3px; }
+  .cs-rk { color: var(--sub); font-size: 11.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .cs-rk .t { font-weight: 600; }
+  .cs-ch img, .cs-en img { width: 30px; height: 30px; border-radius: 8px; display: block; }
+  .cs-ch img.hv, .cs-en img.hv { opacity: .45; }
+  .cs-ch .empty, .cs-en .empty { width: 30px; height: 30px; border-radius: 8px; border: 1px dashed var(--line); }
+  .cs-vs { color: var(--faint); font-size: 11px; text-align: center; }
+  .cs-en { display: flex; align-items: center; gap: 8px; min-width: 0; font-size: 13px; font-weight: 600; color: #fda4af; }
+  .cs-en span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .cs-en .cs-np { color: var(--faint); font-weight: 500; }
+  .cs-num { font-size: 12.5px; font-weight: 600; text-align: right; white-space: nowrap; }
+  .cs-num.up { color: #4ade80; } .cs-num.dn { color: #f87171; } .cs-num.mid { color: var(--text); }
+  .cs-wait { grid-column: 6 / -1; text-align: right; color: var(--faint); font-size: 11.5px; }
+  .cs-ch { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; margin-bottom: 8px; }
+  .cs-ch b { font-size: 12px; letter-spacing: .4px; text-transform: uppercase; } .cs-ch b em { font-style: normal; color: #fda4af; }
+  .cs-ch .rv-links { flex-basis: auto; padding-left: 0; margin-left: auto; }
+  .cs-ch .rv-patch { margin-left: 0; }
+  .cs-crow { display: grid; grid-template-columns: minmax(0, 1fr) 54px 54px 48px 44px 54px 54px 22px; align-items: center; gap: 8px; padding: 5px 8px; border-radius: 8px; font-size: 12.5px; }
+  .cs-crow:not(.cs-head) { cursor: pointer; } .cs-crow:not(.cs-head):hover { background: rgba(255, 255, 255, .06); }
+  .cs-crow > span:not(:first-child) { text-align: right; }
+  .cs-crow .pk { display: flex; align-items: center; gap: 8px; font-weight: 600; min-width: 0; }
+  .cs-crow .pk img { width: 24px; height: 24px; border-radius: 6px; }
+  .cs-crow .gm { color: var(--sub); } .cs-crow .ok { color: #facc15; } .cs-crow .na { color: var(--faint); }
+  .cs-foot { display: flex; align-items: center; gap: 10px; margin-top: 12px; flex-wrap: wrap; }
+  .cs-foot #cs-multi { flex: 1; padding: 12px; }
+  .cs-site { margin-left: 0; } .cs-site button { padding: 6px 12px; font-size: 12px; }
+  .cs-hh { display: flex; align-items: center; } .cs-hh .section { margin: 0; } .cs-hh .btn { margin-left: auto; }
+  .cs-hi { margin-top: 10px; padding: 12px 14px; border-radius: 14px; background: rgba(22, 28, 78, .55); border: 1px solid rgba(255, 255, 255, .07); }
+  .cs-hi-h { display: flex; align-items: center; gap: 10px; font-size: 12px; color: var(--sub); }
+  .cs-hi-h b { color: var(--text); font-size: 13px; } .cs-hi-h .btn { margin-left: auto; padding: 5px 12px; font-size: 12px; }
+  .cs-hi-p { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; margin-top: 10px; }
+  .cs-hp { display: flex; align-items: center; gap: 8px; min-width: 0; padding: 6px 8px; border-radius: 10px; background: rgba(255, 255, 255, .04); cursor: pointer; }
+  .cs-hp:hover { background: rgba(255, 255, 255, .09); }
+  .cs-hp img { width: 28px; height: 28px; border-radius: 7px; flex: none; }
+  .cs-hp div { min-width: 0; } .cs-hp b { display: block; font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .cs-hp small { display: block; color: var(--faint); font-size: 10.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .cs-hp.me b { color: #c4b5fd; }
+  @media (max-width: 900px) { .cs-row { grid-template-columns: 44px minmax(0, 1.6fr) 30px 18px minmax(0, 1fr) 56px; } .cs-row > :nth-child(n+7) { display: none; }
+    .cs-hi-p { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
   .rv-board { margin-top: 14px; padding: 14px 16px; border-radius: 16px; background: rgba(22, 28, 78, .55); border: 1px solid rgba(255, 255, 255, .07); }
   .rv-patch { margin-left: auto; color: var(--faint); font-size: 11px; }
   .rv-wait { color: var(--sub); font-size: 12.5px; margin-top: 10px; }
@@ -1424,7 +1488,7 @@ PAGE = r"""<!doctype html>
     </div>
     <div class="ht" data-go="auto" id="tile-auto" style="--i:7;--c:244, 63, 94">
       <div class="ht-bg" id="t-auto-bg"></div><div class="ht-ov"></div><div class="ht-cs" id="t-auto-draft"></div>
-      <div class="ht-in"><b class="ht-ttl">Reveal</b><span class="ht-st" id="t-auto"></span></div>
+      <div class="ht-in"><b class="ht-ttl">Champ select</b><span class="ht-st" id="t-auto"></span></div>
     </div>
     <div class="ht" data-go="settings" id="tile-settings" style="--i:8;--c:167, 139, 250">
       <div class="ht-bg" id="t-settings-bg"></div><div class="ht-ov"></div><div class="ht-gear"><svg viewBox="0 0 200 200"><circle cx="100" cy="100" r="74" fill="none" stroke="currentColor" stroke-width="26" stroke-dasharray="22 16.75"/><circle cx="100" cy="100" r="58" fill="none" stroke="currentColor" stroke-width="14"/><circle cx="100" cy="100" r="22" fill="none" stroke="currentColor" stroke-width="10"/></svg></div><div class="ht-sw"><i class="on"></i><i></i><i class="on"></i></div><i class="ht-haz"></i>
@@ -1551,6 +1615,37 @@ PAGE = r"""<!doctype html>
   </section>
 
   <section class="page" id="page-auto">
+    <div class="cs-tabs seg" id="cs-tabs"><button data-cs="live" class="on">Champ select</button><button data-cs="history">Geçmiş <em id="cs-hcount"></em></button><button data-cs="settings">Ayarlar</button></div>
+    <div class="cs-pane" data-pane="live">
+      <div class="cs-idle" id="cs-idle"><b>Şampiyon seçiminde değilsin</b><span>Maç bulununca takımın, rakiplerin ve counter'lar burada görünür.</span></div>
+      <div class="cs-card" id="cs-team" hidden>
+        <div class="cs-h"><div><b>Champ Select</b><span class="cs-q" id="cs-queue"></span><small id="cs-ready"></small></div><span class="cs-found" id="cs-found"></span></div>
+        <div class="cs-row cs-head"><span>Koridor</span><span>Takımın</span><span></span><span></span><span>Rakip</span><span>Kazanma</span><span>Kill</span><span>CS</span><span>Altın</span></div>
+        <div id="cs-rows"></div>
+      </div>
+      <div class="cs-card" id="cs-counters" hidden>
+        <div class="cs-ch"><b id="cs-ctitle"></b><small class="rv-patch" id="rv-patch"></small><div class="rv-links" id="cs-clinks"></div></div>
+        <div class="rv-wait" id="rv-wait" hidden></div>
+        <div class="cs-crow cs-head"><span id="cs-cpick"></span><span>LoLa</span><span>U.GG</span><span>Kill</span><span>CS</span><span>Altın</span><span>Maç</span><span title="İki site de destekliyor">✓</span></div>
+        <div id="cs-crows"></div>
+        <div class="note">Master+ maçlar, bütün bölgeler, Ranked Solo/Duo. Kill, CS ve altın 15. dakikadaki farklar (U.GG). Başka bir rakibin counter'ları için tablodaki satırına tıkla; bir counter'a tıklayınca U.GG'de o eşleşme açılır.</div>
+      </div>
+      <div class="rv-dodge" id="rv-dodge" hidden>
+      <div><b>Dodge</b><span>Client'ı yeniden başlatmadan şampiyon seçiminden çık (normal dodge cezası uygulanır)</span></div>
+      <button class="btn" id="rv-dodge-last" title="Şampiyon seçiminin son saniyesinde dodge atar">Son saniye dodge</button>
+      <button class="btn danger" id="rv-dodge-now">Şimdi dodge</button>
+    </div>
+      <div class="cs-foot" id="cs-foot" hidden>
+        <button class="btn" id="cs-copy">İsimleri kopyala</button>
+        <button class="btn primary" id="cs-multi">Takımı ara</button>
+        <div class="seg cs-site" id="cs-site"></div>
+      </div>
+    </div>
+    <div class="cs-pane" data-pane="history" hidden>
+      <div class="cs-hh"><div class="section">Son lobiler</div><button class="btn" id="cs-hclear">Geçmişi sil</button></div>
+      <div id="cs-hist"></div>
+    </div>
+    <div class="cs-pane" data-pane="settings" hidden>
     <div class="au-cards">
       <div class="au" data-auto="accept"><i class="au-i"><svg viewBox="0 0 24 24"><path d="M12 22s8-3.5 8-10V5l-8-3-8 3v7c0 6.5 8 10 8 10z"/></svg></i>
         <div><b>Auto Accept</b><span>Maç bulununca kabul eder</span></div><i class="au-ck">__check__</i></div>
@@ -1562,22 +1657,6 @@ PAGE = r"""<!doctype html>
         <div><b>Auto Pick</b><span>Sıran gelince listedeki ilk boştakini seçer</span></div><i class="au-ck">__check__</i></div>
       <div class="au au-wide" data-auto="reveal"><i class="au-i"><svg viewBox="0 0 24 24"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg></i>
         <div><b>Lobby Reveal</b><span>Champ select'te takım arkadaşlarının adları ve op.gg</span></div><i class="au-ck">__check__</i></div>
-    </div>
-    <div class="au-team" id="au-team" hidden>
-      <div class="au-team-h"><div class="section">Takımın</div><button class="btn" id="au-multi">op.gg'de hepsi</button></div>
-      <div class="au-players" id="au-players"></div>
-    </div>
-    <div class="rv-dodge" id="rv-dodge" hidden>
-      <div><b>Dodge</b><span>Client'ı yeniden başlatmadan şampiyon seçiminden çık (normal dodge cezası uygulanır)</span></div>
-      <button class="btn" id="rv-dodge-last" title="Şampiyon seçiminin son saniyesinde dodge atar">Son saniye dodge</button>
-      <button class="btn danger" id="rv-dodge-now">Şimdi dodge</button>
-    </div>
-    <div class="rv-board" id="rv-board" hidden>
-      <div class="au-team-h"><div class="section">Rakipler ve counter'ları</div><small class="rv-patch" id="rv-patch"></small></div>
-      <div class="rv-wait" id="rv-wait" hidden></div>
-      <div class="rv-enemies" id="rv-enemies"></div>
-      <div class="note">Master+ maçlar, bütün bölgeler, Ranked Solo/Duo. Kazanma oranı Lolalytics'ten (yoksa U.GG), 15. dakika altın, CS ve kill farkları U.GG'den;
-        Δ, beklenenden kaç puan iyi olduğu. Bir counter'a tıklayınca U.GG'de o eşleşme açılır.</div>
     </div>
     <div class="au-lists">
       <div class="au-list" data-list="bans"><div class="section">Ban listesi</div><div class="au-chips" id="au-bans"></div>
@@ -1596,6 +1675,7 @@ PAGE = r"""<!doctype html>
       Sıra sana gelince listendeki ilk boş şampiyon seçilir; banlanmış, alınmış ya da takım arkadaşının istediği şampiyon atlanır.
       Auto Requeue yalnızca eşleşmeli maçlardan sonra çalışır (özel oyun ve antrenman aracı hariç); grupta sırayı lider başlatır.
       Parasite bunları LoL istemcisi üzerinden yapar, League açıkken çalışır.</div>
+    </div>
   </section>
 
   <section class="page" id="page-spotify">
@@ -2078,7 +2158,7 @@ async function poll() {
 }
 // ---- pages: the home tiles lead to each one, Esc or the back button comes home ----
 const PAGES = { home: "", lol: "Profil", spotify: "Spotify", maps: "Skinler ve Haritalar", fonts: "Fontlar", skins: "Skinler ve Haritalar",
-  profile: "Profil arka planı", icon: "Profil simgesi", settings: "Ayarlar", wallpaper: "Duvar kağıdı", auto: "Reveal" };
+  profile: "Profil arka planı", icon: "Profil simgesi", settings: "Ayarlar", wallpaper: "Duvar kağıdı", auto: "Champ select" };
 let page = "home";
 function showPage(name) {
   if (!(name in PAGES)) name = "home";
@@ -2360,20 +2440,6 @@ function drawAuto() {
     }));
     if (!ids.length) $(id).append(Object.assign(document.createElement("span"), { className: "note", textContent: "Liste boş: aşağıdan şampiyon ekle." }));
   });
-  $("au-team").hidden = !(reveal.on && reveal.active && (reveal.players || []).length);
-  const team = JSON.stringify(reveal.players || []);
-  if ($("au-players").dataset.key !== team) {
-    $("au-players").dataset.key = team;
-    $("au-players").replaceChildren(...(reveal.players || []).map((p) => {
-      const el = document.createElement("div");
-      el.className = "au-pl";
-      el.append(Object.assign(document.createElement("b"), { textContent: p.gameName || "?" }),
-        Object.assign(document.createElement("i"), { textContent: p.gameTag ? `#${p.gameTag}` : "" }),
-        Object.assign(document.createElement("small"), { textContent: (p.position || "").toLowerCase() }));
-      if (p.opggUrl) el.addEventListener("click", () => act("open_link", { url: p.opggUrl }));
-      return el;
-    }));
-  }
   drawReveal();
 }
 const RV_SITES = [["ugg", "U.GG"], ["lolalytics", "Lolalytics"], ["laddereye", "LadderEye"], ["log", "LoG"]];
@@ -2382,68 +2448,218 @@ function rvLead(label, v, digits) {
   if (v == null) return null;
   return Object.assign(document.createElement("i"), { className: v > 0 ? "up" : v < 0 ? "dn" : "", textContent: `${label} ${signed(v, digits)}` });
 }
+const CS_LANES = { top: "TOP", jungle: "JGL", middle: "MID", bottom: "ADC", utility: "SUP" };
+const CS_LANE_TR = { top: "Üst", jungle: "Orman", middle: "Orta", bottom: "Alt", utility: "Destek" };
+const CS_SITES = [["opgg", "op.gg"], ["porofessor", "Porofessor"], ["ugg", "U.GG"]];
+let csTab = "live", csPick = null;
+try { csTab = localStorage.getItem("cs-tab") || "live"; } catch (e) {}
+const mk = (tag, cls, text) => { const n = document.createElement(tag); if (cls) n.className = cls; if (text != null) n.textContent = text; return n; };
+const pct = (v) => v == null ? "–" : `${Number(v).toFixed(1)}%`;
+function csNum(v, digits, good) {
+  const n = mk("span", "cs-num");
+  if (v == null) { n.textContent = "–"; n.classList.add("mid"); return n; }
+  n.textContent = Number(v) === 0 ? "0" : signed(v, digits);
+  n.classList.add(Number(v) === 0 ? "mid" : (v > 0) === good ? "up" : "dn");
+  return n;
+}
+function csRank(row) {
+  const r = row.rank;
+  const line = mk("div", "cs-rk");
+  if (row.loading && !r) { line.textContent = "yükleniyor…"; return line; }
+  if (!row.puuid) { line.textContent = row.gameName ? "" : "Gizli"; return line; }
+  if (!r) line.append(mk("span", "t", "Unranked"));
+  else {
+    line.append(mk("span", "t", `${r.tier}${r.division ? " " + r.division : ""}`), ` · ${r.lp} LP`);
+    const games = r.wins + r.losses;
+    if (games) line.append(` · ${r.wins}W ${r.losses}L · ${Math.round(r.wins * 100 / games)}%`);
+  }
+  return line;
+}
+function csEnemyByRole() {
+  const out = {};
+  ((auto.counters || {}).enemies || []).forEach((e) => { if (e.role && !out[e.role]) out[e.role] = e; });
+  return out;
+}
+function csShowTab(name) {
+  csTab = name;
+  try { localStorage.setItem("cs-tab", name); } catch (e) {}
+  document.querySelectorAll("#cs-tabs button").forEach((b) => b.classList.toggle("on", b.dataset.cs === name));
+  document.querySelectorAll("#page-auto .cs-pane").forEach((p) => { p.hidden = p.dataset.pane !== name; });
+}
+document.querySelectorAll("#cs-tabs button").forEach((b) => b.addEventListener("click", () => csShowTab(b.dataset.cs)));
+csShowTab(csTab);
 function drawReveal() {
-  const c = auto.counters || {}, d = auto.dodge || {};
-  const inSelect = c.phase === "ChampSelect";
+  const c = auto.counters || {}, d = auto.dodge || {}, lobby = auto.lobby || {};
+  const inSelect = c.phase === "ChampSelect" || !!lobby.active;
+  const rows = lobby.rows || [];
+  $("cs-idle").hidden = inSelect && rows.length > 0;
+  $("cs-team").hidden = !(inSelect && rows.length);
   $("rv-dodge").hidden = !inSelect;
+  $("cs-foot").hidden = !(inSelect && rows.length);
   $("rv-dodge-last").classList.toggle("armed", !!d.armed);
   $("rv-dodge-last").textContent = d.armed ? "Son saniye dodge: açık" : "Son saniye dodge";
-  const enemies = c.enemies || [];
-  $("rv-board").hidden = !(inSelect && (enemies.length || c.status === "loading"));
+  $("cs-hcount").textContent = (auto.history || []).length || "";
+  drawHistory();
+  const site = auto.multi_site || "opgg";
+  const sig0 = JSON.stringify([site, auto.multiSites]);
+  if ($("cs-site").dataset.key !== sig0) {
+    $("cs-site").dataset.key = sig0;
+    $("cs-site").replaceChildren(...CS_SITES.map(([k, label]) => {
+      const b = mk("button", k === site ? "on" : "", label);
+      b.addEventListener("click", () => saveAuto({ multi_site: k }));
+      return b;
+    }));
+  }
+  const multiUrl = (lobby.links || {})[site] || "";
+  $("cs-multi").disabled = !multiUrl;
+  $("cs-multi").textContent = `Takımı ${(CS_SITES.find(([k]) => k === site) || [0, "op.gg"])[1]}'de aç ↗`;
+  if (!inSelect || !rows.length) { $("cs-counters").hidden = true; csPick = null; return; }
+
+  $("cs-queue").textContent = lobby.queueName || "";
+  $("cs-queue").hidden = !lobby.queueName;
+  const all = lobby.found >= lobby.total;
+  $("cs-ready").textContent = !(auto.reveal || {}).on ? "Lobby Reveal kapalı: isimler için Ayarlar'dan aç."
+    : lobby.found ? (all ? "Takım arkadaşlarının kimlikleri hazır." : "Bazı takım arkadaşları henüz bulunamadı.") : "Takım arkadaşları aranıyor…";
+  $("cs-found").textContent = `${lobby.found}/${lobby.total} bulundu`;
+  $("cs-found").classList.toggle("all", all);
+
+  const enemies = csEnemyByRole();
+  const mine = rows.find((r) => r.me);
+  const lanes = Object.keys(enemies);
+  if (!csPick || !enemies[csPick]) csPick = (mine && enemies[mine.position]) ? mine.position : lanes[0] || null;
+  const sig = JSON.stringify([rows, enemies, csPick]);
+  if ($("cs-rows").dataset.key !== sig) {
+    $("cs-rows").dataset.key = sig;
+    $("cs-rows").replaceChildren(...rows.map((row) => {
+      const e = enemies[row.position];
+      const el = mk("div", `cs-row${row.me ? " me" : ""}${e && row.position === csPick ? " sel" : ""}`);
+      el.append(mk("span", `cs-lane${row.offRole ? " off" : ""}`, (CS_LANES[row.position] || "–") + (row.offRole ? "?" : "")));
+      const pl = mk("div", "cs-pl");
+      pl.append(Object.assign(mk("img"), { src: row.iconId != null ? ICON_IMG(row.iconId) : (row.championId ? CHAMP_ICON(row.championId) : ICON_IMG(29)), alt: "" }));
+      const box = mk("div"), nm = mk("div", "cs-nm");
+      if (row.gameName) nm.append(mk("b", "", row.gameName), mk("i", "", row.gameTag ? `#${row.gameTag}` : ""));
+      else nm.append(mk("span", "hid", row.me ? "Sen" : "Gizli oyuncu"));
+      if (row.offRole) nm.append(Object.assign(mk("span", "cs-off", "OFF-ROLE"), { title: `Genelde ${CS_LANE_TR[row.mainRole] || "başka koridor"} oynuyor` }));
+      box.append(nm, csRank(row));
+      pl.append(box);
+      el.append(pl);
+      const ch = mk("span", "cs-ch");
+      ch.append(row.championId ? Object.assign(mk("img", row.hover ? "hv" : ""), { src: CHAMP_ICON(row.championId), alt: "" }) : mk("i", "empty"));
+      el.append(ch, mk("span", "cs-vs", "vs"));
+      const en = mk("span", "cs-en");
+      if (e) en.append(Object.assign(mk("img"), { src: CHAMP_ICON(e.id), alt: "" }), mk("span", "", e.name));
+      else en.append(mk("i", "empty"), mk("span", "cs-np", "Seçilmedi"));
+      el.append(en);
+      const a = e && e.ally && e.ally.id === row.championId ? e.ally : null;
+      if (a && a.winRate != null) {
+        const wr = mk("span", `cs-num ${a.winRate >= 50 ? "up" : "dn"}`, pct(a.winRate));
+        wr.title = `${a.games} maç${a.delta != null ? `, beklenenden ${signed(a.delta, 1)}` : ""}`;
+        el.append(wr, csNum(a.kills15, 1, true), csNum(a.cs15, 0, true), csNum(a.gold15, 0, true));
+      } else {
+        el.append(mk("span", "cs-wait", !e ? "" : !row.championId ? (row.me ? "Senin seçimin bekleniyor" : "Seçim bekleniyor") : a ? "Yeterli maç yok" : "Yükleniyor…"));
+      }
+      el.addEventListener("click", (ev) => {
+        if (e) { csPick = row.position; drawReveal(); return; }
+        if (row.opggUrl) act("open_link", { url: row.opggUrl });
+      });
+      if (row.opggUrl) pl.addEventListener("click", (ev) => { ev.stopPropagation(); act("open_link", { url: row.opggUrl }); });
+      if (row.opggUrl) pl.title = "op.gg profilini aç";
+      return el;
+    }));
+  }
+
+  const e = csPick ? enemies[csPick] : null;
+  $("cs-counters").hidden = !(e || c.status === "loading");
   $("rv-patch").textContent = c.patch ? `Yama ${c.patch}` : "";
   const wait = c.status === "loading" ? "Counter'lar yükleniyor…"
-    : c.status === "error" ? "Counter verisi şu an alınamadı; sitelerin kendi sayfaları aşağıda." : "";
+    : c.status === "error" ? "Counter verisi şu an alınamadı; sitelerin kendi sayfaları yukarıda." : "";
   $("rv-wait").hidden = !wait; $("rv-wait").textContent = wait;
-  const key = JSON.stringify(enemies);
-  if ($("rv-enemies").dataset.key === key) return;
-  $("rv-enemies").dataset.key = key;
-  $("rv-enemies").replaceChildren(...enemies.map((e) => {
-    const card = document.createElement("div");
-    card.className = "rv-en";
-    const head = document.createElement("div");
-    head.className = "rv-en-h";
-    const title = document.createElement("div");
-    title.append(Object.assign(document.createElement("b"), { textContent: e.name || `#${e.id}` }),
-      Object.assign(document.createElement("small"), { textContent: e.roleLabel || "" }));
-    const sites = document.createElement("div");
-    sites.className = "rv-links";
-    RV_SITES.forEach(([k, label]) => {
-      if (!(e.links || {})[k]) return;
-      const b = Object.assign(document.createElement("button"), { textContent: label, title: `${label}: ${e.name} counter'ları` });
-      b.addEventListener("click", () => act("open_link", { url: e.links[k] }));
-      sites.append(b);
-    });
-    head.append(Object.assign(document.createElement("img"), { src: CHAMP_ICON(e.id), alt: "" }), title, sites);
-    card.append(head);
-    if (e.ally) {
-      const a = document.createElement("div");
-      a.className = "rv-ally";
-      a.append("Takımından ", Object.assign(document.createElement("b"), { textContent: e.ally.name }),
-        e.ally.winRate != null ? `: %${e.ally.winRate} kazanıyor (${e.ally.games} maç${e.ally.delta != null ? `, Δ ${signed(e.ally.delta, 1)}` : ""})`
-          : ": bu eşleşmede yeterli maç yok");
-      if (e.ally.link) a.addEventListener("click", () => act("open_link", { url: e.ally.link }));
-      card.append(a);
+  if (!e) { $("cs-crows").replaceChildren(); $("cs-ctitle").textContent = "Counter'lar"; $("cs-clinks").replaceChildren(); return; }
+  const ckey = JSON.stringify(e);
+  if ($("cs-crows").dataset.key === ckey) return;
+  $("cs-crows").dataset.key = ckey;
+  $("cs-ctitle").replaceChildren("En iyi counter'lar: ", mk("em", "", e.name), ` · ${e.roleLabel || ""}`);
+  $("cs-cpick").textContent = `${e.name} karşısına`;
+  $("cs-clinks").replaceChildren(...RV_SITES.filter(([k]) => (e.links || {})[k]).map(([k, label]) => {
+    const b = mk("button", "", `${label} ↗`);
+    b.addEventListener("click", () => act("open_link", { url: e.links[k] }));
+    return b;
+  }));
+  const counters = e.counters || [];
+  $("cs-crows").replaceChildren(...(counters.length ? counters.map((k) => {
+    const row = mk("div", "cs-crow");
+    const pk = mk("span", "pk");
+    pk.append(Object.assign(mk("img"), { src: CHAMP_ICON(k.id), alt: "" }), mk("span", "", k.name));
+    const wr = (v) => mk("span", `cs-num ${v == null ? "na" : v >= 50 ? "up" : "mid"}`, pct(v));
+    row.append(pk, wr(k.lolaWin), wr(k.uggWin), csNum(k.kills15, 1, true), csNum(k.cs15, 0, true), csNum(k.gold15, 0, true),
+      mk("span", "gm", k.games != null ? String(k.games) : "–"), mk("span", k.sites > 1 ? "ok" : "na", k.sites > 1 ? "✓" : "·"));
+    row.title = `${k.name}: %${k.winRate} (${k.games} maç)${k.delta != null ? `, beklenenden ${signed(k.delta, 1)}` : ""}`;
+    if (k.link) row.addEventListener("click", () => act("open_link", { url: k.link }));
+    return row;
+  }) : [mk("div", "rv-wait", c.status === "loading" ? "" : "Bu eşleşme için yeterli maç yok.")]));
+}
+function csAgo(at) {
+  const s = Math.max(0, Date.now() / 1000 - at);
+  if (s < 3600) return `${Math.max(1, Math.round(s / 60))} dk önce`;
+  if (s < 86400) return `${Math.round(s / 3600)} saat önce`;
+  return new Date(at * 1000).toLocaleDateString("tr-TR", { day: "numeric", month: "long" });
+}
+function drawHistory() {
+  const items = auto.history || [];
+  const site = auto.multi_site || "opgg";
+  const sig = JSON.stringify([items, site]);
+  if ($("cs-hist").dataset.key === sig) return;
+  $("cs-hist").dataset.key = sig;
+  $("cs-hclear").hidden = !items.length;
+  if (!items.length) { $("cs-hist").replaceChildren(mk("div", "note", "Henüz lobi yok. Lobby Reveal açıkken girdiğin her şampiyon seçimi burada saklanır.")); return; }
+  $("cs-hist").replaceChildren(...items.map((h) => {
+    const card = mk("div", "cs-hi"), head = mk("div", "cs-hi-h");
+    head.append(mk("b", "", h.queueName || "Şampiyon seçimi"), csAgo(h.at));
+    const url = (h.links || {})[site] || (h.links || {}).opgg;
+    if (url) {
+      const b = mk("button", "btn", "Takımı aç ↗");
+      b.addEventListener("click", () => act("open_link", { url }));
+      head.append(b);
     }
-    const list = document.createElement("div");
-    list.className = "rv-cs";
-    (e.counters || []).forEach((k) => {
-      const row = document.createElement("div");
-      row.className = "rv-c";
-      row.title = `${k.name}: %${k.winRate} (${k.games} maç)${k.delta != null ? `, Δ ${signed(k.delta, 1)}` : ""}`;
-      const leads = document.createElement("span");
-      leads.className = "ld";
-      [rvLead("altın", k.gold15, 0), rvLead("CS", k.cs15, 1), rvLead("kill", k.kills15, 2)].filter(Boolean)
-        .forEach((x, n) => { if (n) leads.append(" · "); leads.append(x); });
-      row.append(Object.assign(document.createElement("img"), { src: CHAMP_ICON(k.id), alt: "" }),
-        Object.assign(document.createElement("b"), { textContent: k.name }), leads,
-        Object.assign(document.createElement("span"), { className: `wr${k.winRate < 50 ? " lo" : ""}`, textContent: `%${k.winRate}` }));
-      if (k.link) row.addEventListener("click", () => act("open_link", { url: k.link }));
-      list.append(row);
+    const grid = mk("div", "cs-hi-p");
+    (h.players || []).forEach((p) => {
+      const el = mk("div", `cs-hp${p.me ? " me" : ""}`);
+      el.append(p.championId ? Object.assign(mk("img"), { src: CHAMP_ICON(p.championId), alt: "" }) : Object.assign(mk("img"), { src: ICON_IMG(29), alt: "" }));
+      const t = mk("div");
+      const r = p.rank;
+      t.append(mk("b", "", p.gameName + (p.gameTag ? ` #${p.gameTag}` : "")),
+        mk("small", "", [CS_LANES[p.position], r ? `${r.tier}${r.division ? " " + r.division : ""} ${r.lp} LP` : "Unranked"].filter(Boolean).join(" · ")));
+      el.append(t);
+      if (p.opggUrl) el.addEventListener("click", () => act("open_link", { url: p.opggUrl }));
+      grid.append(el);
     });
-    card.append(list);
+    card.append(head, grid);
     return card;
   }));
 }
+$("cs-multi").addEventListener("click", () => {
+  const url = ((auto && auto.lobby && auto.lobby.links) || {})[(auto && auto.multi_site) || "opgg"];
+  if (url) act("open_link", { url });
+});
+$("cs-copy").addEventListener("click", () => {
+  const rows = ((auto && auto.lobby) || {}).rows || [];
+  const text = rows.filter((r) => r.gameName).map((r) => r.gameTag ? `${r.gameName}#${r.gameTag}` : r.gameName).join(", ");
+  if (!text) { showToast("Henüz isim yok"); return; }
+  const done = () => showToast("İsimler kopyalandı");
+  const fallback = () => {
+    const t = Object.assign(document.createElement("textarea"), { value: text });
+    document.body.append(t); t.select();
+    try { document.execCommand("copy"); done(); } catch (e) { showToast("Kopyalanamadı"); }
+    t.remove();
+  };
+  (navigator.clipboard ? navigator.clipboard.writeText(text) : Promise.reject()).then(done, fallback);
+});
+$("cs-hclear").addEventListener("click", () => {
+  if (!auto) return;
+  auto.history = [];
+  drawReveal();
+  act("lobby_history_clear");
+});
 function drawRevealOptions() {
   if (!auto) return;
   document.querySelectorAll(".rv-opt .seg").forEach((seg) => {
@@ -2494,7 +2710,6 @@ document.querySelectorAll(".au").forEach((card) => card.addEventListener("click"
   }
   saveAuto({ [k]: !auto[k] });
 }));
-$("au-multi").addEventListener("click", () => auto && auto.reveal && act("open_link", { url: auto.reveal.multiUrl }));
 document.querySelectorAll(".au-list").forEach((box) => {
   const key = box.dataset.list, input = box.querySelector("input"), sug = box.querySelector(".au-sug");
   const suggest = () => {
