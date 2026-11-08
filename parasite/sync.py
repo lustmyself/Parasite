@@ -50,6 +50,8 @@ def swap(s):
 
 
 def rebrand_text(text):
+    # Point repo links at Parasite first, so bare ones (no https://) keep the owner
+    text = REPO_LINK_RE.sub(PARASITE_REPO, text)
     pieces, pos = [], 0
     for m in URL_RE.finditer(text):
         pieces.append((False, text[pos:m.start()]))
