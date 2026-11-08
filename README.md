@@ -9,6 +9,9 @@
 
 </div>
 
+> [!CAUTION]
+> The `parasiteskin.xyz` website is **UNRELATED** to this project and does not represent this project. **THE DOWNLOAD ON THAT SITE CONTAINS MALWARE**. If you downloaded anything from `parasiteskin.xyz`, reinstall your PC. The only official download is the [GitHub releases page](https://github.com/lustmyself/Parasite/releases/latest).
+
 ---
 
 ## Overview
@@ -120,6 +123,35 @@ skin instead of getting the default one.
 1. Download the latest installer from [Releases](https://github.com/lustmyself/Parasite/releases/latest)
 2. Run the installer as Administrator
 3. Launch Parasite from the Start Menu or desktop shortcut
+
+## Diagnose startup problems
+
+If Parasite is missing from the League client or game skins do not load, reproduce
+the problem, leave Parasite and League open, then right-click Parasite's system tray icon
+and choose **Diagnose Parasite startup**. A progress window immediately confirms the
+run started, with an animated loading bar and elapsed time. **Run in background**
+hides the window while collection continues. The window shows completion or a
+failure, and the report folder opens when finished. **Open Logs folder** opens
+Parasite's `logs` folder, including the `diagnostics` subfolder for past runs.
+
+Reports live in `logs\diagnostics\Parasite-Diagnostics-<timestamp>-<id>` under Parasite's
+user data folder (normally `%LOCALAPPDATA%\Parasite`), separate from the ordinary log
+files. Each run includes `report.txt`, `report.json`, and `collector-status.txt`.
+If collection is blocked or times out after three minutes, the status explains
+the failure and any partial reports are marked incomplete.
+
+The bundled Windows PowerShell 5.1 collector checks Windows/runtime differences,
+Pengu configuration and activation, patcher files, relevant security events,
+process privileges, bridge connectivity, and selected recent error excerpts.
+It reads system state without applying repairs, restarting League, or changing
+security settings. A clock check contacts `time.windows.com`; reports are never
+uploaded. Common credentials and profile paths are redacted, but review reports
+before sharing them with support. `UNKNOWN` means a check was unavailable, and
+a warning is a possible cause rather than proof of failed injection.
+
+For manual collection, run `assets\diagnostics\Diagnose-Parasite.ps1`; its optional
+`-SkipNetworkChecks` flag skips the external clock comparison. No Python or
+PowerShell 7 installation is needed in packaged Parasite.
 
 ## Building from source
 

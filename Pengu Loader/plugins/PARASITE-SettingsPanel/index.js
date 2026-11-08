@@ -1462,6 +1462,27 @@
       pointer-events: none;
       animation: parasiteModImportFadeOut 0.25s ease 1.25s forwards;
     }
+    #parasite-mod-import-loading.is-done.has-errors,
+    #parasite-mod-import-loading.is-done.has-notes {
+      animation: none;
+    }
+    /* A failed import or a mod the game will reject stays until closed */
+    #parasite-mod-import-loading.is-done.has-errors {
+      pointer-events: auto;
+    }
+    .parasite-mod-import-close {
+      padding: 4px 16px;
+      border: 1px solid #463714;
+      background: #1e2328;
+      color: #cdbe91;
+      cursor: pointer;
+      font-family: "Beaufort for LOL", serif;
+      font-size: 12px;
+    }
+    .parasite-mod-import-close:hover {
+      border-color: #c8aa6e;
+      color: #f0e6d2;
+    }
     @keyframes parasiteModImportFadeOut {
       to { opacity: 0; }
     }
@@ -1488,6 +1509,12 @@
       stroke-dashoffset: 32;
       animation: parasiteModImportDraw 0.25s ease-out 0.35s forwards;
     }
+    .parasite-mod-import-error {
+      display: block;
+      color: #ff6b6b;
+      font-size: 30px;
+      font-weight: bold;
+    }
     @keyframes parasiteModImportDraw {
       to { stroke-dashoffset: 0; }
     }
@@ -1506,6 +1533,26 @@
       white-space: nowrap;
       color: #a09b8c;
       font-size: 12px;
+    }
+    .parasite-mod-import-messages {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      max-height: 180px;
+      overflow: auto;
+      font-size: 13px;
+      line-height: 1.45;
+      text-align: left;
+      overflow-wrap: anywhere;
+    }
+    .parasite-mod-import-messages.is-single {
+      text-align: center;
+    }
+    .parasite-mod-import-messages .is-error {
+      color: #ff9a9a;
+    }
+    .parasite-mod-import-messages .is-repaired {
+      color: #9fe3a8;
     }
   `;
   }
@@ -4100,7 +4147,7 @@
     return { dialog, listContainer };
   }
 
-  function renderModRow(listContainer, mod, onDelete, onRename) {
+  function renderModRow(listContainer, mod, onDelete, onRename, onImage, onSelect) {
     const row = document.createElement("div");
     row.className = "mod-manage-row";
     row.style.display = "flex";
@@ -4115,6 +4162,17 @@
     infoWrapper.style.alignItems = "center";
     infoWrapper.style.gap = "10px";
     infoWrapper.style.minWidth = "0";
+
+    if (onSelect) {
+      const selection = document.createElement("input");
+      selection.type = "checkbox";
+      selection.checked = Boolean(mod.selected);
+      selection.setAttribute("aria-label", t("Select mod {name}", { name: mod.displayName || mod.name }));
+      selection.dataset.modSelection = "true";
+      selection.style.flex = "0 0 auto";
+      selection.addEventListener("change", () => onSelect(selection.checked));
+      infoWrapper.appendChild(selection);
+    }
 
     if (mod.thumbnailUrl) {
       const thumb = document.createElement("img");
@@ -4160,6 +4218,18 @@
       actions.appendChild(renameButton);
     }
 
+    if (onImage && mod.imageEditable) {
+      const imageButton = document.createElement("button");
+      imageButton.type = "button";
+      imageButton.className = "mod-rename-button";
+      imageButton.textContent = t(mod.thumbnailUrl ? "Change image" : "Add image");
+      imageButton.addEventListener("click", (e) => {
+        e.stopPropagation();
+        onImage(imageButton, row);
+      });
+      actions.appendChild(imageButton);
+    }
+
     const deleteButton = document.createElement("button");
     deleteButton.type = "button";
     deleteButton.className = "mod-delete-button";
@@ -4172,6 +4242,57 @@
 
     row.appendChild(actions);
     listContainer.appendChild(row);
+  }
+
+  function renderModSelectionToolbar(listContainer, mods, selection, keyForMod, onDeleteSelected) {
+    const toolbar = document.createElement("div");
+    toolbar.style.cssText = "display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 10px;border-bottom:1px solid rgba(205,190,145,0.2);";
+
+    const selectAllLabel = document.createElement("label");
+    selectAllLabel.style.cssText = "display:flex;align-items:center;gap:8px;color:#cdbe91;font-family:'Beaufort for LOL',serif;";
+    const selectAll = document.createElement("input");
+    selectAll.type = "checkbox";
+    selectAll.setAttribute("aria-label", t("Select all mods"));
+    selectAllLabel.appendChild(selectAll);
+    const selectAllText = document.createElement("span");
+    selectAllText.textContent = t("Select all");
+    selectAllLabel.appendChild(selectAllText);
+    toolbar.appendChild(selectAllLabel);
+
+    const deleteSelected = document.createElement("button");
+    deleteSelected.type = "button";
+    deleteSelected.className = "mod-delete-button";
+    toolbar.appendChild(deleteSelected);
+
+    const updateSelection = () => {
+      const checkboxes = Array.from(listContainer.querySelectorAll("input[data-mod-selection]"));
+      checkboxes.forEach((checkbox, index) => {
+        checkbox.checked = selection.has(keyForMod(mods[index]));
+      });
+      deleteSelected.disabled = selection.size === 0;
+      deleteSelected.textContent = t("Delete selected ({count})", { count: selection.size });
+      const selectedCount = mods.filter((mod) => selection.has(keyForMod(mod))).length;
+      selectAll.checked = mods.length > 0 && selectedCount === mods.length;
+      selectAll.indeterminate = selectedCount > 0 && selectedCount < mods.length;
+    };
+
+    selectAll.addEventListener("change", () => {
+      if (selectAll.checked) {
+        mods.forEach((mod) => selection.set(keyForMod(mod), mod));
+      } else {
+        mods.forEach((mod) => selection.delete(keyForMod(mod)));
+      }
+      updateSelection();
+    });
+
+    deleteSelected.addEventListener("click", () => {
+      const selectedMods = Array.from(selection.values());
+      if (!selectedMods.length) return;
+      confirmDeleteMod(null, () => onDeleteSelected(selectedMods, toolbar), selectedMods.length);
+    });
+
+    listContainer.prepend(toolbar);
+    return updateSelection;
   }
 
   function promptRenameMod(currentName, onConfirm) {
@@ -4239,7 +4360,7 @@
     });
   }
 
-  function confirmDeleteMod(modName, onConfirm) {
+  function confirmDeleteMod(modName, onConfirm, selectedCount = 0) {
     const existing = document.getElementById("delete-mod-confirm-dialog");
     if (existing) existing.remove();
 
@@ -4262,7 +4383,11 @@
     message.style.color = "#cdbe91";
     message.style.fontFamily = '"Beaufort for LOL", serif';
     message.style.marginBottom = "16px";
-    message.textContent = t('Delete mod "{name}"? This cannot be undone.', { name: modName });
+    message.textContent = selectedCount > 0
+      ? selectedCount === 1
+        ? t("Delete the selected mod? This cannot be undone.")
+        : t("Delete {count} selected mods? This cannot be undone.", { count: selectedCount })
+      : t('Delete mod "{name}"? This cannot be undone.', { name: modName });
     box.appendChild(message);
 
     const actions = document.createElement("div");
@@ -4297,9 +4422,13 @@
       "champion-mods-manage-dialog",
       t("Manage Mods - Loading..."),
       () => openChampionSelection("manage"),
-      () => { delete window.__parasiteManageChampionId; }
+      () => {
+        delete window.__parasiteManageChampionId;
+        delete window.__parasiteManageChampionSelectedMods;
+      }
     );
     window.__parasiteManageChampionId = championId;
+    window.__parasiteManageChampionSelectedMods = new Map();
 
     if (bridge) bridge.send({
       type: "request-manage-champion-mods",
@@ -4311,6 +4440,7 @@
     const dialog = document.getElementById("champion-mods-manage-dialog");
     if (dialog) dialog.remove();
     delete window.__parasiteManageChampionId;
+    delete window.__parasiteManageChampionSelectedMods;
   }
 
   function handleManageSkinModsResponse(payload) {
@@ -4336,13 +4466,47 @@
 
     // De-duplicate by path: the same folder can appear once per target skin.
     const seen = new Set();
-    mods.forEach((mod) => {
-      const dedupeKey = mod.relativePath || mod.modName;
-      if (seen.has(dedupeKey)) return;
-      seen.add(dedupeKey);
+    const uniqueMods = mods.filter((mod) => {
+      const key = mod.relativePath || mod.modName;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+    const selection = window.__parasiteManageChampionSelectedMods || new Map();
+    const currentKeys = new Set(uniqueMods.map((mod) => mod.relativePath || mod.modName));
+    Array.from(selection.keys()).forEach((key) => {
+      if (!currentKeys.has(key)) selection.delete(key);
+    });
+    const updateSelection = renderModSelectionToolbar(
+      listContainer,
+      uniqueMods,
+      selection,
+      (mod) => mod.relativePath || mod.modName,
+      (selectedMods, toolbar) => {
+        if (!bridge) return;
+        toolbar.querySelectorAll("button, input").forEach((control) => { control.disabled = true; });
+        listContainer.querySelectorAll("button, input").forEach((control) => { control.disabled = true; });
+        bridge.send({
+          type: "delete-champion-mods",
+          championId: window.__parasiteManageChampionId,
+          mods: selectedMods.map((mod) => ({
+            modName: mod.modName,
+            relativePath: mod.relativePath,
+          })),
+        });
+      }
+    );
+    uniqueMods.forEach((mod) => {
+      const key = mod.relativePath || mod.modName;
       renderModRow(
         listContainer,
-        { name: mod.modName, displayName: mod.displayName, thumbnailUrl: mod.thumbnailUrl },
+        {
+          name: mod.modName,
+          displayName: mod.displayName,
+          thumbnailUrl: mod.thumbnailUrl,
+          imageEditable: mod.imageEditable,
+          selected: selection.has(key),
+        },
         (deleteButton, row) => {
           deleteButton.disabled = true;
           deleteButton.textContent = t("Deleting...");
@@ -4363,9 +4527,63 @@
             relativePath: mod.relativePath,
             newName: newName,
           });
+        },
+        (imageButton) => {
+          imageButton.disabled = true;
+          imageButton.textContent = t("Saving...");
+          if (bridge) bridge.send({
+            type: "set-champion-mod-image",
+            championId: window.__parasiteManageChampionId,
+            relativePath: mod.relativePath,
+          });
+        },
+        (selected) => {
+          if (selected) selection.set(key, mod);
+          else selection.delete(key);
+          updateSelection();
         }
       );
     });
+    updateSelection();
+  }
+
+  function handleChampionModsBulkDeleted(payload) {
+    const results = payload.results || [];
+    results.filter((result) => !result.success).forEach((result) => {
+      log("error", `Failed to delete champion mod ${result.modName || ""}: ${result.error || "unknown error"}`);
+    });
+    if (payload.error) log("error", `Failed to delete selected champion mods: ${payload.error}`);
+    if (payload.deletedCount > 0) {
+      log("info", `Deleted ${payload.deletedCount} champion mod(s)`);
+      requestManageCategories();
+    }
+    if (
+      document.getElementById("champion-mods-manage-dialog") &&
+      Number(payload.championId) === Number(window.__parasiteManageChampionId)
+    ) {
+      openChampionModsList(payload.championId);
+    }
+  }
+
+  function handleChampionModImageUpdated(payload) {
+    if (!payload.success) {
+      if (!payload.cancelled) {
+        log("error", "Failed to update skin mod image: " + (payload.error || "unknown error"));
+      }
+    } else {
+      log("info", `Skin mod image updated: ${payload.relativePath}`);
+      requestManageCategories();
+    }
+    if (
+      document.getElementById("champion-mods-manage-dialog") &&
+      Number(payload.championId) === Number(window.__parasiteManageChampionId) &&
+      bridge
+    ) {
+      bridge.send({
+        type: "request-manage-champion-mods",
+        championId: payload.championId,
+      });
+    }
   }
 
   function handleChampionModDeleted(payload) {
@@ -4403,9 +4621,13 @@
       "category-mods-manage-dialog",
       t("Manage Mods - {name}", { name: categoryMeta ? t(categoryMeta.name) : category }),
       null,
-      () => { delete window.__parasiteManageCategory; }
+      () => {
+        delete window.__parasiteManageCategory;
+        delete window.__parasiteManageCategorySelectedMods;
+      }
     );
     window.__parasiteManageCategory = category;
+    window.__parasiteManageCategorySelectedMods = new Map();
 
     if (bridge) bridge.send({
       type: "request-manage-category-mods",
@@ -4426,10 +4648,32 @@
       return;
     }
 
+    const selection = window.__parasiteManageCategorySelectedMods || new Map();
+    const currentKeys = new Set(mods.map((mod) => mod.name));
+    Array.from(selection.keys()).forEach((key) => {
+      if (!currentKeys.has(key)) selection.delete(key);
+    });
+    const updateSelection = renderModSelectionToolbar(
+      listContainer,
+      mods,
+      selection,
+      (mod) => mod.name,
+      (selectedMods, toolbar) => {
+        if (!bridge) return;
+        toolbar.querySelectorAll("button, input").forEach((control) => { control.disabled = true; });
+        listContainer.querySelectorAll("button, input").forEach((control) => { control.disabled = true; });
+        bridge.send({
+          type: "delete-category-mods",
+          category: window.__parasiteManageCategory,
+          mods: selectedMods.map((mod) => ({ modName: mod.name })),
+        });
+      }
+    );
     mods.forEach((mod) => {
+      const key = mod.name;
       renderModRow(
         listContainer,
-        { name: mod.name, displayName: mod.displayName },
+        { name: mod.name, displayName: mod.displayName, selected: selection.has(key) },
         (deleteButton) => {
           deleteButton.disabled = true;
           deleteButton.textContent = t("Deleting...");
@@ -4448,9 +4692,34 @@
             modName: mod.name,
             newName: newName,
           });
+        },
+        null, // category mods have no image
+        (selected) => {
+          if (selected) selection.set(key, mod);
+          else selection.delete(key);
+          updateSelection();
         }
       );
     });
+    updateSelection();
+  }
+
+  function handleCategoryModsBulkDeleted(payload) {
+    const results = payload.results || [];
+    results.filter((result) => !result.success).forEach((result) => {
+      log("error", `Failed to delete category mod ${result.modName || ""}: ${result.error || "unknown error"}`);
+    });
+    if (payload.error) log("error", `Failed to delete selected category mods: ${payload.error}`);
+    if (payload.deletedCount > 0) {
+      log("info", `Deleted ${payload.deletedCount} mod(s) from ${payload.category}`);
+      requestManageCategories();
+    }
+    if (
+      document.getElementById("category-mods-manage-dialog") &&
+      payload.category === window.__parasiteManageCategory
+    ) {
+      openCategoryModsList(payload.category);
+    }
   }
 
   function handleCategoryModDeleted(payload) {
@@ -4724,7 +4993,12 @@
     title.textContent = t("Adding mod...");
     card.appendChild(title);
 
-    if (payload.fileName) {
+    if (payload.fileCount > 1) {
+      const fileCount = document.createElement("div");
+      fileCount.className = "parasite-mod-import-file";
+      fileCount.textContent = t("{count} mod files selected", { count: payload.fileCount });
+      card.appendChild(fileCount);
+    } else if (payload.fileName) {
       const fileName = document.createElement("div");
       fileName.className = "parasite-mod-import-file";
       fileName.textContent = payload.fileName;
@@ -4736,15 +5010,89 @@
     document.body.appendChild(overlay);
   }
 
-  function showModImportDone() {
+  function showModImportDone(payload) {
     const overlay = document.getElementById("parasite-mod-import-loading");
     if (!overlay || overlay.classList.contains("is-done")) return;
 
     overlay.classList.add("is-done");
-    overlay.querySelector(".parasite-mod-import-spinner").outerHTML =
-      '<svg class="parasite-mod-import-check" viewBox="0 0 52 52"><circle cx="26" cy="26" r="24"></circle><path d="M15 27l7 7 15-15"></path></svg>';
-    overlay.querySelector(".parasite-mod-import-title").textContent = t("Mod added");
-    modImportTimer = setTimeout(hideModImportLoading, MOD_IMPORT_DONE_MS);
+    const imported = Array.isArray(payload.imported) ? payload.imported : [];
+    const errors = Array.isArray(payload.importErrors) ? payload.importErrors : [];
+    const failed = errors.length > 0;
+    // Several files: each line names its mod; one file: its name is already shown
+    const several = imported.length + errors.length > 1;
+    // An error the user has to read: no fade, a close button instead
+    if (failed) overlay.classList.add("has-errors");
+    overlay.querySelector(".parasite-mod-import-spinner").outerHTML = failed && !imported.length
+      ? '<span class="parasite-mod-import-error" aria-hidden="true">!</span>'
+      : '<svg class="parasite-mod-import-check" viewBox="0 0 52 52"><circle cx="26" cy="26" r="24"></circle><path d="M15 27l7 7 15-15"></path></svg>';
+    const title = failed && !imported.length
+      ? t("Import failed")
+      : payload.partial
+        ? t("Some mods added")
+        : imported.length > 1 ? t("Mods added") : t("Mod added");
+    overlay.querySelector(".parasite-mod-import-title").textContent = title;
+
+    const card = overlay.querySelector(".parasite-mod-import-card");
+    const lines = [
+      ...errors.map((item) => ({ className: "is-error", text: importErrorText(item, several) })),
+      // What LTK Manager's check repaired in a mod it kept (check_mod in overlay_manager.py)
+      ...imported
+        .filter((item) => item && item.health && item.health.repaired > 0)
+        .map((item) => ({
+          className: "is-repaired",
+          text: several
+            ? t("LTK Manager repaired {name}.", { name: item.modName || item.fileName || "" })
+            : t("LTK Manager repaired this mod."),
+        })),
+    ];
+    if (lines.length) {
+      overlay.classList.add("has-notes");
+      const list = document.createElement("div");
+      list.className = "parasite-mod-import-messages" + (lines.length === 1 ? " is-single" : "");
+      list.setAttribute("role", failed ? "alert" : "status");
+      lines.forEach((line) => {
+        const row = document.createElement("div");
+        row.className = line.className;
+        row.textContent = line.text;
+        list.appendChild(row);
+      });
+      card.appendChild(list);
+    }
+    if (failed) {
+      const close = document.createElement("button");
+      close.type = "button";
+      close.className = "parasite-mod-import-close";
+      close.textContent = t("Close");
+      close.addEventListener("click", hideModImportLoading);
+      card.appendChild(close);
+      close.focus();
+      return;
+    }
+    modImportTimer = setTimeout(hideModImportLoading, lines.length ? MOD_IMPORT_DONE_MS * 2 : MOD_IMPORT_DONE_MS);
+  }
+
+  // A failed import's line: LTK Manager's refusals (_rejected_import in message_handler.py) in the
+  // user's language, any other failure with Parasite's error text
+  function importErrorText(item, several) {
+    const name = item.fileName || "";
+    if (item.code === "ltk_skinhack") {
+      return several
+        ? t("LTK Manager considers {name} a skinhack, so it won't be playable.", { name })
+        : t("LTK Manager considers this mod a skinhack, so it won't be playable.");
+    }
+    if (item.code === "ltk_rejected") {
+      const reason = item.reason || "";
+      return several
+        ? t("LTK Manager found problems it can't repair in {name}, so it won't be playable. {reason}", { name, reason }).trim()
+        : t("LTK Manager found problems it can't repair in this mod, so it won't be playable. {reason}", { reason }).trim();
+    }
+    return t("Failed to import {name}: {error}", { name, error: item.error || "" });
+  }
+
+  // Parasite asks LTK Manager to check the added mods before it answers the import
+  function showModImportChecking() {
+    const title = document.querySelector("#parasite-mod-import-loading .parasite-mod-import-title");
+    if (title) title.textContent = t("Checking with LTK Manager...");
   }
 
   function hideModImportLoading() {
@@ -4755,10 +5103,10 @@
   }
 
   function handleFolderOpenedResponse(payload) {
-    if (payload.success) {
+    if (payload.success || payload.partial || payload.importErrors?.length) {
       const loadingLeft = MOD_IMPORT_MIN_LOADING_MS - (Date.now() - modImportShownAt);
       clearTimeout(modImportTimer);
-      modImportTimer = setTimeout(showModImportDone, Math.max(0, loadingLeft));
+      modImportTimer = setTimeout(() => showModImportDone(payload), Math.max(0, loadingLeft));
       requestManageCategories();
     } else {
       hideModImportLoading();
@@ -4769,7 +5117,17 @@
       log("error", `Failed to import mod: ${escapeHtml(payload.error)}`);
       // Could show an error message to user here
     } else {
-      log("info", `Imported mod: ${payload.modName || payload.path || "success"}`);
+      const importedCount = payload.imported ? payload.imported.length : 0;
+      if (importedCount > 1 || payload.partial) {
+        log("info", `Imported ${importedCount} mod(s)${payload.partial ? "; some failed" : ""}`);
+      } else {
+        log("info", `Imported mod: ${payload.modName || payload.path || "success"}`);
+      }
+    }
+    if (payload.importErrors && payload.importErrors.length) {
+      payload.importErrors.forEach((item) => {
+        log("error", `Failed to import ${escapeHtml(item.fileName)}: ${escapeHtml(item.error)}`);
+      });
     }
   }
 
@@ -5092,6 +5450,17 @@
           };
         }
 
+        if (code === 'LTK_SLOW_MOD_CHECK') {
+          const seconds = String(e?.detail || '').trim() || '?';
+          return {
+            title: t("LTK Manager's mod check slows down the game's loading"),
+            details: [
+              t("What it means: LTK Manager checks each mod Parasite installs, and on this PC that took {seconds}s while the game was loading, which can leave it on a black loading screen. It usually takes a few seconds: a hard drive or an antivirus scanning the files makes it this slow.", { seconds }),
+              t('Fix: quit Parasite, open LTK Manager from the Start menu > Settings > Library, turn off "Automatically check mods", then close LTK Manager (also from the system tray) and start Parasite again.'),
+            ],
+          };
+        }
+
         if (code === 'LTK_MANAGER_MISSING') {
           return {
             title: t('LTK Manager is not installed'),
@@ -5109,13 +5478,25 @@
             details: [
               detail ? t('What happened: {detail}', { detail }) : t('What happened: LTK Manager refused the mod import.'),
               t('Fix: free up some disk space, then retry. If it keeps happening, report it with your Parasite logs.'),
-              t('Details are in ltk_bridge.log and ltk_api.log in C:\\Users\\Public.'),
+              t("Details are in ltk_api.log, in the ltk folder of Parasite's logs (Parasite's tray icon > Open Logs folder)."),
             ],
           };
         }
 
         // Kept in one place: it is also the key of its translations (PARASITE-I18n)
+        const LTK_ADMIN_FIX = 'Fix: untick "Run this program as an administrator" in the Compatibility tab of the Properties of ltk-manager.exe and ltk_patcher_host.exe (for one marked "all users", under "Change settings for all users"), then close LTK Manager (also from the system tray) and retry.';
         const CDP_FIX = "Fix: Parasite could not reach LTK Manager's built-in browser. Restart your PC, then retry. If it keeps happening, use a regular Windows account (not the built-in Administrator) and check that your antivirus does not block LTK Manager.";
+        if (code === 'LTK_ELEVATED') {
+          const detail = String(e?.detail || '').trim();
+          return {
+            title: t('LTK Manager is set to run as administrator'),
+            details: [
+              t("What it means: Windows' compatibility settings run LTK Manager's programs as administrator, so it cannot be started for your Windows account and cannot patch League: {detail}", { detail }),
+              t(LTK_ADMIN_FIX),
+            ],
+          };
+        }
+
         if (code === 'LTF_FAILED') {
           const detail = String(e?.detail || '').trim();
           // Why it failed (ltk_failure_cause in overlay_manager.py): what to
@@ -5126,15 +5507,19 @@
             late: () => t('Fix: the game started before the patcher was ready. Retry the next game.'),
             bridge: () => t('Fix: LTK Manager closed while the game was running. Retry the next game. If it happens every game, report it with your Parasite logs.'),
             import: () => t('Fix: free up some disk space, then retry.'),
+            outdated: () => t('Fix: LTK Manager is too old for Parasite: it does not know the commands Parasite sends it. Update LTK Manager (or reinstall it from github.com/LeagueToolkit/ltk-manager/releases), then retry.'),
             killed: () => t("Fix: another program closed LTK Manager, most often an antivirus. Add Parasite's folder to its exclusions, then retry."),
             crashed: () => t('Fix: LTK Manager crashed. Retry the next game. If it crashes every game, report it with your Parasite logs.'),
             cdp: () => t(CDP_FIX),
             league_admin: () => t('Fix: League is set to run as administrator, and LTK Manager does not patch it then. Right-click League of Legends.exe and LeagueClient.exe (in the League of Legends folder) > Properties > Compatibility, untick "Run this program as an administrator" (also under "Change settings for all users"), then restart League.'),
             signature: () => t("Fix: Windows could not verify the digital signature of LTK Manager's files: one was modified or damaged, and its patcher refuses to run. Reinstall LTK Manager from its official release (github.com/LeagueToolkit/ltk-manager/releases), then retry."),
             host_missing: () => t("Fix: LTK Manager's own patcher (ltk_patcher_host.exe) is missing from its folder, most often removed by an antivirus. Reinstall LTK Manager, then add its folder (C:\\Program Files\\LTK Manager) to your antivirus exclusions."),
-            disabled: () => t("Fix: LTK Manager's integrity check turned the overlay off because of a mod (named above). LTK Manager refuses a custom skin made of another skin's files: use another custom skin or the official one."),
+            disabled: () => t("Fix: LTK Manager's integrity check turned the overlay off because of a mod (named above): it refuses a skin made of another skin's files. For a custom skin, use another one; for one of Parasite's skins or chromas, the package is at fault: pick another skin or chroma and report it at github.com/Alban1911/LeagueSkins/issues."),
+            ltk_admin: () => t(LTK_ADMIN_FIX),
+            delivery: () => t("Fix: LTK Manager could not download its patcher: LTK's delivery service refused the request (the reason above). Parasite cannot change that. Retry later, or from another network (without a VPN or proxy)."),
             corrupt: () => t("Fix: League could not read a file of the overlay, most often a mod made for an older patch. Turn your mods off, then back on one at a time to find it. LTK Manager's incident file (named above) lists the mods it suspects."),
             incident: () => t("Fix: LTK Manager's incident file (named above) says what went wrong in the game and which mods it suspects."),
+            not_attached: () => t("Fix: LTK Manager's patcher found the game but could not get into it, so the game ran without skins. Check that League and the Riot Client are not set to run as administrator and that your antivirus does not block LTK Manager, then retry."),
             manager_admin: () => t('Fix: LTK Manager runs as administrator, and it does not patch League then. Turn User Account Control back on, or use a regular Windows account (not the built-in Administrator), then restart the PC.'),
           };
           const fix = fixes[e?.cause];
@@ -5143,7 +5528,7 @@
             details: [
               detail ? t('What happened: {detail}', { detail }) : t('What happened: the LTK patcher reported an error.'),
               fix ? fix() : t('Fix: retry the next game. If it fails every game, report it with your Parasite logs.'),
-              t('Details are in ltk_bridge.log, ltk_api.log and ltk_launcher.log in C:\\Users\\Public.'),
+              t("Details are in ltk_api.log and ltk_launcher.log, in the ltk folder of Parasite's logs (Parasite's tray icon > Open Logs folder)."),
             ],
           };
         }
@@ -5478,12 +5863,16 @@
       bridge.subscribe("champions-list-response", handleChampionsListResponse);
       bridge.subscribe("champion-skins-response", handleChampionSkinsResponse);
       bridge.subscribe("mod-import-started", showModImportLoading);
+      bridge.subscribe("mod-import-checking", showModImportChecking);
       bridge.subscribe("folder-opened-response", handleFolderOpenedResponse);
       // A Parasite that closes mid-import never answers it
       bridge.onDisconnect(hideModImportLoading);
       bridge.subscribe("manage-categories-response", handleManageCategoriesResponse);
       bridge.subscribe("manage-champion-mods-response", handleManageSkinModsResponse);
       bridge.subscribe("manage-category-mods-response", handleManageCategoryModsResponse);
+      bridge.subscribe("champion-mod-image-updated", handleChampionModImageUpdated);
+      bridge.subscribe("champion-mods-bulk-deleted", handleChampionModsBulkDeleted);
+      bridge.subscribe("category-mods-bulk-deleted", handleCategoryModsBulkDeleted);
       bridge.subscribe("champion-mod-deleted", handleChampionModDeleted);
       bridge.subscribe("category-mod-deleted", handleCategoryModDeleted);
       bridge.subscribe("champion-mod-renamed", handleChampionModRenamed);

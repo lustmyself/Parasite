@@ -36,6 +36,17 @@ class LtfDiagnosticsTests(unittest.TestCase):
         self.assertEqual(summary["code"], "LTF_FAILED")
         self.assertEqual(summary["cause"], "late")
 
+    def test_a_session_failure_saved_with_the_older_hint_is_still_one(self):
+        # Before ltk_bridge.log, which nothing wrote, left the hint
+        (summary,) = summarize((
+            "Injection failed: the game started before the patcher was scanning (joined too late)",
+            "The game started before the patcher was ready. Retry the next game. Details are in "
+            "C:\\Users\\Public\\ltk_bridge.log, ltk_api.log and ltk_launcher.log.",
+        ))
+
+        self.assertEqual(summary["code"], "LTF_FAILED")
+        self.assertEqual(summary["cause"], "late")
+
     def test_an_open_ltk_manager_gets_its_own_cause(self):
         (summary,) = summarize((
             "Injection failed: LTK Manager is already open without Parasite's bridge",
@@ -55,6 +66,17 @@ class LtfDiagnosticsTests(unittest.TestCase):
 
         self.assertEqual(summary["code"], "LTF_FAILED")
         self.assertEqual(summary["cause"], "cdp")
+
+    def test_a_slow_ltk_mod_check_gets_its_own_entry(self):
+        # #481: it names LTK Manager, but it is no failed session
+        from injection.overlay.overlay_manager import SLOW_MOD_CHECK_HINT, SLOW_MOD_CHECK_MESSAGE
+        (summary,) = summarize((
+            f"{SLOW_MOD_CHECK_MESSAGE} 263s on this PC, slowing down the game's loading.",
+            SLOW_MOD_CHECK_HINT,
+        ))
+
+        self.assertEqual(summary["code"], "LTK_SLOW_MOD_CHECK")
+        self.assertEqual(summary["detail"], "263")
 
     def test_an_older_install_report_of_it_is_not_an_import_problem(self):
         (summary,) = summarize((

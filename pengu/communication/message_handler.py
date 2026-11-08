@@ -6,6 +6,8 @@ Routes and handles different WebSocket message types
 """
 
 import asyncio
+import base64
+import binascii
 import json
 import logging
 import os
@@ -70,8 +72,11 @@ BACKGROUND_MESSAGE_TYPES = frozenset({
     "request-manage-categories",
     "request-manage-champion-mods",
     "request-manage-category-mods",
+    "set-champion-mod-image",
     "delete-champion-mod",
+    "delete-champion-mods",
     "delete-category-mod",
+    "delete-category-mods",
     "rename-champion-mod",
     "rename-category-mod",
 })
@@ -86,8 +91,76 @@ def _mod_thumbnail(mod_folder: Path) -> Optional[Path]:
     return None
 
 
-def _choose_mod_file() -> Optional[Path]:
-    """Show a native file picker for a user-selected mod archive."""
+def _mod_thumbnail_details(
+    mod_folder: Path,
+    mods_root: Path,
+    port: int,
+) -> tuple[Optional[str], Optional[str]]:
+    thumbnail_path = _mod_thumbnail(mod_folder)
+    if thumbnail_path is None:
+        return None, None
+    relative_path = str(thumbnail_path.relative_to(mods_root)).replace("\\", "/")
+    quoted_path = quote(relative_path, safe="/")
+    version = thumbnail_path.stat().st_mtime_ns
+    return relative_path, f"http://127.0.0.1:{port}/mod-asset/{quoted_path}?v={version}"
+
+
+# LTK Manager's rule for a base skin that uses another skin's model or name:
+# its patcher turns the whole champion WAD off in game (a "skinhack")
+SKINHACK_RULE = "bin/skinhack"
+
+
+def _rejected_import(item: dict, result: dict) -> dict:
+    """The import error for a mod LTK Manager will turn off in game. "code"
+    picks the panel's (translated) text; "error" is for the log."""
+    problems = result.get("problems") or []
+    reason = " ".join(p.get("description") or p.get("title") or "" for p in problems).strip()
+    if any(p.get("rule") == SKINHACK_RULE for p in problems):
+        code, error = "ltk_skinhack", "LTK Manager considers this mod a skinhack, so it can't be played"
+    else:
+        code = "ltk_rejected"
+        error = "LTK Manager found problems it can't repair in this mod" + (f" ({reason})" if reason else "") + \
+            ", so it can't be played"
+    return {"fileName": item.get("fileName", ""), "error": error, "code": code, "reason": reason}
+
+
+def _choose_mod_files() -> list[Path]:
+    """Show a native file picker for one or more user-selected mod archives."""
+    root = None
+    try:
+        import tkinter as tk
+        from tkinter import filedialog
+
+        root = tk.Tk()
+        root.withdraw()
+        try:
+            root.attributes("-topmost", True)
+        except Exception:
+            pass
+        selected_files = filedialog.askopenfilenames(
+            title="Select Parasite mod files",
+            filetypes=[
+                ("Parasite mods", "*.fantome *.zip *.modpkg"),
+                ("Fantome mods", "*.fantome"),
+                ("ZIP mods", "*.zip"),
+                ("Mod packages", "*.modpkg"),
+                ("All files", "*.*"),
+            ],
+        )
+        return [Path(selected) for selected in selected_files]
+    except Exception as exc:  # noqa: BLE001
+        log.error("[SkinMonitor] Could not open the mod file picker: %s", exc)
+        return []
+    finally:
+        if root is not None:
+            try:
+                root.destroy()
+            except Exception:
+                pass
+
+
+def _choose_mod_image_file() -> Optional[Path]:
+    """Show a native file picker for a skin mod preview image."""
     root = None
     try:
         import tkinter as tk
@@ -100,19 +173,13 @@ def _choose_mod_file() -> Optional[Path]:
         except Exception:
             pass
         selected = filedialog.askopenfilename(
-            title="Select a Parasite mod file",
-            filetypes=[
-                ("Parasite mods", "*.fantome *.zip *.modpkg"),
-                ("Fantome mods", "*.fantome"),
-                ("ZIP mods", "*.zip"),
-                ("Mod packages", "*.modpkg"),
-                ("All files", "*.*"),
-            ],
+            title="Select a PNG image for the skin mod",
+            filetypes=[("PNG images", "*.png")],
         )
         return Path(selected) if selected else None
     except Exception as exc:  # noqa: BLE001
-        log.error("[SkinMonitor] Could not open the mod file picker: %s", exc)
-        return None
+        log.error("[ManageMods] Could not open the skin mod image picker: %s", exc)
+        raise RuntimeError(f"Could not open image picker: {exc}") from exc
     finally:
         if root is not None:
             try:
@@ -338,10 +405,16 @@ class MessageHandler:
             self._handle_dismiss_custom_mod(payload)
         elif payload_type == "delete-champion-mod":
             self._handle_delete_champion_mod(payload)
+        elif payload_type == "delete-champion-mods":
+            self._handle_delete_champion_mods(payload)
         elif payload_type == "delete-category-mod":
             self._handle_delete_category_mod(payload)
+        elif payload_type == "delete-category-mods":
+            self._handle_delete_category_mods(payload)
         elif payload_type == "rename-champion-mod":
             self._handle_rename_champion_mod(payload)
+        elif payload_type == "set-champion-mod-image":
+            self._handle_set_champion_mod_image(payload)
         elif payload_type == "rename-category-mod":
             self._handle_rename_category_mod(payload)
         elif payload_type == "dismiss-historic":
@@ -918,6 +991,26 @@ class MessageHandler:
                         'detail': builtins,
                     }
 
+                # Category: LTK Manager's own programs set to run as
+                # administrator (before the LTF category: it names LTK Manager)
+                if "ltk manager is set to run as administrator" in ml:
+                    programs = msg.split('(', 1)[1].rsplit(')', 1)[0].strip() if '(' in msg else ''
+                    return {
+                        'code': 'LTK_ELEVATED',
+                        'text': 'LTK Manager set to run as administrator -> turn it off',
+                        'detail': programs,
+                    }
+
+                # Category: LTK Manager's automatic mod check took minutes while
+                # the game loaded (before the LTF category: it names LTK Manager)
+                if "automatic mod check took" in ml:
+                    took = re.search(r"took (\d+)s", msg)
+                    return {
+                        'code': 'LTK_SLOW_MOD_CHECK',
+                        'text': 'LTK Manager mod check slows loading -> turn it off',
+                        'detail': took.group(1) if took else '',
+                    }
+
                 # Category: the League client runs as administrator (checked on
                 # each client connection; before the Windows account category)
                 if "can't apply skins" in ml and 'league client runs as administrator' in ml:
@@ -965,7 +1058,7 @@ class MessageHandler:
                 )
                 is_ltf_report = (
                     is_import_failure
-                    or 'ltk_bridge.log' in fl
+                    or 'ltk_api.log' in fl
                     or 'ltf' in ml or 'ltk patcher' in ml or 'ltk manager' in ml
                 )
                 if is_ltf_report:
@@ -1097,13 +1190,11 @@ class MessageHandler:
             thumbnail_url = None
             try:
                 if entry.path.is_dir():
-                    thumbnail_path = _mod_thumbnail(entry.path)
-                    if thumbnail_path is not None:
-                        thumbnail_relative_path = str(
-                            thumbnail_path.relative_to(self.mod_storage.mods_root)
-                        ).replace("\\", "/")
-                        quoted_path = quote(thumbnail_relative_path, safe="/")
-                        thumbnail_url = f"http://127.0.0.1:{self.port}/mod-asset/{quoted_path}"
+                    thumbnail_relative_path, thumbnail_url = _mod_thumbnail_details(
+                        entry.path,
+                        self.mod_storage.mods_root,
+                        self.port,
+                    )
             except Exception as e:
                 log.debug('[SkinMonitor] Could not build mod thumbnail URL: %s', e)
 
@@ -1119,6 +1210,7 @@ class MessageHandler:
                     "relativePath": str(relative_path).replace("\\", "/"),
                     "thumbnailRelativePath": thumbnail_relative_path,
                     "thumbnailUrl": thumbnail_url,
+                    "imageEditable": entry.path.is_dir(),
                 }
             )
 
@@ -1195,13 +1287,11 @@ class MessageHandler:
             thumbnail_url = None
             try:
                 if entry.path.is_dir():
-                    thumbnail_path = _mod_thumbnail(entry.path)
-                    if thumbnail_path is not None:
-                        thumbnail_relative_path = str(
-                            thumbnail_path.relative_to(self.mod_storage.mods_root)
-                        ).replace("\\", "/")
-                        quoted_path = quote(thumbnail_relative_path, safe="/")
-                        thumbnail_url = f"http://127.0.0.1:{self.port}/mod-asset/{quoted_path}"
+                    thumbnail_relative_path, thumbnail_url = _mod_thumbnail_details(
+                        entry.path,
+                        self.mod_storage.mods_root,
+                        self.port,
+                    )
             except Exception as e:
                 log.debug(f"[SkinMonitor] No thumbnail for mod {entry.path}: {e}")
             mods_payload.append(
@@ -1215,6 +1305,7 @@ class MessageHandler:
                     "relativePath": str(relative_path).replace("\\", "/"),
                     "thumbnailRelativePath": thumbnail_relative_path,
                     "thumbnailUrl": thumbnail_url,
+                    "imageEditable": entry.path.is_dir(),
                 }
             )
         return mods_payload
@@ -1969,6 +2060,68 @@ class MessageHandler:
                 "error": str(exc),
             }))
 
+    def _handle_delete_champion_mods(self, payload: dict) -> None:
+        """Delete selected skin mods and report each result in one response."""
+        champion_id = payload.get("championId")
+        mods = payload.get("mods")
+        if not self.mod_storage:
+            error = "Mod storage is not available"
+            results = []
+        elif not isinstance(mods, list) or not mods:
+            error = "At least one skin mod is required"
+            results = []
+        else:
+            error = None
+            results = []
+            for mod in mods:
+                if not isinstance(mod, dict):
+                    results.append({"success": False, "error": "Invalid mod entry"})
+                    continue
+                mod_name = mod.get("modName")
+                relative_path = mod.get("relativePath")
+                try:
+                    deleted = self.mod_storage.delete_champion_mod(
+                        champion_id,
+                        mod_name=mod_name,
+                        relative_path=relative_path,
+                    )
+                    if deleted:
+                        self._clear_active_selection_if_matches(champion_id, relative_path)
+                        results.append({
+                            "success": True,
+                            "modName": mod_name,
+                            "relativePath": relative_path,
+                        })
+                    else:
+                        results.append({
+                            "success": False,
+                            "modName": mod_name,
+                            "relativePath": relative_path,
+                            "error": "Mod not found",
+                        })
+                except Exception as exc:
+                    log.error("[DeleteMod] Failed to delete champion mod %s: %s", mod_name, exc)
+                    results.append({
+                        "success": False,
+                        "modName": mod_name,
+                        "relativePath": relative_path,
+                        "error": str(exc),
+                    })
+
+        deleted_count = sum(result.get("success", False) for result in results)
+        failures = len(results) - deleted_count
+        response = {
+            "type": "champion-mods-bulk-deleted",
+            "championId": champion_id,
+            "success": failures == 0 and error is None,
+            "partial": deleted_count > 0 and failures > 0,
+            "deletedCount": deleted_count,
+            "results": results,
+        }
+        if error:
+            response["error"] = error
+        self._send_response(json.dumps(response))
+
     def _clear_category_selection_if_matches(self, category: object, mod_name: object) -> None:
         """Clear live selection and mod historic if they point at the deleted category mod."""
         if not category or not mod_name:
@@ -2064,6 +2217,62 @@ class MessageHandler:
                 "error": str(exc),
             }))
 
+    def _handle_delete_category_mods(self, payload: dict) -> None:
+        """Delete selected category mods and report each result in one response."""
+        category = payload.get("category")
+        mods = payload.get("mods")
+        if not self.mod_storage:
+            error = "Mod storage is not available"
+            results = []
+        elif not isinstance(mods, list) or not mods:
+            error = "At least one category mod is required"
+            results = []
+        else:
+            error = None
+            results = []
+            for mod in mods:
+                if not isinstance(mod, dict):
+                    results.append({"success": False, "error": "Invalid mod entry"})
+                    continue
+                mod_name = mod.get("modName")
+                try:
+                    deleted = self.mod_storage.delete_category_mod(category, mod_name)
+                    if deleted:
+                        self._clear_category_selection_if_matches(category, mod_name)
+                        results.append({"success": True, "modName": mod_name})
+                    else:
+                        results.append({
+                            "success": False,
+                            "modName": mod_name,
+                            "error": "Mod not found",
+                        })
+                except Exception as exc:
+                    log.error(
+                        "[DeleteMod] Failed to delete category mod %s/%s: %s",
+                        category,
+                        mod_name,
+                        exc,
+                    )
+                    results.append({
+                        "success": False,
+                        "modName": mod_name,
+                        "error": str(exc),
+                    })
+
+        deleted_count = sum(result.get("success", False) for result in results)
+        failures = len(results) - deleted_count
+        response = {
+            "type": "category-mods-bulk-deleted",
+            "category": category,
+            "success": failures == 0 and error is None,
+            "partial": deleted_count > 0 and failures > 0,
+            "deletedCount": deleted_count,
+            "results": results,
+        }
+        if error:
+            response["error"] = error
+        self._send_response(json.dumps(response))
+
     def _sync_selected_custom_mod_display_name(
         self,
         champion_id: object,
@@ -2146,6 +2355,61 @@ class MessageHandler:
                 "success": False,
                 "championId": champion_id,
                 "modName": mod_name,
+                "error": str(exc),
+            }))
+
+    def _handle_set_champion_mod_image(self, payload: dict) -> None:
+        """Add or replace a skin mod preview image and refresh its cache URL."""
+        champion_id = payload.get("championId")
+        relative_path = payload.get("relativePath")
+        try:
+            if not self.mod_storage:
+                raise RuntimeError("Mod storage is not available")
+            if not champion_id or not isinstance(relative_path, str):
+                raise ValueError("Champion ID and mod path are required")
+
+            selected_image = _choose_mod_image_file()
+            if selected_image is None:
+                self._send_response(json.dumps({
+                    "type": "champion-mod-image-updated",
+                    "success": False,
+                    "cancelled": True,
+                    "championId": champion_id,
+                }))
+                return
+
+            from PIL import Image
+
+            try:
+                image_context = Image.open(selected_image)
+            except (OSError, ValueError) as exc:
+                raise ValueError("The selected file is not a valid PNG image") from exc
+            with image_context as image:
+                if image.format != "PNG":
+                    raise ValueError("The selected file is not a PNG image")
+                if image.width > 4096 or image.height > 4096:
+                    raise ValueError("Image dimensions must be 4096 by 4096 pixels or smaller")
+                image.verify()
+
+            image_path = self.mod_storage.set_champion_mod_image(
+                champion_id,
+                relative_path,
+                selected_image,
+            )
+            log.info("[ManageMods] Updated skin mod image: %s", image_path)
+            self._send_response(json.dumps({
+                "type": "champion-mod-image-updated",
+                "success": True,
+                "championId": champion_id,
+                "relativePath": relative_path,
+            }))
+        except Exception as exc:
+            log.error("[ManageMods] Failed to update skin mod image: %s", exc)
+            self._send_response(json.dumps({
+                "type": "champion-mod-image-updated",
+                "success": False,
+                "championId": champion_id,
+                "relativePath": relative_path,
                 "error": str(exc),
             }))
 
@@ -2922,12 +3186,59 @@ class MessageHandler:
                 self.websocket_server.broadcast(message), self.websocket_server.loop
             )
     
-    def _send_mod_import_started(self, mod_file: Path) -> None:
-        """Tell the plugins a picked mod is being imported; the folder-opened-response ends it"""
-        self._send_response(json.dumps({
+    # Client phases where LTK Manager belongs to the game's injection
+    _MOD_CHECK_BUSY_PHASES = frozenset({"ChampSelect", "FINALIZATION", "GameStart", "InProgress", "Reconnect"})
+
+    def _check_imported_mods(self, imported: list[dict], errors: list[dict], remove) -> list[dict]:
+        """Have LTK Manager check each just-imported mod and repair what it
+        can, and return the mods kept. One LTK Manager will still turn off in
+        game (a skinhack, a problem it cannot repair) is not added: *remove*
+        deletes it again, and it joins *errors* with the reason. A kept mod
+        gets the verdict as "health". Skipped during champion select and
+        games, where LTK Manager is the game's."""
+        injection_manager = getattr(self, "injection_manager", None)
+        injector = getattr(injection_manager, "injector", None)
+        overlay = getattr(injector, "overlay_manager", None)
+        if overlay is None or not imported:
+            return imported
+        phase = getattr(getattr(self, "shared_state", None), "phase", None)
+        if phase in self._MOD_CHECK_BUSY_PHASES or getattr(injection_manager, "_injection_in_progress", False):
+            log.info("[MODCHECK] Not checking the added mods with LTK Manager during champion select or a game")
+            return imported
+        self._send_response(json.dumps({"type": "mod-import-checking", "fileCount": len(imported)}))
+        kept = []
+        for item in imported:
+            try:
+                result = overlay.check_mod(Path(item["path"]), item.get("modName") or Path(item["path"]).name)
+            except Exception as e:  # noqa: BLE001 - a check must never fail the import
+                log.warning(f"[MODCHECK] Could not check {item.get('modName')}: {e}")
+                result = None
+            if result and result.get("problems"):
+                rejection = _rejected_import(item, result)
+                try:
+                    remove(item)
+                except Exception as e:  # noqa: BLE001 - kept, with the warning, rather than half removed
+                    log.warning(f"[MODCHECK] Could not remove {item.get('modName')} again: {e}")
+                    item["health"] = result
+                    kept.append(item)
+                    continue
+                log.warning(f"[MODCHECK] Not adding {item.get('modName')}: {rejection['error']}")
+                errors.append(rejection)
+                continue
+            if result is not None:
+                item["health"] = result
+            kept.append(item)
+        return kept
+
+    def _send_mod_import_started(self, mod_files: list[Path]) -> None:
+        """Tell the plugins selected mods are being imported."""
+        payload = {
             "type": "mod-import-started",
-            "fileName": mod_file.name,
-        }))
+            "fileCount": len(mod_files),
+        }
+        if len(mod_files) == 1:
+            payload["fileName"] = mod_files[0].name
+        self._send_response(json.dumps(payload))
 
     def _send_settings_save_success(self) -> None:
         """Send settings save success response"""
@@ -2977,15 +3288,15 @@ class MessageHandler:
             log.debug(f"[SkinMonitor] Error during folder cleanup: {e}")
     
     def _handle_add_custom_mods_category_selected(self, payload: dict) -> None:
-        """Open a file picker and import one mod into the selected category."""
+        """Open a file picker and import selected mods into the selected category."""
         category = payload.get("category")
         try:
             if category not in self.mod_storage.MOD_CATEGORIES:
                 log.warning(f"[SkinMonitor] Invalid category: {category}")
                 return
 
-            selected_mod_file = _choose_mod_file()
-            if selected_mod_file is None:
+            selected_mod_files = _choose_mod_files()
+            if not selected_mod_files:
                 self._send_response(json.dumps({
                     "type": "folder-opened-response",
                     "success": False,
@@ -2994,22 +3305,52 @@ class MessageHandler:
                 }))
                 return
 
-            self._send_mod_import_started(selected_mod_file)
-            mod_folder, mod_name = self.mod_storage.import_category_mod_file(
-                category,
-                selected_mod_file,
+            self._send_mod_import_started(selected_mod_files)
+            imported = []
+            errors = []
+            for mod_file in selected_mod_files:
+                try:
+                    mod_folder, mod_name = self.mod_storage.import_category_mod_file(
+                        category,
+                        mod_file,
+                    )
+                    imported.append({
+                        "fileName": mod_file.name,
+                        "path": str(mod_folder),
+                        "modName": mod_name,
+                    })
+                    log.info(
+                        f"[SkinMonitor] Imported {category} mod {mod_name} to {mod_folder}"
+                    )
+                except Exception as exc:
+                    log.error(
+                        f"[SkinMonitor] Failed to import {category} mod {mod_file.name}: {exc}"
+                    )
+                    errors.append({"fileName": mod_file.name, "error": str(exc)})
+
+            imported = self._check_imported_mods(
+                imported, errors,
+                lambda item: self.mod_storage.delete_category_mod(category, item["modName"]),
             )
-            log.info(
-                f"[SkinMonitor] Imported {category} mod {mod_name} to {mod_folder}"
-            )
-            
             response_payload = {
                 "type": "folder-opened-response",
-                "success": True,
+                "success": bool(imported) and not errors,
+                "partial": bool(imported) and bool(errors),
                 "category": category,
-                "path": str(mod_folder),
-                "modName": mod_name,
+                "imported": imported,
+                "importErrors": errors,
             }
+            if imported:
+                response_payload.update({
+                    "path": imported[0]["path"],
+                    "modName": imported[0]["modName"],
+                })
+            if errors and not imported:
+                response_payload["error"] = (
+                    errors[0]["error"]
+                    if len(selected_mod_files) == 1
+                    else "Failed to import all selected mods"
+                )
             self._send_response(json.dumps(response_payload))
         except Exception as e:
             log.error(f"[SkinMonitor] Failed to import {category} mod: {e}")
@@ -3294,8 +3635,8 @@ class MessageHandler:
                     self._send_response(json.dumps(response_payload))
                     return
 
-                selected_mod_file = _choose_mod_file()
-                if selected_mod_file is None:
+                selected_mod_files = _choose_mod_files()
+                if not selected_mod_files:
                     self._send_response(json.dumps({
                         "type": "folder-opened-response",
                         "success": False,
@@ -3304,27 +3645,57 @@ class MessageHandler:
                     }))
                     return
 
-                self._send_mod_import_started(selected_mod_file)
-                mod_folder, target_manifest, mod_name = self.mod_storage.import_mod_file(
-                    champion_id,
-                    selected_mod_file,
-                    skin_ids,
+                self._send_mod_import_started(selected_mod_files)
+                imported = []
+                errors = []
+                for mod_file in selected_mod_files:
+                    try:
+                        mod_folder, target_manifest, mod_name = self.mod_storage.import_mod_file(
+                            champion_id,
+                            mod_file,
+                            skin_ids,
+                        )
+                        imported.append({
+                            "fileName": mod_file.name,
+                            "path": str(mod_folder),
+                            "modName": mod_name,
+                            "targetManifest": str(target_manifest),
+                        })
+                        log.info(
+                            f"[SkinMonitor] Imported mod for champion "
+                            f"{champion_id}, mod {mod_name}, targets {skin_ids}"
+                        )
+                    except Exception as exc:
+                        log.error(
+                            f"[SkinMonitor] Failed to import skin mod {mod_file.name}: {exc}"
+                        )
+                        errors.append({"fileName": mod_file.name, "error": str(exc)})
+
+                imported = self._check_imported_mods(
+                    imported, errors,
+                    lambda item: self.mod_storage.delete_champion_mod(champion_id, mod_name=item["modName"]),
                 )
-                
-                log.info(
-                    f"[SkinMonitor] Imported mod for champion "
-                    f"{champion_id}, mod {mod_name}, targets {skin_ids}"
-                )
-                
                 response_payload = {
                     "type": "folder-opened-response",
-                    "success": True,
-                    "path": str(mod_folder),
+                    "success": bool(imported) and not errors,
+                    "partial": bool(imported) and bool(errors),
+                    "imported": imported,
+                    "importErrors": errors,
                     "championFolder": str(self.mod_storage.get_champion_dir(champion_id)),
-                    "modName": mod_name,
                     "skinIds": skin_ids,
-                    "targetManifest": str(target_manifest),
                 }
+                if imported:
+                    response_payload.update({
+                        "path": imported[0]["path"],
+                        "modName": imported[0]["modName"],
+                        "targetManifest": imported[0]["targetManifest"],
+                    })
+                if errors and not imported:
+                    response_payload["error"] = (
+                        errors[0]["error"]
+                        if len(selected_mod_files) == 1
+                        else "Failed to import all selected mods"
+                    )
                 self._send_response(json.dumps(response_payload))
         except Exception as e:
             log.error(f"[SkinMonitor] Failed to handle skin selection: {e}")

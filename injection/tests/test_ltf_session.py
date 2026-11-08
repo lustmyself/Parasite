@@ -28,6 +28,15 @@ class FakeBridge:
     # Answer an install with the whole entry it created (id, names, enabled),
     # not its id alone
     full_install_answer = False
+    # The health_check_off answer; None: a bridge older than the command
+    health_check_answer = {"ok": True, "changed": False}
+    # Library entries LTK Manager cannot read, logged to broken_log at each read
+    broken_ids = []
+    broken_log = None
+    # LTK Manager's mod storage (modDir per entry) and its health answers
+    mod_storage = None
+    health_answers = []  # verdicts check_mod_health returns, the last one repeats
+    repair_files = None  # {path in archive: bytes} repair_mod writes into the entry's archive
 
     def __init__(self, port=None, pid=None):
         self.port = port
@@ -45,6 +54,12 @@ class FakeBridge:
         cls.patcher_statuses = []
         cls.initial_library = []
         cls.full_install_answer = False
+        cls.health_check_answer = {"ok": True, "changed": False}
+        cls.broken_ids = []
+        cls.broken_log = None
+        cls.mod_storage = None
+        cls.health_answers = []
+        cls.repair_files = None
 
     @classmethod
     def wait_for_bridge(cls, timeout=30.0, expected_pid=None, cancelled=None):
@@ -67,6 +82,12 @@ class FakeBridge:
         self.library_reads += 1
         if self.library_fails:
             raise BridgeCommandError("list failed: CDP busy (another eval in progress)")
+        # LTK Manager logs, at each read, the entries it cannot read and leaves out
+        if FakeBridge.broken_log is not None:
+            with open(FakeBridge.broken_log, "a", encoding="utf-8") as handle:
+                for mod_id in FakeBridge.broken_ids:
+                    handle.write("2026-11-07T23:20:47.381184Z  WARN ltk_manager_library::mods::library: Skipping "
+                                 f"broken mod entry {mod_id}: Serialization error: expected value at line 1 column 1\n")
         return [dict(entry) for entry in self.library_entries]
 
     def _install(self, file_name, name):
@@ -77,6 +98,9 @@ class FakeBridge:
             "displayName": name or Path(file_name).stem,
             "enabled": True,
         }
+        if FakeBridge.mod_storage is not None:
+            entry.update({"modDir": str(FakeBridge.mod_storage / f"mod-{mod_id[:8]}"), "storage": "archive",
+                          "format": "fantome"})
         self.library_entries.append(entry)
         value = dict(entry) if FakeBridge.full_install_answer else {"id": mod_id}
         return {"ok": True, "response": {"ok": True, "value": value}}
@@ -103,6 +127,31 @@ class FakeBridge:
             raise BridgeCommandError(f"unknown mod {target}")
         self.library_entries = remaining
         return {"ok": True}
+
+    def check_mod_health(self, mod_id):
+        self.calls.append(("check_mod_health", mod_id))
+        answers = FakeBridge.health_answers
+        verdict = answers.pop(0) if len(answers) > 1 else (answers[0] if answers else {"health": "healthy"})
+        return {"ok": True, "response": {"ok": True, "value": dict(verdict, modId=mod_id)}}
+
+    def repair_mod(self, mod_id):
+        self.calls.append(("repair_mod", mod_id))
+        files = FakeBridge.repair_files or {}
+        entry = next(e for e in self.library_entries if e["id"] == mod_id)
+        archive = Path(entry["modDir"] + ".fantome")
+        archive.parent.mkdir(parents=True, exist_ok=True)
+        import zipfile
+        with zipfile.ZipFile(archive, "w") as packed:
+            for name, data in files.items():
+                packed.writestr(name, data)
+        return {"ok": True, "response": {"ok": True, "value": {"applied": len(files), "skipped": 0,
+                                                               "remaining": [], "failed": []}}}
+
+    def health_check_off(self):
+        self.calls.append(("health_check_off",))
+        if FakeBridge.health_check_answer is None:
+            raise BridgeCommandError("unknown: health_check_off")
+        return FakeBridge.health_check_answer
 
     def start_patcher(self):
         self.calls.append(("start_patcher",))
@@ -174,6 +223,12 @@ class LtfSessionTestCase(unittest.TestCase):
             patch.object(overlay_manager, "RESTART_MISSED_GAME", False),
             # Never this PC's own LTK Manager log
             patch.object(overlay_manager.LtkLogTail, "log_dir", staticmethod(lambda: self.ltk_logs)),
+            # Nor its LTF logs
+            patch.object(overlay_manager, "ltk_logs_dir", lambda: self.root / "logs" / "ltk"),
+            patch.object(overlay_manager, "launcher_log_paths",
+                         lambda: (self.root / "logs" / "ltk" / "ltk_launcher.log",
+                                  self.root / "Public" / "ltk_launcher.log",
+                                  self.root / "Temp" / "ltk_launcher.log")),
         ):
             patcher.start()
             self.addCleanup(patcher.stop)
@@ -358,6 +413,23 @@ class InjectionSessionTests(LtfSessionTestCase):
         self.assertNotIn("start_patcher", names)
         self.assertNotIn("kill", names)  # a reused manager belongs to the user
 
+    def test_an_ltk_manager_refusing_the_commands_is_reported_as_outdated(self):
+        """#473: an LTK Manager without the library plugin rejected the
+        library read, and Troubleshooting told the user to free disk space"""
+        def refuse(bridge_self):
+            raise BridgeCommandError(
+                'list failed: {"ok": false, "raw": {"ok": false, "error": '
+                '"Command plugin:library|get_installed_mods not allowed by ACL"}}'
+            )
+
+        with patch.object(FakeBridge, "library", refuse):
+            result = self.overlay.mk_run_overlay([self.make_mod()], stop_callback=lambda: True)
+
+        self.assertEqual(result, 1)
+        self.assertEqual(self.reported_codes(), ["LTF_FAILED"])
+        self.assertEqual(self.reported_causes(), ["outdated"])
+        self.assertNotIn("start_patcher", self.bridge.command_names())
+
     def test_a_missing_bridge_reports_ltf_missing(self):
         (self.tools / "ltk_launcher.exe").unlink()
         mod = self.make_mod()
@@ -422,6 +494,100 @@ class InjectionSessionTests(LtfSessionTestCase):
 
         self.assertEqual(result, 1)
         self.assertEqual(self.reported_causes(), ["running"])
+
+    def test_the_launchers_own_log_of_a_start_goes_into_parasites_log(self):
+        """#478: why the launcher could not make explorer.exe LTK Manager's
+        parent was only in ltk_launcher.log, which the user could not find"""
+        parasite_log, public_log, temp_log = overlay_manager.launcher_log_paths()
+        parasite_log.parent.mkdir(parents=True)
+        parasite_log.write_text("[launch] an earlier start, parent pid = 1 (explorer.exe)\r\n", encoding="utf-8")
+
+        def launch(*args, **kwargs):
+            with open(parasite_log, "a", encoding="utf-8") as handle:
+                handle.write("========== ltk_launcher ==========\r\n"
+                             "[warn] spawn with explorer.exe as the parent failed (err=87) - starting it as a child\r\n"
+                             "[launch] spawned pid = 4242 (suspended), parent pid = 99 (not explorer.exe)\r\n")
+            return MagicMock(returncode=0, stdout="LTK_MANAGER_PID=4242\n")
+
+        mod = self.make_mod()
+        with patch.object(overlay_manager, "find_bridge", return_value=None), \
+                patch.object(overlay_manager.subprocess, "run", side_effect=launch), \
+                self.assertLogs(overlay_manager.log.name, level="DEBUG") as logs:
+            self.overlay.mk_run_overlay([mod], stop_callback=lambda: True)
+
+        launcher_lines = [line for line in logs.output if "ltk_launcher:" in line]
+        self.assertEqual(len(launcher_lines), 2)  # this start's lines only, without its banner
+        self.assertIn("WARNING", launcher_lines[0])
+        self.assertIn("starting it as a child", launcher_lines[0])
+        self.assertEqual(self.overlay._launcher_parent, "not explorer.exe")
+        self.assertFalse(public_log.exists())
+        self.assertFalse(temp_log.exists())
+
+    def test_the_launcher_logs_into_parasites_logs_folder(self):
+        """The LTF logs go to Parasite's logs\\ltk folder (Open Logs folder), not
+        C:\\Users\\Public where users could not find them"""
+        mod = self.make_mod()
+        no_bridge, run = self.launched()
+        with no_bridge, run as launcher:
+            self.overlay.mk_run_overlay([mod], stop_callback=lambda: True)
+
+        command = launcher.call_args.args[0]
+        log_dir = self.root / "logs" / "ltk"
+        self.assertEqual(command[command.index("--log-dir") + 1], str(log_dir))
+        self.assertTrue(log_dir.is_dir())
+
+    def test_ltk_managers_automatic_mod_check_is_turned_off_before_any_install(self):
+        """#481: LTK Manager checked Parasite's skin anew every game, for minutes
+        on a hard drive while the game loaded"""
+        FakeBridge.health_check_answer = {"ok": True, "changed": True}
+        mod = self.make_mod()
+
+        with self.assertLogs(overlay_manager.log.name, level="INFO") as logs:
+            self.overlay.mk_run_overlay([mod], stop_callback=lambda: True)
+
+        names = self.bridge.command_names()
+        self.assertIn("health_check_off", names)
+        self.assertLess(names.index("health_check_off"), names.index("import"))
+        self.assertTrue(any("Turned off LTK Manager's automatic mod check" in line for line in logs.output))
+
+    def test_mods_ltk_manager_cannot_read_are_turned_off_for_good(self):
+        """#479: an enabled library entry with an empty metadata file failed
+        every overlay build; LTK Manager's library leaves it out, so Parasite
+        never turned it off"""
+        broken = "0bb265aa-2b0c-44ff-9cfd-91935223a297"
+        FakeBridge.broken_ids = [broken]
+        FakeBridge.broken_log = self.ltk_logs / "ltk-manager.2026-11-07.log"
+        mod = self.make_mod()
+
+        self.overlay.mk_run_overlay([mod], stop_callback=lambda: True)
+
+        toggles = [call for call in self.bridge.calls if call[0] == "toggle" and call[1] == broken]
+        self.assertEqual(toggles, [("toggle", broken, False)])  # once, and never back on
+        names = self.bridge.command_names()
+        self.assertLess(names.index("toggle"), names.index("start_patcher"))
+
+    def test_a_bridge_without_the_command_still_injects(self):
+        FakeBridge.health_check_answer = None  # an LTF bridge older than it
+        mod = self.make_mod()
+
+        result = self.overlay.mk_run_overlay([mod], stop_callback=lambda: True)
+
+        self.assertEqual(result, 0)
+        self.assertIn("import", self.bridge.command_names())
+
+    def test_a_large_launcher_log_is_kept_as_old(self):
+        parasite_log = overlay_manager.launcher_log_paths()[0]
+        parasite_log.parent.mkdir(parents=True)
+        parasite_log.write_bytes(b"x" * (overlay_manager.LAUNCHER_LOG_MAX_BYTES + 1))
+
+        mod = self.make_mod()
+        no_bridge, run = self.launched()
+        with no_bridge, run:
+            self.overlay.mk_run_overlay([mod], stop_callback=lambda: True)
+
+        self.assertFalse(parasite_log.exists())
+        self.assertEqual((parasite_log.parent / "ltk_launcher.old.log").stat().st_size,
+                         overlay_manager.LAUNCHER_LOG_MAX_BYTES + 1)
 
     def test_a_failed_launcher_reports_start_failure(self):
         mod = self.make_mod()
@@ -857,6 +1023,96 @@ class PatcherStatusParsingTests(LtfSessionTestCase):
         (reason,) = [call.args[2] for call in self.report_issue.call_args_list if call.args[0] == "LTF_FAILED"]
         self.assertIn("zed.wad.client: base-skin check: skin0 is another skin", reason)
 
+    # What LTK Manager logged for #475: its host found the game, the DLL never
+    # loaded, and the incident it filed is titled "Unexplained Game Exit"
+    NOT_ATTACHED_LOG = (
+        "2026-11-07T16:12:27.302329Z  WARN ltk_manager_runtime::patcher::host::persistent: [ltk-host stderr]   "
+        "60.000000000s ERROR ltk_patcher_host::worker: failed: DLL never attached after 60s -- if the game is "
+        "elevated, run the host elevated\n"
+        "2026-11-07T16:12:35.791000Z  INFO ltk_manager_core::patching::pipeline: Incident recorded: Unexplained "
+        "Game Exit id=2026-11-08T00-10-46 verdict=EndedWithoutReason"
+    )
+
+    def test_a_dll_that_never_got_into_the_game_is_reported_once(self):
+        """#475: Troubleshooting only showed the incident's "Unexplained Game
+        Exit", not that the patcher never got into the game"""
+        session = self._session()
+        FakeBridge.patcher_statuses = [status(session={"log": self.NOT_ATTACHED_LOG})]
+
+        self.overlay._poll_patcher_status(session)
+        self.overlay._poll_patcher_status(session)
+
+        self.assertEqual(self.reported_causes(), ["not_attached"])  # its incident only repeats it
+        (reason,) = [call.args[2] for call in self.report_issue.call_args_list if call.args[0] == "LTF_FAILED"]
+        self.assertIn("never got into the game (DLL never attached after 60s)", reason)
+
+    def test_a_dll_that_got_into_the_relaunched_game_is_not_reported(self):
+        session = self._session()
+        FakeBridge.patcher_statuses = [status(session={"log": self.NOT_ATTACHED_LOG.split("\n")[0] + "\n"
+                                                       "2026-11-07T16:13:01.000000Z  INFO x: [ltk-host stderr] "
+                                                       "INFO ltk_patcher_host::worker: dll attached pid=9616"})]
+
+        self.overlay._poll_patcher_status(session)
+
+        self.assertEqual(self.reported_causes(), [])
+
+    def test_a_refusal_names_a_manager_not_started_under_explorer(self):
+        """#478: LTK Manager's log showed parent ltk_launcher.exe; the reason
+        the launcher fell back was only in ltk_launcher.log"""
+        session = self._session()
+        self.overlay._launcher_parent = "not explorer.exe"
+        FakeBridge.patcher_statuses = [status(session={"log": (
+            "2026-11-07T20:56:40.028528Z  INFO ltk_manager_runtime::patcher::injector: [ltk-dll pid=19048 "
+            "tid=14596 ERROR] ltk_patcher_dll::verify: host verification failed, refusing overlay: "
+            "[VRF00000007] (18776)")})]
+
+        self.overlay._poll_patcher_status(session)
+
+        self.assertEqual(self.reported_causes(), ["refused"])
+        (reason,) = [call.args[2] for call in self.report_issue.call_args_list if call.args[0] == "LTF_FAILED"]
+        self.assertIn("LTK Manager's patcher refused the overlay (host verification failed: VRF00000007 (18776); "
+                      "LTK Manager's parent was not explorer.exe (not explorer.exe))", reason)
+
+    def test_a_refusal_with_a_manager_under_explorer_names_no_parent(self):
+        session = self._session()
+        self.overlay._launcher_parent = "explorer.exe"
+        FakeBridge.patcher_statuses = [status(session={"log": "ERROR] ltk_patcher_dll::verify: host verification "
+                                                              "failed, refusing overlay: [VRF00000008] (1, x)"})]
+
+        self.overlay._poll_patcher_status(session)
+
+        (reason,) = [call.args[2] for call in self.report_issue.call_args_list if call.args[0] == "LTF_FAILED"]
+        self.assertNotIn("parent", reason)
+
+    def test_a_slow_automatic_mod_check_is_reported_once(self):
+        """#481: LTK Manager's check of the skin Parasite installed took 4 to 6
+        minutes on a slow drive, while the game sat on a black loading screen"""
+        session = self._session()
+        FakeBridge.patcher_statuses = [status(session={"log": (
+            "2026-11-07T20:03:50.541496Z  INFO ltk_manager_library::mods::health::sweep: Swept mod health in "
+            "263.0511754s: 1 of 1 checked, 0 repairable, 0 unrepairable\n"
+            "2026-11-07T20:03:50.559942Z  INFO ltk_manager_library::mods::health::sweep: Swept mod health in "
+            "16.5453ms: 1 of 1 checked, 0 repairable, 0 unrepairable")})]
+
+        self.overlay._poll_patcher_status(session)
+        self.overlay._poll_patcher_status(session)
+
+        (call,) = [c for c in self.report_issue.call_args_list if c.args[0] == "LTK_SLOW_MOD_CHECK"]
+        self.assertEqual(call.args[1], "warning")
+        self.assertIn("took 263s on this PC", call.args[2])
+        self.assertIn("Automatically check mods", call.kwargs["hint"])
+        self.assertEqual(self.reported_causes(), [])  # no failed session
+
+    def test_a_mod_check_of_a_few_seconds_is_not_reported(self):
+        session = self._session()
+        FakeBridge.patcher_statuses = [status(session={"log": (
+            "2026-11-07T20:40:38.929013Z  INFO ltk_manager_library::mods::health::sweep: Swept mod health in "
+            "4.0536767s: 1 of 1 checked, 1 repairable, 0 unrepairable")})]
+
+        self.overlay._poll_patcher_status(session)
+
+        self.assertNotIn("LTK_SLOW_MOD_CHECK", self.reported_codes())
+
     def test_an_incident_after_the_game_is_reported(self):
         """#432: League could not mount a WAD of the overlay and closed"""
         session = self._session()
@@ -999,6 +1255,88 @@ class PatcherStatusParsingTests(LtfSessionTestCase):
             self.assertEqual(self.overlay.mk_run_overlay([mod], stop_callback=lambda: True), 1)
 
         self.assertEqual(self.reported_causes(), ["cdp"])
+
+
+class ModCheckTests(LtfSessionTestCase):
+    """LTK Manager checks a mod the user adds, and repairs what it can"""
+
+    SKINHACK = {
+        "rule": "bin/skinhack", "title": "Another skin's model",
+        "description": "This base skin uses the mesh of another skin.",
+        "severity": "error", "count": 1, "fixable": 0,
+    }
+
+    def setUp(self):
+        super().setUp()
+        FakeBridge.mod_storage = self.root / "ltk-mods"
+        self.folder = self.mods / self.make_mod()
+
+    def test_a_healthy_mod_is_left_as_it_is_and_removed_from_ltk_manager(self):
+        FakeBridge.health_answers = [{"health": "healthy", "fixable": 0, "counts": {}}]
+
+        result = self.overlay.check_mod(self.folder, "Eternal Aspect Leona")
+
+        self.assertEqual(result, {"health": "healthy", "repaired": 0, "problems": []})
+        self.assertEqual((self.folder / "WAD" / "Aatrox.wad.client").read_bytes(), b"wad")
+        self.assertIn("uninstall", self.bridge.command_names())
+        self.assertNotIn("repair_mod", self.bridge.command_names())
+        self.assertEqual(self.state()["installed"], {})
+
+    def test_a_repairable_mod_is_repaired_and_parasite_keeps_the_repaired_files(self):
+        FakeBridge.health_answers = [
+            {"health": "repairable", "fixable": 2, "counts": {"errors": 2}},
+            {"health": "healthy", "fixable": 0, "counts": {}},
+        ]
+        FakeBridge.repair_files = {"META/info.json": '{"Name": "Eternal Aspect Leona"}',
+                                   "WAD/Aatrox.wad.client": b"fixed"}
+
+        result = self.overlay.check_mod(self.folder, "Eternal Aspect Leona")
+
+        self.assertEqual(result, {"health": "repairable", "repaired": 2, "problems": []})
+        self.assertEqual((self.folder / "WAD" / "Aatrox.wad.client").read_bytes(), b"fixed")
+        self.assertEqual([p.name for p in self.mods.iterdir()], [self.folder.name])  # nothing left behind
+        self.assertIn("uninstall", self.bridge.command_names())
+
+    def test_a_fix_one_pass_leaves_for_the_next_is_applied(self):
+        """The Nasus mod: its type fixes rewrote skin0.bin, so the same pass
+        skipped its skinhack fix ("skin0.bin changed since the check"); LTK
+        Manager's second repair applied it and the mod passed in game"""
+        FakeBridge.health_answers = [
+            {"health": "repairable", "fixable": 2, "counts": {"fatals": 2}},
+            {"health": "repairable", "fixable": 1, "counts": {"errors": 1},
+             "rules": [dict(self.SKINHACK, fixable=1)]},
+            {"health": "healthy", "fixable": 0, "counts": {}},
+        ]
+        FakeBridge.repair_files = {"META/info.json": "{}", "WAD/Aatrox.wad.client": b"fixed"}
+
+        result = self.overlay.check_mod(self.folder, "Eternal Aspect Leona")
+
+        self.assertEqual(self.bridge.command_names().count("repair_mod"), 2)
+        self.assertEqual(result, {"health": "repairable", "repaired": 4, "problems": []})
+
+    def test_a_mod_the_game_will_reject_is_reported(self):
+        """#440, #454: LTK Manager turns off a skin that uses another skin's model"""
+        FakeBridge.health_answers = [{"health": "unrepairable", "fixable": 0, "counts": {"errors": 1},
+                                      "rules": [self.SKINHACK, dict(self.SKINHACK, rule="x/warning",
+                                                                     severity="warning")]}]
+
+        result = self.overlay.check_mod(self.folder, "Eternal Aspect Leona")
+
+        self.assertEqual(result["problems"], [{"rule": "bin/skinhack", "title": "Another skin's model",
+                                               "description": "This base skin uses the mesh of another skin."}])
+        self.assertNotIn("repair_mod", self.bridge.command_names())
+
+    def test_nothing_is_checked_while_a_game_uses_ltk_manager(self):
+        self.process_manager.set_session_stopper(lambda: None)
+
+        self.assertIsNone(self.overlay.check_mod(self.folder, "Eternal Aspect Leona"))
+        self.assertEqual(FakeBridge.created, [])
+
+    def test_nothing_is_checked_while_champion_select_stages(self):
+        self.overlay._staging_open = True
+
+        self.assertIsNone(self.overlay.check_mod(self.folder, "Eternal Aspect Leona"))
+        self.assertEqual(FakeBridge.created, [])
 
 
 class RestartMissedGameTests(LtfSessionTestCase):
@@ -1415,6 +1753,19 @@ class FailureCauseTests(unittest.TestCase):
         self.assertEqual(ltk_failure_cause(reason), "host_missing")
         self.assertIn("Reinstall LTK Manager", OverlayManager._ltk_failure_hint(reason))
 
+    def test_commands_ltk_manager_does_not_declare_mean_it_is_outdated(self):
+        """#473: Tauri refuses a command the app does not declare; the reason
+        names an install, but the fix is updating LTK Manager, not disk space"""
+        reason = ("LTK Manager refused Parasite's commands (list failed: {\"error\": \"Command "
+                  "plugin:library|get_installed_mods not allowed by ACL\"})")
+        self.assertEqual(ltk_failure_cause(reason), "outdated")
+        self.assertEqual(ltk_failure_cause(
+            "could not start the LTK patcher (Command plugin:patcher|start_patcher not allowed by ACL)"
+        ), "outdated")
+        hint = OverlayManager._ltk_failure_hint(reason)
+        self.assertIn("Update LTK Manager", hint)
+        self.assertNotIn("disk space", hint)
+
     def test_ltk_manager_verdicts_on_the_game(self):
         self.assertEqual(ltk_failure_cause(
             "LTK Manager disabled the overlay (wad data/final/champions/zed.wad.client: base-skin check: skin0 "
@@ -1433,6 +1784,34 @@ class FailureCauseTests(unittest.TestCase):
                               {"disabled": "LTK Manager disabled the overlay (x)",
                                "corrupt": "recorded an incident after the game: x (CorruptArchive; y)",
                                "incident": "LTK Manager recorded an incident after the game: x (Crash; y)"}[cause]))
+
+    def test_ltk_programs_windows_will_not_start_unelevated(self):
+        """#456: LTK Manager could not spawn its host, set to run as administrator"""
+        reason = ("the LTK patcher stopped before it was ready (LTK Manager: Failed to spawn host "
+                  "'ltk_patcher_host.exe': The requested operation requires elevation. (os error 740))")
+        self.assertEqual(ltk_failure_cause(reason), "ltk_admin")
+        self.assertIn("ltk_patcher_host.exe", OverlayManager._ltk_failure_hint(reason))
+
+    def test_a_patcher_ltks_delivery_service_refused(self):
+        """#482: LTK Manager could not download its patcher (429 rate_limited)"""
+        reason = ("the LTK patcher stopped before it was ready (LTK Manager: No patcher DLL is available "
+                  "error=the delivery service refused the request with status 429 rate_limited)")
+        self.assertEqual(ltk_failure_cause(reason), "delivery")
+        self.assertIn("delivery service", OverlayManager._ltk_failure_hint(reason))
+
+    def test_a_refused_parasite_package_is_sent_to_leagueskins(self):
+        """#454: the refused WAD came from an official skin's chroma, and the
+        hint said to use the official one"""
+        hint = OverlayManager._ltk_failure_hint("LTK Manager disabled the overlay (wad x: base-skin check)")
+        self.assertIn("LeagueSkins", hint)
+        self.assertNotIn("or the official one", hint)
+
+    def test_a_dll_that_never_got_into_the_game(self):
+        reason = "LTK Manager's patcher never got into the game (DLL never attached after 60s)"
+        self.assertEqual(ltk_failure_cause(reason), "not_attached")
+        hint = OverlayManager._ltk_failure_hint(reason)
+        self.assertIn("run as administrator", hint)
+        self.assertIn("antivirus", hint)
 
     def test_bridge_and_import_failures(self):
         self.assertEqual(ltk_failure_cause("the LTF bridge went away during the game"), "bridge")

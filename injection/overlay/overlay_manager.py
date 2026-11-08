@@ -30,6 +30,7 @@ import re
 import shutil
 import subprocess
 import sys
+import tempfile
 import threading
 import time
 import uuid
@@ -48,6 +49,8 @@ except ImportError:
 from injection.game.reconnect import kill_game, reconnect_to_game
 from utils.core.logging import get_logger, log_event
 from utils.core.issue_reporter import report_issue
+from utils.core.junction import safe_remove_entry
+from utils.core.safe_extract import extract_mod_archive
 from ..tools.bridge import (
     BridgeCommandError,
     BridgeUnavailable,
@@ -87,6 +90,70 @@ RESTART_WINDOW_MAX_S = 180.0
 RESTART_SKIPPED_MESSAGE = "Parasite did not restart the game for the LTK patcher"
 
 
+def _answer_value(response: dict) -> dict:
+    """The value LTK Manager answered a library command with ({} when none)."""
+    nested = response.get("response") if isinstance(response, dict) else None
+    value = nested.get("value") if isinstance(nested, dict) else None
+    return value if isinstance(value, dict) else {}
+
+
+# LTK's problem severities: "fatal" (the game crashes on it) and "error" (the
+# game rejects it, the mod does not work); "warning" and "info" leave it working
+REJECTED_SEVERITIES = ("fatal", "error")
+# Repairs in a row while LTK Manager still offers fixes (a pass can leave one
+# for the next); a mod whose repair keeps finding more stops here
+REPAIR_PASSES = 3
+
+
+def _rejected_by_game(verdict: dict) -> List[dict]:
+    """What in LTK Manager's verdict still makes the game reject the mod."""
+    rules = verdict.get("rules") or []
+    problems = [
+        {"rule": str(rule.get("rule") or ""), "title": str(rule.get("title") or ""),
+         "description": str(rule.get("description") or "")}
+        for rule in rules
+        if isinstance(rule, dict) and rule.get("severity") in REJECTED_SEVERITIES and int(rule.get("count") or 0) > 0
+    ]
+    counts = verdict.get("counts") or {}
+    if not problems and int(counts.get("fatals") or 0) + int(counts.get("errors") or 0) > 0:
+        # A verdict without its rules (an older LTK Manager): still say so
+        problems.append({"rule": "", "title": "", "description": ""})
+    return problems
+
+
+def _verdict_summary(verdict: dict) -> str:
+    counts = verdict.get("counts") or {}
+    return ", ".join(f"{counts.get(key, 0)} {key}" for key in ("fatals", "errors", "warnings")) + \
+        f", {verdict.get('fixable', 0)} fixable"
+
+
+def _log_sizes(paths) -> Dict[Path, int]:
+    """Each log's size now, so _new_log_lines reads only what follows."""
+    sizes = {}
+    for path in paths:
+        try:
+            sizes[path] = path.stat().st_size
+        except OSError:
+            sizes[path] = 0
+    return sizes
+
+
+def _new_log_lines(sizes: Dict[Path, int]) -> List[str]:
+    """The non-empty lines appended to each log since *sizes* were taken (a
+    log that shrank, deleted and written again, is read from its start)."""
+    lines: List[str] = []
+    for path, start in sizes.items():
+        try:
+            with open(path, "rb") as handle:
+                end = handle.seek(0, 2)
+                handle.seek(start if start <= end else 0)
+                data = handle.read()
+        except OSError:
+            continue
+        lines.extend(line.strip() for line in data.decode("utf-8", "replace").splitlines() if line.strip())
+    return lines
+
+
 def restart_window_s() -> float:
     """The Monitor Auto-Resume Timeout (General/monitor_auto_resume_timeout)."""
     try:
@@ -116,6 +183,43 @@ STATUS_FAILURE_LIMIT = 5
 BYTES_IMPORT_LIMIT = 40 * 1024 * 1024
 
 LAUNCHER_TIMEOUT_S = 60
+# The LTF logs (ltk_launcher.log, and ltk_api.log from LeagueToolFlop.dll in
+# LTK Manager) go to this folder of Parasite's logs (--log-dir), where Open Logs
+# folder leads: users could not find them in C:\Users\Public (#478)
+LTK_LOGS_FOLDER = "ltk"
+# ltk_launcher.log only grows: past this size the last one is kept as .old
+LAUNCHER_LOG_MAX_BYTES = 1024 * 1024
+
+
+def ltk_logs_dir() -> Path:
+    """Parasite's logs\\ltk folder (%LOCALAPPDATA%\\Parasite\\logs\\ltk)."""
+    from utils.core.paths import get_user_data_dir
+    return get_user_data_dir() / "logs" / LTK_LOGS_FOLDER
+
+
+def launcher_log_paths() -> tuple:
+    """Where ltk_launcher.exe logs how it started LTK Manager, and why it fell
+    back when it could not make explorer.exe its parent: Parasite's logs\\ltk
+    folder; C:\\Users\\Public and the temp folder for a launcher not given it
+    (or its helper, when it cannot write there). Parasite copies a start's lines
+    into its own log, so a report has them (#478)."""
+    return (
+        ltk_logs_dir() / "ltk_launcher.log",
+        Path(r"C:\Users\Public\ltk_launcher.log"),
+        Path(tempfile.gettempdir()) / "ltk_launcher.log",
+    )
+
+
+def _rotate_launcher_log(path: Path) -> None:
+    """Keep ltk_launcher.log under LAUNCHER_LOG_MAX_BYTES (the previous one as .old)."""
+    try:
+        if path.stat().st_size > LAUNCHER_LOG_MAX_BYTES:
+            path.replace(path.with_name(path.stem + ".old.log"))
+    except OSError:
+        pass
+# The parent Windows recorded for the LTK Manager the launcher spawned
+LAUNCHER_PARENT_LINE = re.compile(r"parent pid = \d+ \(([^)]*)\)")
+LAUNCHER_SHELL_PARENT = "explorer.exe"
 BRIDGE_START_TIMEOUT_S = 30
 # LTK Manager's built-in browser (CDP) answers seconds after its bridge does:
 # a command sent in between fails with "CDP unavailable", and the countdown's
@@ -158,6 +262,28 @@ SIGNATURE_FAILURE_MESSAGE = "Windows could not verify the signature of LTK Manag
 # failed a check, which the rest of the line names (a custom skin made of
 # another skin's files: "base-skin check: skin0 is another skin: ...")
 OVERLAY_DISABLED_LINE = re.compile(r"overlay verification failed, disabling overlay:\s*([^\r\n\"]+)", re.IGNORECASE)
+# LTK's host found the game but its DLL never loaded into it: the game runs
+# without the overlay, and the incident LTK Manager files for it can be titled
+# "Unexplained Game Exit", which does not say so (#475)
+DLL_NOT_ATTACHED_LINE = re.compile(r"DLL never attached after \d+\s*s", re.IGNORECASE)
+NOT_ATTACHED_MESSAGE = "LTK Manager's patcher never got into the game"
+# A mod LTK Manager cannot read (its metadata empty or damaged): its library
+# leaves it out, so Parasite never saw it to turn off, but an enabled one still
+# fails every overlay build with "Serialization(... expected value ...)" (#479)
+BROKEN_ENTRY_LINE = re.compile(r"Skipping broken mod entry ([0-9a-fA-F]{8}-[0-9a-fA-F-]{27})")
+# LTK Manager checks each mod new to its library ("Automatically check mods"),
+# and Parasite installs the picked skin anew for each game. That check takes
+# seconds; on a slow drive it took 4 to 6 minutes, reading the disk while the
+# game loaded, and the game sat on a black loading screen until it was closed
+# (#481). Its log line gives the time as a Rust duration ("263.05s", "361.8ms")
+SLOW_MOD_CHECK_LINE = re.compile(r"Swept mod health in ([0-9.]+)(ns|µs|us|ms|s)\b")
+DURATION_UNITS_S = {"ns": 1e-9, "µs": 1e-6, "us": 1e-6, "ms": 1e-3, "s": 1.0}
+SLOW_MOD_CHECK_S = 30.0
+SLOW_MOD_CHECK_MESSAGE = "LTK Manager's automatic mod check took"
+SLOW_MOD_CHECK_HINT = (
+    "Quit Parasite, open LTK Manager from the Start menu > Settings > Library, turn off \"Automatically check mods\", "
+    "then close LTK Manager (also from the system tray) and start Parasite again."
+)
 OVERLAY_DISABLED_MESSAGE = "disabled the overlay"
 # LTK Manager's diagnosis of a game that went wrong (a WAD League could not
 # mount, a crash...), kept as <id>.json in its incidents folder
@@ -187,8 +313,11 @@ CDP_FAILURE_MARKER = "cdp unavailable"
 # window.__TAURI_INTERNALS__ is still undefined (#441)
 TAURI_NOT_READY_MARKER = "reading 'invoke'"
 CDP_UNREACHABLE_REASON = "Parasite's bridge could not reach LTK Manager's built-in browser (CDP unavailable or timed out)"
+# Tauri rejecting a command LTK Manager does not declare ("Command
+# plugin:library|get_installed_mods not allowed by ACL")
+LTK_ACL_REFUSAL = "not allowed by acl"
 # Every LTF report's hint ends with it (Troubleshooting recognizes the reports by it)
-LTF_LOGS_HINT = "Details are in C:\\Users\\Public\\ltk_bridge.log, ltk_api.log and ltk_launcher.log."
+LTF_LOGS_HINT = "Details are in ltk_api.log and ltk_launcher.log, in the ltk folder of Parasite's logs."
 
 
 def ltk_failure_cause(reason: str) -> str:
@@ -204,16 +333,31 @@ def ltk_failure_cause(reason: str) -> str:
         return "league_admin"
     if "manager_elevated" in lowered or "ltk manager is running as administrator" in lowered:
         return "manager_admin"
+    # Windows refusing to start one of LTK Manager's programs unelevated: one is
+    # set to run as administrator (#456: "os error 740" spawning its host)
+    if "os error 740" in lowered or "requires elevation" in lowered:
+        return "ltk_admin"
+    # LTK Manager could not get its patcher from its delivery service (#482):
+    # the service, not Parasite, refused it
+    if "no patcher dll is available" in lowered:
+        return "delivery"
     # LTK Manager's own patcher missing from its folder (an antivirus took
     # it): reinstalling LTK Manager is the fix, not Parasite's files
     if "ltk_patcher_host.exe not found" in lowered:
         return "host_missing"
     if OVERLAY_DISABLED_MESSAGE in lowered:
         return "disabled"
+    if NOT_ATTACHED_MESSAGE.lower() in lowered:
+        return "not_attached"
     if "corruptarchive" in lowered:
         return "corrupt"
     if "recorded an incident" in lowered:
         return "incident"
+    # Tauri's answer to a command the app does not declare: an LTK Manager
+    # older than the commands Parasite drives (its library plugin came in v1.24.1).
+    # Before "import": an install refused that way is no disk problem (#473)
+    if LTK_ACL_REFUSAL in lowered:
+        return "outdated"
     if "import" in lowered:
         return "import"
     if "already open" in lowered:
@@ -396,6 +540,9 @@ class OverlayManager:
         # Staging is open from the countdown's start until the injection or a
         # discard: a late stage must not touch the injection's session
         self._staging_open = False
+        # The parent ltk_launcher.exe last gave the LTK Manager it started, as
+        # its log names it ("explorer.exe" when the patcher's check accepts it)
+        self._launcher_parent: Optional[str] = None
 
     @property
     def current_overlay_process(self):
@@ -601,6 +748,9 @@ class OverlayManager:
             "disabled": [],  # the user's mods turned off for the session
             "patcher_running": False,
             "ltk_log": None,  # LtkLogTail from the patcher's start
+            "library_log": None,  # LtkLogTail from the session's start (broken library entries)
+            "broken_entries": set(),  # their ids, as LTK Manager's log named them
+            "broken_off": set(),  # those Parasite turned off
             # Read from LTK Manager's log since the patcher's (last) start
             "overlay_build_s": None,
             "scan_started_at": None,  # epoch time the host began to scan
@@ -610,6 +760,8 @@ class OverlayManager:
             "ltk_signature": None,  # the WinVerifyTrust result in that refusal, as 0x...
             "ltk_disabled": None,  # why the DLL's integrity scan turned the overlay off
             "ltk_incident": None,  # (title, id, verdict) LTK Manager recorded after the game
+            "ltk_not_attached": None,  # LTK's host giving up on getting its DLL into the game
+            "ltk_slow_mod_check_s": None,  # LTK Manager's longest automatic mod check, when slow
             "ltk_error": None,  # LTK Manager's first patcher ERROR line
             "staged_after_s": None,  # pick -> patcher start, for the staged mods
             # The library as _install_mods last read it, for _disable_other_mods
@@ -635,6 +787,8 @@ class OverlayManager:
             "refused_reported": False,
             "disabled_reported": False,
             "incident_reported": False,
+            "not_attached_reported": False,
+            "slow_mod_check_reported": False,
             "early_stop_logged": False,
             "lock": threading.Lock(),
         }
@@ -677,15 +831,159 @@ class OverlayManager:
                 )
             return None
 
+        # LTK Manager set to run as administrator: Windows refuses to start it
+        # as the desktop user (error 740), which Parasite's bridge cannot work with
+        try:
+            from utils.system.windows_account import check_ltk_settings
+            check_ltk_settings()
+        except Exception as e:  # noqa: BLE001 - a diagnostic must never stop the injection
+            log.debug(f"[INJECT] Could not check LTK Manager's compatibility settings: {e}")
+
         bridge, launched = self._connect_bridge(launcher, manager, report, cancelled)
         if bridge is None:
             return None
 
         session = self._new_session(bridge, launched)
+        # Before any library read: LTK Manager logs the entries it cannot read then
+        session["library_log"] = LtkLogTail(LtkLogTail.log_dir())
+        # Before any install: an install is what sets a check off
+        self._turn_off_health_check(bridge)
         self._check_ltk_builtins()
         self._cleanup_stale_installs(bridge)
         shutil.rmtree(self._staging_root(), ignore_errors=True)
         return session
+
+    # -- mod check -----------------------------------------------------------
+    def check_mod(self, folder: Path, display_name: str) -> Optional[dict]:
+        """Have LTK Manager check a mod the user adds, and repair what it can.
+
+        LTK Manager's Problems rules find what makes the game drop or reject a
+        mod (an audio bank of an old version, a bin type a patch changed,
+        another skin's model...), and a repair fixes what a machine can. Run on
+        a mod as it is added, the user learns then, not in a game, that LTK
+        Manager will turn it off, and a repairable one is repaired once.
+
+        None when it did not run: an injection's session is using LTK Manager
+        (champion select, a game), LTK Manager is missing or failed. Otherwise
+        {"health": LTK's word before any repair, "repaired": fixes applied and
+        written back into *folder*, "problems": [{"rule", "title",
+        "description"}] that still make the game reject the mod}.
+        """
+        if self.game_dir is None or not self._connect_lock.acquire(blocking=False):
+            return None
+        try:
+            with self._session_lock:
+                busy = self._early_session is not None or self._staging_open
+            if busy or (self.process_manager is not None and self.process_manager.session_active()):
+                log.debug(f"[MODCHECK] LTK Manager is in use for a game - not checking {display_name}")
+                return None
+            session = self._start_ltf_session(report=False)
+            if session is None:
+                return None
+            try:
+                return self._check_in_session(session, folder, display_name)
+            except (BridgeUnavailable, BridgeCommandError, OSError, ValueError) as e:
+                log.warning(f"[MODCHECK] LTK Manager could not check {display_name}: {e}")
+                return None
+            finally:
+                # Removes the mod from LTK Manager, closes it if Parasite started it
+                self._end_session(session)
+        finally:
+            self._connect_lock.release()
+
+    def _check_in_session(self, session: dict, folder: Path, display_name: str) -> dict:
+        staging = self._staging_root() / f"check-{uuid.uuid4().hex}"
+        staging.mkdir(parents=True, exist_ok=True)
+        try:
+            archive = write_fantome_zip(folder, staging / f"{folder.name}.fantome")
+            entry = self._import_archive(session, archive, folder, display_name)
+            bridge = session["bridge"]
+            mod_id = str(entry.get("id"))
+            verdict = _answer_value(bridge.check_mod_health(mod_id))
+            result = {"health": str(verdict.get("health") or ""), "repaired": 0, "problems": []}
+            log.info(f"[MODCHECK] LTK Manager's verdict on {display_name}: {result['health'] or 'unknown'}"
+                     f" ({_verdict_summary(verdict)})")
+            # One pass can leave a fix for the next: a rule skips a file an
+            # earlier rule of the same pass rewrote ("skin0.bin changed since
+            # the check"), as the skinhack repair did after the type fixes
+            repaired = 0
+            for _ in range(REPAIR_PASSES):
+                if verdict.get("health") != "repairable" or int(verdict.get("fixable") or 0) <= 0:
+                    break
+                report = _answer_value(bridge.repair_mod(mod_id))
+                applied = int(report.get("applied") or 0)
+                if report.get("failed"):
+                    log.warning(f"[MODCHECK] LTK Manager could not repair all of {display_name}: {report.get('failed')}")
+                if not applied:
+                    break
+                repaired += applied
+                verdict = _answer_value(bridge.check_mod_health(mod_id))
+            if repaired and self._take_repaired_archive(bridge, entry, folder, staging):
+                result["repaired"] = repaired
+                log.info(f"[MODCHECK] LTK Manager repaired {repaired} problem(s) in {display_name} "
+                         f"({_verdict_summary(verdict)} left)")
+            result["problems"] = _rejected_by_game(verdict)
+            for problem in result["problems"]:
+                log.warning(f"[MODCHECK] {display_name} will not work in game: {problem['title']} - "
+                            f"{problem['description']}")
+            return result
+        finally:
+            shutil.rmtree(staging, ignore_errors=True)
+
+    def _take_repaired_archive(self, bridge, entry: dict, folder: Path, staging: Path) -> bool:
+        """Replace *folder* with the archive LTK Manager repaired in place
+        (an archive-storage mod keeps its archive beside its folder)."""
+        mod_id = str(entry.get("id"))
+        if not entry.get("modDir"):
+            entry = next((e for e in bridge.library() if str(e.get("id")) == mod_id), entry)
+        mod_dir = entry.get("modDir")
+        if not mod_dir or entry.get("storage") not in (None, "archive"):
+            log.warning(f"[MODCHECK] LTK Manager repaired {folder.name}, but its archive could not be found")
+            return False
+        suffix = ".modpkg" if entry.get("format") == "modpkg" else ".fantome"
+        source = Path(mod_dir).with_name(Path(mod_dir).name + suffix)
+        if not source.is_file():
+            log.warning(f"[MODCHECK] LTK Manager repaired {folder.name}, but {source} is missing")
+            return False
+        copied = staging / f"repaired{suffix}"
+        shutil.copyfile(source, copied)
+        replacement = Path(tempfile.mkdtemp(prefix=".parasite-import-", dir=str(folder.parent)))
+        previous = folder.with_name(f".parasite-import-{folder.name}.before-repair")
+        try:
+            extract_mod_archive(copied, replacement)
+            if not any(replacement.iterdir()):
+                raise ValueError("the repaired archive holds no files")
+            safe_remove_entry(previous)
+            folder.replace(previous)
+            try:
+                replacement.replace(folder)
+            except OSError:
+                previous.replace(folder)
+                raise
+        except Exception:
+            safe_remove_entry(replacement)
+            raise
+        safe_remove_entry(previous)
+        return True
+
+    @staticmethod
+    def _turn_off_health_check(bridge) -> None:
+        """Turn off LTK Manager's "Automatically check mods": it checks each
+        mod new to its library, and Parasite installs the picked skin anew for each
+        game, so it checked every game; on a hard drive that took minutes while
+        the game sat on its loading screen (#481). The check means nothing for
+        Parasite's skins, and the user can still run it by hand in LTK Manager."""
+        try:
+            response = bridge.health_check_off()
+        except (BridgeCommandError, BridgeUnavailable) as e:
+            # An LTF bridge older than the command, or a page not answering yet
+            log.debug(f"[INJECT] Could not turn off LTK Manager's automatic mod check: {e}")
+            return
+        if response.get("changed"):
+            log.info(
+                "[INJECT] Turned off LTK Manager's automatic mod check (Settings > Library > Automatically "
+                "check mods): it checked Parasite's skin anew every game"
+            )
 
     @staticmethod
     def _check_ltk_builtins() -> None:
@@ -740,6 +1038,24 @@ class OverlayManager:
                 return
             time.sleep(CDP_READY_POLL_S)
 
+    def _log_launcher_run(self, sizes: Dict[Path, int]) -> None:
+        """Copy what ltk_launcher.exe (and its helper) logged for this start
+        into Parasite's log, and keep the parent it gave LTK Manager."""
+        parent = None
+        for line in _new_log_lines(sizes):
+            if line.startswith("=========="):
+                continue
+            if line.startswith(("[warn]", "[err]")):
+                log.warning(f"[INJECT] ltk_launcher: {line}")
+            elif line.startswith("[launch]"):
+                log.info(f"[INJECT] ltk_launcher: {line}")
+            else:
+                log.debug(f"[INJECT] ltk_launcher: {line}")
+            found = LAUNCHER_PARENT_LINE.search(line)
+            if found:
+                parent = found.group(1).strip()
+        self._launcher_parent = parent
+
     def _connect_bridge(self, launcher: Path, manager: Path, report: bool,
                         cancelled: Optional[Callable[[], bool]] = None):
         """The bridge and whether Parasite started LTK Manager for it."""
@@ -766,9 +1082,16 @@ class OverlayManager:
 
         log.info(f"[INJECT] Starting LTK Manager through {launcher.name}")
         creationflags = subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0
+        log_dir = ltk_logs_dir()
+        try:
+            log_dir.mkdir(parents=True, exist_ok=True)
+        except OSError as e:
+            log.debug(f"[INJECT] Could not create {log_dir}: {e}")
+        _rotate_launcher_log(log_dir / "ltk_launcher.log")
+        launcher_logs = _log_sizes(launcher_log_paths())
         try:
             result = subprocess.run(
-                [str(launcher), "--exe", str(manager), "--quiet"],
+                [str(launcher), "--exe", str(manager), "--quiet", "--log-dir", str(log_dir)],
                 cwd=str(launcher.parent),
                 creationflags=creationflags,
                 capture_output=True,
@@ -778,8 +1101,10 @@ class OverlayManager:
                 timeout=LAUNCHER_TIMEOUT_S,
             )
         except Exception as e:
+            self._log_launcher_run(launcher_logs)
             self._report_ltf_failure(f"could not start the LTF launcher ({e})", report)
             return None, False
+        self._log_launcher_run(launcher_logs)
         if result.returncode == LAUNCHER_EXIT_ALREADY_RUNNING:
             log.warning("[INJECT] LTK Manager opened before the launcher could start it - leaving it alone")
             self._report_ltf_failure(ALREADY_OPEN_REASON, report)
@@ -1169,6 +1494,8 @@ class OverlayManager:
                     if report and not stopped():
                         if _cdp_unreachable(e):
                             self._report_ltf_failure(_cdp_unreachable_reason())
+                        elif LTK_ACL_REFUSAL in str(e).lower():
+                            self._report_ltf_failure(f"LTK Manager refused Parasite's commands ({e})")
                         elif not self._report_low_disk_space_failure(mod_names):
                             report_issue(
                                 "LTF_IMPORT_FAILED",
@@ -1397,6 +1724,32 @@ class OverlayManager:
                 log.info(f"[INJECT] Turned off {self._entry_name(entry)} in LTK Manager for this game")
             except (BridgeUnavailable, BridgeCommandError) as e:
                 log.warning(f"[INJECT] Could not turn off {self._entry_name(entry)} - it may apply too: {e}")
+        self._disable_broken_entries(session, library)
+
+    def _disable_broken_entries(self, session: dict, library: List[dict]) -> None:
+        """Turn off the mods LTK Manager cannot read (#479).
+
+        Its library leaves them out, so the loop above never sees them, but
+        an enabled one fails every overlay build. They stay off after the
+        game: LTK Manager cannot apply them anyway, and turning one back on
+        would break the next build again.
+        """
+        tail = session.get("library_log")
+        if tail is not None:
+            session["broken_entries"].update(BROKEN_ENTRY_LINE.findall(tail.read()))
+        listed = {str(entry.get("id") or "") for entry in library}
+        done = session["broken_off"]
+        for mod_id in sorted(session["broken_entries"] - listed - set(session["installed"]) - done):
+            done.add(mod_id)  # LTK Manager names it at every library read: once is enough
+            try:
+                session["bridge"].toggle(mod_id, False)
+            except (BridgeUnavailable, BridgeCommandError) as e:
+                log.warning(f"[INJECT] Could not turn off LTK Manager's unreadable mod {mod_id}: {e}")
+                continue
+            log.warning(
+                f"[INJECT] Turned off LTK Manager's unreadable mod {mod_id} (its files are damaged): "
+                "an enabled one fails every overlay build"
+            )
 
     # -- injection ----------------------------------------------------------
     def mk_run_overlay(self, mod_names: List[str], timeout: int = 120, stop_callback: Optional[Callable] = None) -> int:
@@ -1905,6 +2258,13 @@ class OverlayManager:
         disabled = OVERLAY_DISABLED_LINE.search(text)
         if disabled and session.get("ltk_disabled") is None:
             session["ltk_disabled"] = disabled.group(1).strip()[:LTK_ERROR_MAX_CHARS]
+        not_attached = DLL_NOT_ATTACHED_LINE.search(text)
+        if not_attached and session.get("ltk_not_attached") is None:
+            session["ltk_not_attached"] = not_attached.group(0)
+        for sweep in SLOW_MOD_CHECK_LINE.finditer(text):
+            seconds = float(sweep.group(1)) * DURATION_UNITS_S[sweep.group(2)]
+            if seconds >= SLOW_MOD_CHECK_S and seconds > (session.get("ltk_slow_mod_check_s") or 0.0):
+                session["ltk_slow_mod_check_s"] = seconds
         incident = INCIDENT_LINE.search(text)
         if incident and session.get("ltk_incident") is None:
             session["ltk_incident"] = (incident.group(1).strip(), incident.group(2), incident.group(3))
@@ -2019,11 +2379,28 @@ class OverlayManager:
             signature = session.get("ltk_signature")
             if signature:
                 log.error(f"[INJECT] {SIGNATURE_FAILURE_MESSAGE} ({signature}): reinstall LTK Manager")
-            if not self._stopped_by_parasite():
-                self._report_ltf_failure(
-                    f"LTK Manager's patcher refused the overlay (host verification failed: {described}"
-                    + (f"; {SIGNATURE_FAILURE_MESSAGE}, {signature})" if signature else ")")
+            # The check wants LTK Manager started under explorer.exe: when the
+            # launcher could not do that, its lines in this log say why (#478)
+            parent = self._launcher_parent
+            unparented = parent is not None and parent != LAUNCHER_SHELL_PARENT
+            if unparented:
+                log.error(
+                    f"[INJECT] LTK Manager was not started under explorer.exe ({parent}), which the patcher's "
+                    "check refuses - the ltk_launcher lines above say why"
                 )
+            if not self._stopped_by_parasite():
+                details = [f"host verification failed: {described}"]
+                if signature:
+                    details.append(f"{SIGNATURE_FAILURE_MESSAGE}, {signature}")
+                if unparented:
+                    details.append(f"LTK Manager's parent was not explorer.exe ({parent})")
+                self._report_ltf_failure(f"LTK Manager's patcher refused the overlay ({'; '.join(details)})")
+        not_attached = session.get("ltk_not_attached")
+        if not_attached and not session.get("ltk_attached") and not session.get("not_attached_reported"):
+            session["not_attached_reported"] = True
+            log.error(f"[INJECT] {NOT_ATTACHED_MESSAGE} ({not_attached}) - it runs without the overlay")
+            if not self._stopped_by_parasite():
+                self._report_ltf_failure(f"{NOT_ATTACHED_MESSAGE} ({not_attached})")
         # LTK Manager's own verdicts on the game: the overlay turned off by its
         # integrity scan, an incident after the game. Parasite's injection
         # "completes" either way: without these, nothing told the user (#432)
@@ -2038,8 +2415,22 @@ class OverlayManager:
             title, incident_id, verdict = incident
             where = f"{LTK_INCIDENTS_DIR}\\{incident_id}.json"
             log.error(f"[INJECT] LTK Manager recorded an incident: {title} ({verdict}), see {where}")
-            if not disabled:  # its incident only repeats the disabled overlay
+            # Its incident only repeats a disabled overlay or a DLL that never got in
+            if not disabled and not session.get("not_attached_reported"):
                 self._report_ltf_failure(f"LTK Manager recorded an incident after the game: {title} ({verdict}; {where})")
+        slow = session.get("ltk_slow_mod_check_s")
+        if slow is not None and not session.get("slow_mod_check_reported"):
+            session["slow_mod_check_reported"] = True
+            message = f"{SLOW_MOD_CHECK_MESSAGE} {slow:.0f}s on this PC, slowing down the game's loading"
+            log.warning(f"[INJECT] {message}")
+            report_issue(
+                "LTK_SLOW_MOD_CHECK",
+                "warning",
+                f"{message}.",
+                details={"seconds": f"{slow:.0f}"},
+                hint=SLOW_MOD_CHECK_HINT,
+                dedupe_window_s=600.0,
+            )
 
     def _poll_patcher_status(self, session: dict) -> None:
         """Record what the LTK patcher reports while the game runs.
@@ -2224,8 +2615,18 @@ class OverlayManager:
                     f"Manager) to your antivirus exclusions. {logs}")
         if cause == "disabled":
             return ("LTK Manager's integrity check turned the overlay off because of a mod: the reason names its "
-                    "WAD. LTK Manager refuses a custom skin made of another skin's files: use another custom skin "
-                    f"or the official one. {logs}")
+                    "WAD. LTK Manager refuses a skin made of another skin's files. For a custom skin, use another "
+                    "one; for one of Parasite's skins or chromas, the package is at fault: pick another skin or chroma "
+                    f"and report it at github.com/Alban1911/LeagueSkins/issues. {logs}")
+        if cause == "ltk_admin":
+            return ("Windows refuses to start one of LTK Manager's programs without administrator rights: it is set "
+                    "to run as administrator. Untick \"Run this program as an administrator\" in the Compatibility "
+                    "tab of the Properties of ltk-manager.exe and ltk_patcher_host.exe (also under \"Change settings "
+                    f"for all users\"), then close LTK Manager (also from the system tray) and retry. {logs}")
+        if cause == "delivery":
+            return ("LTK Manager could not download its patcher: LTK's delivery service refused the request (the "
+                    "reason above). Parasite cannot change that. Retry later, or from another network (without a VPN "
+                    f"or proxy). {logs}")
         if cause == "corrupt":
             return ("League could not read a file of the overlay, most often a mod made for an older patch. Turn "
                     "your mods off, then back on one at a time to find it; LTK Manager's incident file names the "
@@ -2250,9 +2651,19 @@ class OverlayManager:
         if cause == "refused":
             return ("LTK Manager's patcher refused to apply the overlay. Update Parasite (its launcher starts LTK "
                     f"Manager the way the patcher expects); if it still happens, {report}. {logs}")
+        if cause == "not_attached":
+            return ("LTK Manager's patcher found the game but could not get into it, so the game ran without the "
+                    "overlay. Check that League and the Riot Client are not set to run as administrator and that "
+                    f"your antivirus does not block LTK Manager, then retry; if it happens every game, {report}. "
+                    f"{logs}")
         if cause == "bridge":
             return (f"LTK Manager closed while the game was running. Retry the next game; "
                     f"if it happens every game, {report}. {logs}")
+        if cause == "outdated":
+            return ("LTK Manager is too old for Parasite: it does not know the commands Parasite sends it. Update LTK "
+                    "Manager (or reinstall it from github.com/LeagueToolkit/ltk-manager/releases), then retry. If "
+                    "you picked its ltk-manager.exe yourself, check it is the up-to-date install, not an old copy. "
+                    f"{logs}")
         if cause == "import":
             return f"Parasite could not install the mod into LTK Manager. Free some disk space, then retry. {logs}"
         if cause == "killed":

@@ -496,6 +496,38 @@ def _warn_pengu_activation_failed() -> None:
     create_daemon_thread(show, "PenguActivationWarning").start()
 
 
+def _warn_pengu_injection_failed(client_pid: int) -> None:
+    """Pengu Loader was activated, but the client checked once the LCU was up
+    has no Pengu module and Parasite's plugin never reached the bridge
+    (utils.integration.startup_verifier). Called on the verifier's thread."""
+    log = get_logger()
+    report_issue(
+        "PENGU_INJECTION_FAILED",
+        "error",
+        "Pengu Loader was not loaded into the League client, so Parasite did not appear in it.",
+        details={"client_pid": client_pid},
+        hint="Right-click Parasite in the system tray and choose Diagnose Parasite startup.",
+    )
+    if sys.platform != "win32":
+        return
+
+    import ctypes
+    try:
+        ctypes.windll.user32.MessageBoxW(
+            0,
+            "Parasite did not load into this League client: Pengu Loader's DLL is missing from it.\n\n"
+            "Right-click Parasite's system tray icon and choose Diagnose Parasite startup. "
+            "Keep League open while collecting the report.\n\n"
+            "Then send report.txt and report.json on the Parasite Discord (https://discord.gg/roseskins) "
+            "or in a GitHub issue (https://github.com/lustmyself/Parasite/issues), so we can find out why. "
+            "You can also paste them into an AI assistant for a first look.",
+            "Parasite - Client injection failed",
+            0x50030,  # MB_OK | MB_ICONWARNING | MB_SETFOREGROUND | MB_TOPMOST
+        )
+    except Exception as e:
+        log.warning(f"[Pengu] Could not show the injection warning: {e}")
+
+
 def _setup_pengu_and_injection(lcu, injection_manager, activate_pengu: bool = True) -> None:
     """
     Detect and save leaguepath/clientpath, then setup Pengu Loader and injection system.
@@ -798,6 +830,11 @@ def run_league_unlock(args: Optional[argparse.Namespace] = None,
 
     # Setup Pengu Loader and injection system (LCU is already connected when WebSocket is active)
     _setup_pengu_and_injection(lcu, injection_manager, activate_pengu=not pengu_active)
+
+    from utils.integration.startup_verifier import StartupInjectionVerifier
+    verifier = StartupInjectionVerifier(lcu, state, t_ui.websocket_server, _warn_pengu_injection_failed)
+    thread_manager.register("Startup injection verifier", verifier, stop_method=verifier.stop)
+    verifier.start()
     
     # Run main loop
     try:

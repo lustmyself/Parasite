@@ -37,8 +37,9 @@ namespace fs = std::filesystem;
 
 static const char* kCredit = "made by lol123love for educational purposes and bcz love loves LTK :p BIG FLOP!";
 
-static const char* kHookLog = "C:\\Users\\Public\\ltk_bridge.log";
-static const char* kApiLog = "C:\\Users\\Public\\ltk_api.log";
+// The log: in the folder the launcher names (LTF_LOG_DIR, Parasite's logs\ltk
+// folder), else in C:\Users\Public
+static wchar_t g_apiLog[MAX_PATH * 2] = L"C:\\Users\\Public\\ltk_api.log";
 static const int   kApiPortStart = 46321;
 static const int   kApiPortEnd = 46340;
 static const DWORD kSocketTimeoutHttp = 3000;
@@ -85,16 +86,18 @@ static const char* kLibToggleMod = "plugin:library|toggle_mod";
 static const char* kLibUninstallMod = "plugin:library|uninstall_mod";
 static const char* kLibInstallMod = "plugin:library|install_mod";
 static const char* kLibHealthVerdicts = "plugin:library|get_mod_health_verdicts";
+static const char* kLibCheckModHealth = "plugin:library|check_mod_health";
+static const char* kLibRepairMod = "plugin:library|repair_mod";
 static const char* kPatStartPatcher = "plugin:patcher|start_patcher";
 static const char* kPatStopPatcher = "plugin:patcher|stop_patcher";
 static const char* kPatGetPatcherStatus = "plugin:patcher|get_patcher_status";
 
-static void LogTo(const char* path, const char* fmt, va_list ap) {
+static void LogTo(const wchar_t* path, const char* fmt, va_list ap) {
     char buf[2048];
     int n = vsnprintf(buf, sizeof(buf) - 1, fmt, ap);
     if (n <= 0) return;
     if (n >= (int)sizeof(buf) - 1) n = (int)sizeof(buf) - 2;
-    HANDLE h = CreateFileA(path, FILE_APPEND_DATA, FILE_SHARE_READ, NULL,
+    HANDLE h = CreateFileW(path, FILE_APPEND_DATA, FILE_SHARE_READ, NULL,
         OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
     if (h == INVALID_HANDLE_VALUE) return;
     SetFilePointer(h, 0, NULL, FILE_END);
@@ -106,13 +109,20 @@ static void LogTo(const char* path, const char* fmt, va_list ap) {
 static void ApiLog(const char* fmt, ...) {
     va_list ap;
     va_start(ap, fmt);
-    LogTo(kApiLog, fmt, ap);
+    LogTo(g_apiLog, fmt, ap);
     va_end(ap);
 }
-static void LogInit(const char* path) {
-    HANDLE h = CreateFileA(path, GENERIC_WRITE, FILE_SHARE_READ, NULL,
+static void LogInit(const wchar_t* path) {
+    HANDLE h = CreateFileW(path, GENERIC_WRITE, FILE_SHARE_READ, NULL,
         CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
     if (h != INVALID_HANDLE_VALUE) CloseHandle(h);
+}
+static void ResolveApiLog() {
+    wchar_t dir[MAX_PATH] = {};
+    DWORD n = GetEnvironmentVariableW(L"LTF_LOG_DIR", dir, MAX_PATH);
+    if (n == 0 || n >= MAX_PATH) return;
+    CreateDirectoryW(dir, NULL);
+    swprintf_s(g_apiLog, L"%s\\ltk_api.log", dir);
 }
 
 static int ParseDebugPort(const wchar_t* args) {
@@ -656,12 +666,9 @@ static std::string CdpEvaluate(const std::string& jsExpr, DWORD timeoutMs = kCdp
     return {};
 }
 
-static mj::JVal TauriInvoke(const std::string& command, const mj::JVal& args, DWORD timeoutMs = kCdpEvalBudgetMs) {
-    std::string js =
-        "(async () => { try { const r = await window.__TAURI_INTERNALS__.invoke("
-        + mj::JVal::str(command).dump() + ", " + args.dump() +
-        "); return r; } catch (e) { return { ok: false, error: (e && e.message) ? e.message : String(e) }; } })()";
-
+// Evaluates *js* (an expression yielding a JSON-able value) in LTK Manager's
+// page, one evaluation at a time
+static mj::JVal CdpEvaluateJson(const std::string& js, DWORD timeoutMs = kCdpEvalBudgetMs) {
     BOOL entered = FALSE;
     for (int i = 0; i < 100 && !entered; ++i) {
         entered = TryEnterCriticalSection(&g_cdpLock);
@@ -687,6 +694,70 @@ static mj::JVal TauriInvoke(const std::string& command, const mj::JVal& args, DW
         return err;
     }
     return mj::parse(raw);
+}
+
+static mj::JVal TauriInvoke(const std::string& command, const mj::JVal& args, DWORD timeoutMs = kCdpEvalBudgetMs) {
+    std::string js =
+        "(async () => { try { const r = await window.__TAURI_INTERNALS__.invoke("
+        + mj::JVal::str(command).dump() + ", " + args.dump() +
+        "); return r; } catch (e) { return { ok: false, error: (e && e.message) ? e.message : String(e) }; } })()";
+    return CdpEvaluateJson(js, timeoutMs);
+}
+
+// LTK Manager's own check of one mod (its Problems rules), and its repair of
+// what a machine can repair: Parasite runs them on a mod the user adds. Both read
+// the whole mod, and the check reads the game too: a hard drive takes minutes
+static mj::JVal CmdLibraryCall(const char* command, const std::string& modId) {
+    if (modId.empty()) {
+        mj::JVal r = mj::JVal::obj_();
+        r.set("ok", mj::JVal::boo(false)); r.set("error", mj::JVal::str("missing 'modId'"));
+        return r;
+    }
+    mj::JVal args = mj::JVal::obj_();
+    args.set("modId", mj::JVal::str(modId));
+    mj::JVal resp = TauriInvoke(command, args, kCdpInstallBudgetMs);
+    mj::JVal r = mj::JVal::obj_();
+    r.set("ok", resp.get("ok") ? *resp.get("ok") : mj::JVal::boo(true));
+    r.set("response", resp);
+    return r;
+}
+
+// LTK Manager checks every mod new to its library ("Automatically check mods",
+// autoHealthCheckEnabled), and Parasite installs the picked skin anew for each
+// game: a check every game, minutes long on a hard drive, while the game loads
+// (Parasite#481). Turns the setting off as LTK Manager's settings page does: the
+// whole settings read, the one field changed, saved back
+static mj::JVal CmdHealthCheckOff() {
+    const char* js = R"JS(
+(async () => {
+    try {
+        const invoke = window.__TAURI_INTERNALS__.invoke;
+        const got = await invoke('plugin:settings|get_settings');
+        if (!got || got.ok === false) {
+            return { ok: false, error: 'get_settings failed: ' + JSON.stringify(got && got.error) };
+        }
+        const settings = got.value !== undefined ? got.value : got;
+        if (!settings || typeof settings !== 'object') return { ok: false, error: 'get_settings returned no settings' };
+        if (settings.autoHealthCheckEnabled === false) return { ok: true, changed: false };
+        settings.autoHealthCheckEnabled = false;
+        const saved = await invoke('plugin:settings|save_settings', { settings });
+        if (saved && saved.ok === false) {
+            return { ok: false, error: 'save_settings failed: ' + JSON.stringify(saved.error) };
+        }
+        return { ok: true, changed: true };
+    } catch (e) {
+        return { ok: false, error: (e && e.message) ? e.message : String(e) };
+    }
+})()
+)JS";
+    mj::JVal r = CdpEvaluateJson(js);
+    if (r.t != mj::JVal::OBJ) {
+        mj::JVal err = mj::JVal::obj_();
+        err.set("ok", mj::JVal::boo(false));
+        err.set("error", mj::JVal::str("unexpected answer from LTK Manager's page"));
+        return err;
+    }
+    return r;
 }
 
 // LTK Manager creates its window hidden and its frontend shows it once the page
@@ -1298,6 +1369,9 @@ static std::string HandleCommand(const std::string& line) {
     if (c == "uninstall")      return CmdUninstall(req.get("target") ? req.get("target")->asStr() : "").dump();
     if (c == "health")         return CmdHealth(req.get("modId") ? req.get("modId")->asStr() : "").dump();
     if (c == "spoof_health")   return CmdSpoofHealth().dump();
+    if (c == "health_check_off") return CmdHealthCheckOff().dump();
+    if (c == "check_mod_health") return CmdLibraryCall(kLibCheckModHealth, req.get("modId") ? req.get("modId")->asStr() : "").dump();
+    if (c == "repair_mod")       return CmdLibraryCall(kLibRepairMod, req.get("modId") ? req.get("modId")->asStr() : "").dump();
     if (c == "start_patcher")  return CmdStartPatcher().dump();
     if (c == "stop_patcher")   return CmdStopPatcher().dump();
     if (c == "patcher_status") return CmdPatcherStatus().dump();
@@ -1393,7 +1467,8 @@ BOOL APIENTRY DllMain(HMODULE hModule, DWORD reason, LPVOID) {
     if (reason == DLL_PROCESS_ATTACH) {
         if (InterlockedCompareExchange(&g_dllAttached, 1, 0) != 0) return TRUE;
         DisableThreadLibraryCalls(hModule);
-        LogInit(kHookLog); LogInit(kApiLog);
+        ResolveApiLog();
+        LogInit(g_apiLog);
 
         srand((unsigned)GetTickCount64() ^ (unsigned)GetCurrentProcessId());
         InitializeCriticalSection(&g_cdpLock);

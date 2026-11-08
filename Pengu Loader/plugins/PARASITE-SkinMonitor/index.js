@@ -373,6 +373,9 @@ function setupBridgeSocket() {
   bridgeSocket.addEventListener("open", () => {
     opened = true;
     bridgeReady = true;
+    bridgeSocket.send(JSON.stringify({
+      type: "parasite-plugin-ready", plugin: "PARASITE-SkinMonitor", protocol: 1,
+    }));
     retryDelay = RETRY_BASE_MS;
     if (retryTimer) {
       clearTimeout(retryTimer);
