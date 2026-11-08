@@ -35,7 +35,8 @@ PARASITE_REPO = "lustmyself/Parasite"
 # Real external services: renaming them would only produce dead links.
 URL_RE = re.compile(r"https?://[^\s\"'<>)`\]]+")
 LOCAL_URL_PREFIXES = ("http://127.0.0.1", "https://plugins/", "http://localhost")
-KEEP_WORDS = re.compile(r"\b(proses\w*)\b")  # Indonesian "process", not the brand
+# Indonesian "process" is not the brand; bare Discord invites (no https://) are real links
+KEEP_WORDS = re.compile(r"\b(proses\w*|discord\.gg/[\w-]+|discord\.com/invite/[\w-]+)")
 REPO_LINK_RE = re.compile(r"Alban1911/Rose(?![-A-Za-z])")
 BINARY_EXT = {
     ".png", ".jpg", ".jpeg", ".gif", ".ico", ".webp", ".ttf", ".otf", ".woff", ".woff2",
