@@ -7,9 +7,10 @@ against it. The numbers are the public JSON U.GG's and Lolalytics' own pages loa
 needed); both are read and averaged, so a counter both sites back ranks first. Each enemy
 links to its counter pages on U.GG, Lolalytics, LadderEye and League of Graphs.
 
-Nothing runs while the hub isn't showing the page: the page's polling asks for the board,
-which looks at the champ select at most every couple of seconds and computes in the
-background when the enemy picks change.
+The board is asked for by the hub page's polling and, in champ select, by Lobby Reveal's
+thread every 1.5 s (parasite_lobby.enrich, for the client box), whether or not the hub is
+open. It looks at the champ select at most every couple of seconds and downloads and
+computes in the background only when the enemy picks change; the downloads are cached.
 """
 
 from __future__ import annotations
