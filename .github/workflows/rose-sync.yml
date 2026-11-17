@@ -1,8 +1,8 @@
 name: Follow Rose releases
 
-# Every few hours: if Rose has a release Parasite doesn't, rebuild Parasite from it
-# (parasite/sync.py), test, build the installer and publish a Parasite release.
-# Parasite's auto-update then delivers it to users.
+# Every few hours: if Rose has a release Parasite doesn't, or main has Parasite changes
+# the latest Parasite release doesn't, rebuild Parasite (parasite/sync.py), test, build
+# the installer and publish a Parasite release. Parasite's auto-update then delivers it.
 
 on:
   schedule:
@@ -37,8 +37,8 @@ jobs:
     runs-on: windows-latest
     timeout-minutes: 90
     permissions:
-      contents: write
-      issues: write
+      contents: write # push the synced source to main, publish the release
+      issues: write # open a failure issue, close the ones a release resolves
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -69,21 +69,57 @@ jobs:
             echo "::error::Unexpected Parasite version '$version'"
             exit 1
           fi
+          # reason: why this run builds a new version. rose = a Rose release Parasite
+          # hasn't built yet; commits = Parasite changes on main the release doesn't have.
+          # Empty: v$version isn't released yet (raised by hand), build it as it is.
           skip=false
+          reason=""
+          previous=""
           if gh release view "v$version" --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1; then
             built_from=$(gh release view "v$version" --repo "$GITHUB_REPOSITORY" --json body --jq .body \
               | grep -oP "github.com/$ROSE_REPO/releases/tag/\K[0-9.]+" | head -1 || true)
-            if [ "$built_from" = "$tag" ] || [ -n "$INPUT_TAG" ]; then
-              skip=true
+            if [ "$built_from" != "$tag" ] && [ -z "$INPUT_TAG" ]; then
+              reason=rose
             else
+              # v$version already has this Rose release. Release again only if main has
+              # commits v$version doesn't. The monthly keepalive commit (parasite/keepalive.txt)
+              # and workflow/issue-template changes (.github/) change nothing that ships.
+              if ! released=$(gh api "repos/$GITHUB_REPOSITORY/commits/v$version" --jq .sha) \
+                || ! git cat-file -e "$released^{commit}" 2> /dev/null; then
+                echo "::error::Can't find the commit release v$version was built from"
+                exit 1
+              fi
+              pending=$(git log --format='%h %s' "$released..HEAD" -- . \
+                ':(exclude)parasite/keepalive.txt' ':(exclude).github')
+              if [ -z "$pending" ]; then
+                skip=true
+              elif [ -n "$INPUT_TAG" ] && [ "$INPUT_TAG" != "$built_from" ]; then
+                echo "::warning::main has changes v$version doesn't, but v$version was built from Rose ${built_from:-?}, not $INPUT_TAG. Run without rose_tag to release them."
+                skip=true
+              else
+                reason=commits
+                echo "Parasite changes since v$version:"
+                echo "$pending"
+              fi
+            fi
+            if [ -n "$reason" ]; then
+              previous="$version"
               version="${version%%.*}.$(( ${version#*.} + 1 ))"
               echo "$version" > parasite/parasite_version.txt
-              echo "Rose $tag is new: building Parasite v$version"
+              if [ "$reason" = rose ]; then
+                echo "Rose $tag is new: building Parasite v$version"
+              else
+                echo "main has Parasite changes v$previous doesn't: building Parasite v$version"
+              fi
             fi
           fi
-          echo "version=$version" >> "$GITHUB_OUTPUT"
+          {
+            echo "version=$version"
+            echo "previous=$previous"
+            echo "reason=$reason"
+          } >> "$GITHUB_OUTPUT"
           if [ "$skip" = "true" ] && [ "$DRY_RUN" != "true" ]; then
-            echo "Parasite v$version is already released; nothing to do"
+            echo "Parasite v$version is already released and main has nothing new; nothing to do"
             echo "skip=true" >> "$GITHUB_OUTPUT"
           else
             echo "Following Rose $tag"
@@ -133,7 +169,8 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           PARASITE_RELAY_WORKER: ${{ vars.PARASITE_RELAY_WORKER }}
-        # Parasite's relay (parasite/relay): empty without its Cloudflare account, and skin sharing stays off
+        # Parasite's relay (parasite/relay): from the secret or the Cloudflare account; without
+        # either, write_config.py falls back to the relay Lust runs (skin sharing stays on)
         run: python parasite/relay/write_config.py
 
       - name: Plugins (JS syntax)
@@ -180,12 +217,18 @@ jobs:
           path: installer/
           retention-days: 14
 
+      # Main can move during the build (keepalive, a push): merge it in rather than rebase,
+      # so the release can point at the commit that was built (BUILT) and main's newer
+      # commits stay outside it, for the next run to release.
       - name: Commit the synced source
+        id: commit
         if: steps.rose.outputs.skip == 'false' && inputs.dry_run != true
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ steps.rose.outputs.tag }}
+          VERSION: ${{ steps.rose.outputs.version }}
+          REASON: ${{ steps.rose.outputs.reason }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
@@ -194,10 +237,37 @@ jobs:
           git add -A
           if git diff --cached --quiet; then
             echo "Source already matches Rose $TAG"
+          elif [ "$REASON" = commits ]; then
+            git commit -q -m "Release Parasite $VERSION"
           else
             git commit -q -m "Sync with Rose $TAG"
-            git push "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" HEAD:main
           fi
+          built=$(git rev-parse HEAD)
+          echo "built=$built" >> "$GITHUB_OUTPUT"
+          remote="https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          for attempt in 1 2 3 4 5; do
+            git fetch -q --no-tags "$remote" main
+            if git merge-base --is-ancestor HEAD FETCH_HEAD; then
+              echo "main already has $built"
+              exit 0
+            fi
+            if ! git merge-base --is-ancestor FETCH_HEAD HEAD; then
+              echo "main moved during the build: merging it in"
+              if ! git merge -q --no-edit -m "Merge main into Parasite $VERSION" FETCH_HEAD; then
+                git merge --abort || true
+                echo "::error::main changed files this run changed too (conflict); nothing was pushed or released. Re-run the workflow."
+                exit 1
+              fi
+            fi
+            if git push "$remote" HEAD:main; then
+              exit 0
+            fi
+            echo "Push $attempt failed; trying again"
+            git reset -q --hard "$built"
+            sleep $(( attempt * 15 ))
+          done
+          echo "::error::Could not push to main after 5 attempts; nothing was released"
+          exit 1
 
       - name: Publish the Parasite release
         if: steps.rose.outputs.skip == 'false' && inputs.dry_run != true
@@ -206,13 +276,21 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ steps.rose.outputs.tag }}
           VERSION: ${{ steps.rose.outputs.version }}
+          PREVIOUS: ${{ steps.rose.outputs.previous }}
+          BUILT: ${{ steps.commit.outputs.built }}
         run: |
           name="Parasite $VERSION"
-          news="Pengu Loader/plugins/PARASITE-News/whats-new.json"
+          # Read from the built commit: a merge of a newer main may have changed the tree
+          news=$(git show "$BUILT:Pengu Loader/plugins/PARASITE-News/whats-new.json" 2>/dev/null || true)
           changes=""
-          if [ -f "$news" ] && [ "$(jq -r .version "$news")" = "$VERSION" ]; then
+          if [ -n "$news" ] && [ "$(jq -r .version <<< "$news")" = "$VERSION" ]; then
             changes="**What's new**
-          $(jq -r '.en[] | "- " + .' "$news")
+          $(jq -r '.en[] | "- " + .' <<< "$news")
+          "
+          fi
+          if [ -n "$PREVIOUS" ]; then
+            changes="$changes
+          Changes since v$PREVIOUS: https://github.com/$GITHUB_REPOSITORY/compare/v$PREVIOUS...v$VERSION
           "
           fi
           notes="$name, built from [Rose $TAG](https://github.com/$ROSE_REPO/releases/tag/$TAG).
@@ -223,9 +301,39 @@ jobs:
             "installer/Parasite_Setup_$VERSION.exe" \
             "installer/update_package_$VERSION.zip" \
             --repo "$GITHUB_REPOSITORY" \
-            --target "$(git rev-parse HEAD)" \
+            --target "$BUILT" \
             --title "$name" \
             --notes "$notes"
+
+      # A failure issue is resolved once Parasite is released from that Rose release or a
+      # newer one: now (published), or already (nothing to do on a scheduled run).
+      - name: Close the failure issues this resolves
+        if: success() && inputs.dry_run != true && (steps.rose.outputs.skip == 'false' || inputs.rose_tag == '')
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.rose.outputs.tag }}
+          VERSION: ${{ steps.rose.outputs.version }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          if ! issues=$(gh issue list --repo "$GITHUB_REPOSITORY" --state open --limit 100 \
+            --search '"Automatic update to Rose" in:title author:app/github-actions' \
+            --json number,title --jq '.[] | "\(.number)\t\(.title)"'); then
+            echo "::warning::Could not list the failure issues"
+            exit 0
+          fi
+          while IFS=$'\t' read -r number title; do
+            [ -n "$number" ] || continue
+            failed=$(sed -nE 's/^Automatic update to Rose ([0-9.]+|\?) failed$/\1/p' <<< "$title")
+            [ -n "$failed" ] || continue
+            if [ "$failed" != "?" ] && [ "$(printf '%s\n%s\n' "$failed" "$TAG" | sort -V | tail -1)" != "$TAG" ]; then
+              continue
+            fi
+            echo "Closing #$number ($title)"
+            gh issue close "$number" --repo "$GITHUB_REPOSITORY" --reason completed \
+              --comment "Resolved: Parasite v$VERSION is released, built from Rose $TAG. Run: $RUN_URL" \
+              || echo "::warning::Could not close #$number"
+          done <<< "$issues"
 
       - name: Report the failure as an issue
         if: failure() && inputs.dry_run != true
