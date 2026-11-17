@@ -168,7 +168,7 @@ class MoveTests(MigrationTestCase):
         self.assertIsNone(self.entry("voiceover/Broken.fantome").ltk_id)
         self.assertIsNotNone(self.entry("maps/VO Korean.fantome").ltk_id)
         (notice,) = self.ui.notices
-        self.assertIn("Parasite moved 1 of your 2 mods", notice)
+        self.assertIn("Parasite 2 modundan 1 tanesini", notice)
         self.assertIn("- Broken: import failed: unsupported archive", notice)
         self.assertTrue(needs_migration(self.mods_root))
 
@@ -437,7 +437,7 @@ class WhenNothingMovesTests(MigrationTestCase):
 
         self.assertIn("needed", report.skipped_reason)
         (notice,) = self.ui.notices
-        self.assertIn("100 MB is free there", notice)
+        self.assertIn("orada 100 MB boş", notice)
         self.assertNotIn("import", self.bridge.command_names())
         self.assertTrue(archive.exists())
 
@@ -496,7 +496,7 @@ class BackupTests(MigrationTestCase):
         report = self.migrate(FakeUi(backup=True))
 
         (backup,) = self.desktop.iterdir()
-        self.assertEqual(backup.name, f"Parasite mods backup {date.today():%Y-%m-%d}")
+        self.assertEqual(backup.name, f"Parasite mod yedeği {date.today():%Y-%m-%d}")
         self.assertEqual((backup / "voiceover" / "VO Korean.fantome").read_bytes(), original)
         self.assertEqual((backup / "voiceover" / ModStorageService.CATEGORY_METADATA).read_bytes(), manifest)
         self.assertEqual((backup / "voiceover" / "VO Korean.png").read_bytes(), PNG)
@@ -508,11 +508,11 @@ class BackupTests(MigrationTestCase):
 
     def test_a_backup_of_the_same_day_gets_a_number(self):
         self.category_mod("VO Korean")
-        (self.desktop / f"Parasite mods backup {date.today():%Y-%m-%d}").mkdir(parents=True)
+        (self.desktop / f"Parasite mod yedeği {date.today():%Y-%m-%d}").mkdir(parents=True)
 
         self.migrate(FakeUi(backup=True))
 
-        self.assertTrue((self.desktop / f"Parasite mods backup {date.today():%Y-%m-%d} (2)" / "voiceover").is_dir())
+        self.assertTrue((self.desktop / f"Parasite mod yedeği {date.today():%Y-%m-%d} (2)" / "voiceover").is_dir())
 
     def test_a_failed_backup_is_removed_and_nothing_moves(self):
         archive = self.category_mod("VO Korean")
@@ -525,7 +525,7 @@ class BackupTests(MigrationTestCase):
         self.assertEqual(FakeBridge.created[-1].command_names().count("import"), 0)
         self.assertIn("the backup failed", report.skipped_reason)
         (notice,) = self.ui.notices
-        self.assertIn("Parasite could not back up your mods to your desktop", notice)
+        self.assertIn("Parasite modlarını masaüstüne yedekleyemedi", notice)
 
     def test_a_desktop_without_room_for_the_backup_moves_nothing(self):
         archive = self.category_mod("VO Korean")

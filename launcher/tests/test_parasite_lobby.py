@@ -12,7 +12,7 @@ class RankTests(unittest.TestCase):
     def test_solo_rank(self):
         stats = {"queueMap": {"RANKED_SOLO_5x5": {"tier": "DIAMOND", "division": "I", "leaguePoints": 73,
                                                   "wins": 6, "losses": 1}}}
-        self.assertEqual(lobby.parse_rank(stats), {"tier": "Diamond", "division": "I", "lp": 73, "wins": 6, "losses": 1})
+        self.assertEqual(lobby.parse_rank(stats), {"tier": "Elmas", "division": "I", "lp": 73, "wins": 6, "losses": 1})
 
     def test_apex_has_no_division(self):
         stats = {"queueMap": {"RANKED_SOLO_5x5": {"tier": "MASTER", "division": "NA", "leaguePoints": 536}}}

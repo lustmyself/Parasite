@@ -63,7 +63,7 @@ class ModMigrationSequenceTests(MigrationTestCase):
         self.assertEqual(box, (4242, BACKUP_QUESTION.format(size=migration.size_text(size), free="120 GB"),
                                TITLE, mod_migration_sequence.MB_YESNO | mod_migration_sequence.MB_ICONQUESTION
                                | mod_migration_sequence.MB_TOPMOST))
-        self.assertIn(f"({migration.size_text(size)}, 120 GB free)", box[1])
+        self.assertIn(f"({migration.size_text(size)}, boş alan 120 GB)", box[1])
         self.assertFalse(archive.exists())
 
     def test_yes_copies_the_mods_to_the_desktop_before_moving_them(self):
@@ -74,14 +74,14 @@ class ModMigrationSequenceTests(MigrationTestCase):
         report = self.perform()
 
         (backup,) = self.backup_folders()
-        self.assertRegex(backup.name, re.escape(f"Parasite mods backup {date.today():%Y-%m-%d}") + "$")
+        self.assertRegex(backup.name, re.escape(f"Parasite mod yedeği {date.today():%Y-%m-%d}") + "$")
         self.assertEqual((backup / "voiceover" / "VO Korean.fantome").read_bytes(), original)
         self.assertEqual((backup / "voiceover" / "VO Korean.png").read_bytes(), PNG)
         self.assertEqual(report.moved, ["VO Korean"])
         self.assertFalse(archive.exists())
         details = self.dialog.details()
-        self.assertLess(details.index("Backing up your mods to your desktop…"),
-                        details.index("Moving your mods into LTK Manager (1/1): VO Korean"))
+        self.assertLess(details.index("Modların masaüstüne yedekleniyor…"),
+                        details.index("Modların LTK Manager'a taşınıyor (1/1): VO Korean"))
         transfers = [call for call in self.dialog.calls if call[0] == "update_transfer_progress"]
         self.assertTrue(transfers)
 
@@ -106,7 +106,7 @@ class ModMigrationSequenceTests(MigrationTestCase):
         self.assertTrue(archive.exists())
         self.assertEqual(report.moved, [])
         question, notice = self.boxes()
-        self.assertIn("Parasite could not back up your mods to your desktop", notice[1])
+        self.assertIn("Parasite modlarını masaüstüne yedekleyemedi", notice[1])
         self.assertEqual(notice[3], mod_migration_sequence.MB_OK | mod_migration_sequence.MB_ICONWARNING
                          | mod_migration_sequence.MB_TOPMOST)
 

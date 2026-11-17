@@ -68,7 +68,7 @@ class StartupDiagnosticsTests(unittest.TestCase):
             result = diagnostics.run_startup_diagnostics(self.stop)
         launch.assert_not_called()
         self.assertFalse(result.completed)
-        self.assertIn("missing", (result.directory / "collector-status.txt").read_text())
+        self.assertIn("eksik", (result.directory / "collector-status.txt").read_text())
 
     def test_launch_error_does_not_leak_raw_exception(self):
         with patch.object(diagnostics.subprocess, "Popen", side_effect=OSError(5, "token=secret")):
@@ -85,7 +85,7 @@ class StartupDiagnosticsTests(unittest.TestCase):
         with patch.object(diagnostics.subprocess, "Popen", side_effect=failed):
             result = diagnostics.run_startup_diagnostics(self.stop)
         self.assertFalse(result.completed)
-        self.assertIn("code 1", result.message)
+        self.assertIn("1 koduyla", result.message)
 
     def test_incomplete_report_is_not_reported_as_success(self):
         def partial(*args, **kwargs):
@@ -110,7 +110,7 @@ class StartupDiagnosticsTests(unittest.TestCase):
         self.child.kill.assert_called_once()
         self.child.wait.assert_called_once()
         self.assertFalse(result.completed)
-        self.assertIn("timed out", result.message)
+        self.assertIn("3 dakikada bitmedi", result.message)
 
     def test_shutdown_cancels_active_collector(self):
         def stopping(*args, **kwargs):

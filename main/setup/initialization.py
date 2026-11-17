@@ -75,7 +75,7 @@ def convert_stored_mods(tray_manager: Optional[TrayManager]) -> None:
 
     def progress(index: int, total: int, name: str) -> None:
         if tray_manager:
-            tray_manager.set_title(f"Parasite - preparing mods ({index}/{total}): {name}"[:127])
+            tray_manager.set_title(f"Parasite - modlar hazırlanıyor ({index}/{total}): {name}"[:127])
 
     try:
         converted = convert_folder_mods(progress=progress)

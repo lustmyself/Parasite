@@ -58,15 +58,15 @@ def run_startup_diagnostics(stop_event: threading.Event) -> DiagnosticsResult:
         )
         return DiagnosticsResult(directory, completed, message, cancelled)
 
-    finish("Collecting. If Parasite exits unexpectedly, this run may be incomplete.")
+    finish("Toplanıyor. Parasite beklenmedik şekilde kapanırsa bu rapor eksik kalabilir.")
     if stop_event.is_set():
-        return finish("Collection cancelled because Parasite is stopping.", cancelled=True)
+        return finish("Parasite kapandığı için toplama iptal edildi.", cancelled=True)
     script = get_asset_path("diagnostics/Diagnose-Parasite.ps1")
     if not script.is_file():
-        return finish("The bundled diagnostic script is missing. Repair or reinstall Parasite.")
+        return finish("Tanılama betiği eksik. Parasite'ı onar ya da yeniden kur.")
     powershell = _powershell_path()
     if not powershell.is_file():
-        return finish("Windows PowerShell 5.1 could not be found. Check your Windows installation.")
+        return finish("Windows PowerShell 5.1 bulunamadı. Windows kurulumunu kontrol et.")
 
     command = [
         str(powershell), "-NoLogo", "-NoProfile", "-NonInteractive",
@@ -91,11 +91,11 @@ def run_startup_diagnostics(stop_event: threading.Event) -> DiagnosticsResult:
             try:
                 while process.poll() is None:
                     if stop_event.wait(0.25):
-                        return finish("Collection cancelled because Parasite is stopping.", cancelled=True)
+                        return finish("Parasite kapandığı için toplama iptal edildi.", cancelled=True)
                     if time.monotonic() >= deadline:
                         return finish(
-                            "Collection timed out after 3 minutes. A Windows query may be unresponsive. "
-                            "Any existing reports are incomplete; retry and share this status with support."
+                            "Toplama 3 dakikada bitmedi: bir Windows sorgusu yanıt vermiyor olabilir. "
+                            "Oluşan raporlar eksik; tekrar dene ve bu durumu destekle paylaş."
                         )
             finally:
                 if process.poll() is None:
@@ -103,16 +103,16 @@ def run_startup_diagnostics(stop_event: threading.Event) -> DiagnosticsResult:
                 process.wait()
             if process.returncode != 0:
                 return finish(
-                    f"The diagnostic collector exited with code {process.returncode}. "
-                    "Any existing reports are incomplete. Check Windows PowerShell availability "
-                    "and application-control history with support; a collector failure does not "
-                    "establish why Parasite failed to start."
+                    f"Tanılama aracı {process.returncode} koduyla kapandı. "
+                    "Oluşan raporlar eksik. Windows PowerShell'in çalışıp çalışmadığını ve uygulama "
+                    "denetimi geçmişini destekle birlikte kontrol et; aracın hatası Parasite'ın neden "
+                    "açılmadığını göstermez."
                 )
     except OSError as error:
         # Don't persist exception text: it can contain unredacted profile paths.
         return finish(
-            f"Windows could not run the diagnostic collector (error {getattr(error, 'winerror', None) or error.errno}). "
-            "Check Windows PowerShell and application-control history with support."
+            f"Windows tanılama aracını çalıştıramadı (hata {getattr(error, 'winerror', None) or error.errno}). "
+            "Windows PowerShell'i ve uygulama denetimi geçmişini destekle birlikte kontrol et."
         )
 
     try:
@@ -124,9 +124,9 @@ def run_startup_diagnostics(stop_event: threading.Event) -> DiagnosticsResult:
         counts = {status: sum(f["status"] == status for f in findings)
                   for status in ("FAIL", "WARN", "UNKNOWN")}
     except (OSError, ValueError, KeyError, TypeError):
-        return finish("The collector did not produce complete reports. Retry and share this status with support.")
+        return finish("Tanılama aracı raporları tamamlayamadı. Tekrar dene ve bu durumu destekle paylaş.")
     return finish(
-        f"Collection complete: {counts['FAIL']} FAIL, {counts['WARN']} WARN, "
-        f"{counts['UNKNOWN']} UNKNOWN. Read report.txt for evidence and next steps.",
+        f"Toplama tamamlandı: {counts['FAIL']} HATA, {counts['WARN']} UYARI, "
+        f"{counts['UNKNOWN']} BİLİNMİYOR. Kanıtlar ve sonraki adımlar report.txt dosyasında.",
         completed=True,
     )

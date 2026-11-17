@@ -26,27 +26,26 @@ def _dll_dialog_text(reason: str, detail: str = ""):
     runtime problem; *action* is the label of the button that fixes it."""
     if reason == "no_manager":
         return (
-            "Parasite - LTK Manager Missing",
-            "Parasite couldn't install LTK Manager",
-            "Parasite applies skins through LTK Manager and tried to install it for you, but the "
-            "download or the installation did not finish (no internet, or the Windows prompt was "
-            "declined). It only has to be installed once: Parasite "
-            "opens it in the background during champ select and closes it after the game, "
-            "so you never have to open it yourself.",
-            "1. Restart Parasite to try again, and click Yes on the Windows prompt. Or install "
-            f"LTK Manager yourself ({LTK_MANAGER_DOWNLOAD_URL}).\n"
-            "2. Already installed in another folder? Click Set up path and select its "
-            "ltk-manager.exe: Parasite remembers it and starts right away.",
-            "Set up path",
+            "Parasite - LTK Manager bulunamadı",
+            "Parasite, LTK Manager'ı kuramadı",
+            "Parasite skinleri LTK Manager üzerinden uygular ve onu senin için kurmayı denedi, ama "
+            "indirme ya da kurulum bitmedi (internet yok ya da Windows'un sorusu reddedildi). "
+            "Yalnızca bir kez kurulması yeter: Parasite onu şampiyon seçiminde arka planda açar "
+            "ve maçtan sonra kapatır, senin hiç açman gerekmez.",
+            "1. Tekrar denemek için Parasite'ı yeniden başlat ve Windows'un sorusunda Evet'e tıkla. "
+            f"Ya da LTK Manager'ı kendin kur ({LTK_MANAGER_DOWNLOAD_URL}).\n"
+            "2. Başka bir klasöre mi kurulu? Yolu ayarla'ya tıkla ve oradaki ltk-manager.exe'yi seç: "
+            "Parasite onu hatırlar ve hemen açılır.",
+            "Yolu ayarla",
         )
     return (
-        "Parasite - Missing Component",
-        "One Parasite component is missing",
-        f"Parasite needs {detail or 'its bridge files'} in its tools folder before it can start.",
-        "1. Reinstall Parasite: these files are part of every install.\n"
-        "2. If an antivirus removed them, restore the files or add Parasite's folder to its exclusions.\n"
-        "3. Restart Parasite.",
-        "Open tools folder",
+        "Parasite - Eksik bileşen",
+        "Parasite'ın bir bileşeni eksik",
+        f"Parasite'ın açılabilmesi için araçlar klasöründe {detail or 'köprü dosyaları'} gerekiyor.",
+        "1. Parasite'ı yeniden kur: bu dosyalar her kurulumda gelir.\n"
+        "2. Bir antivirüs onları sildiyse dosyaları geri yükle ya da Parasite'ın klasörünü antivirüsün istisnalarına ekle.\n"
+        "3. Parasite'ı yeniden başlat.",
+        "Araçlar klasörünü aç",
     )
 
 
@@ -112,10 +111,10 @@ def _show_native_dll_dialog(reason="missing", detail=""):
     button_close = 1002
     buttons = (TaskDialogButton * 2)(
         TaskDialogButton(button_open, action),
-        TaskDialogButton(button_close, "Close Parasite"),
+        TaskDialogButton(button_close, "Parasite'ı kapat"),
     )
-    content = _with_links(f"{status_body}\n\nHow to fix it:\n{steps}")
-    footer = _with_links("Need help? Open an issue: https://github.com/lustmyself/Parasite/issues")
+    content = _with_links(f"{status_body}\n\nNasıl düzeltilir:\n{steps}")
+    footer = _with_links("Yardım mı lazım? Sorun bildir: https://github.com/lustmyself/Parasite/issues")
     assets_dirs = []
     if hasattr(sys, "_MEIPASS"):
         assets_dirs.append(Path(sys._MEIPASS) / "assets")
@@ -244,9 +243,9 @@ def _show_fallback_dll_dialog(reason="missing", detail="") -> str:
 
     title, status_title, status_body, steps, action = _dll_dialog_text(reason, detail)
     message = (
-        f"{status_title}\n\n{status_body}\n\nHow to fix it:\n{steps}\n\n"
-        "Need help? Open an issue: https://github.com/lustmyself/Parasite/issues\n\n"
-        f"Press OK to {action.lower()}, or Cancel to close Parasite."
+        f"{status_title}\n\n{status_body}\n\nNasıl düzeltilir:\n{steps}\n\n"
+        "Yardım mı lazım? Sorun bildir: https://github.com/lustmyself/Parasite/issues\n\n"
+        f"Tamam: {action}. İptal: Parasite'ı kapat."
     )
     response = ctypes.windll.user32.MessageBoxW(
         0, message, title, 0x00000001 | 0x00000030 | 0x00040000
@@ -289,7 +288,7 @@ def _pick_ltk_manager() -> Optional[Path]:
 
     # Pairs of label and pattern, each ending in a NUL, the list in a second one
     file_filter = ctypes.create_unicode_buffer(
-        "LTK Manager (ltk-manager.exe)\0ltk-manager.exe;LTK Manager.exe\0Programs (*.exe)\0*.exe\0\0"
+        "LTK Manager (ltk-manager.exe)\0ltk-manager.exe;LTK Manager.exe\0Programlar (*.exe)\0*.exe\0\0"
     )
     file_buffer = ctypes.create_unicode_buffer(1024)
     initial_dir = os.environ.get("ProgramW6432") or os.environ.get("ProgramFiles") or ""
@@ -300,7 +299,7 @@ def _pick_ltk_manager() -> Optional[Path]:
         lpstrFile=ctypes.cast(file_buffer, wintypes.LPWSTR),
         nMaxFile=len(file_buffer),
         lpstrInitialDir=initial_dir or None,
-        lpstrTitle="Select LTK Manager (ltk-manager.exe)",
+        lpstrTitle="LTK Manager'ı seç (ltk-manager.exe)",
         # OFN_FILEMUSTEXIST | OFN_PATHMUSTEXIST | OFN_NOCHANGEDIR | OFN_EXPLORER | OFN_DONTADDTORECENT
         Flags=0x1000 | 0x0800 | 0x0008 | 0x00080000 | 0x02000000,
     )
@@ -330,9 +329,9 @@ def _set_up_ltk_manager_path(tools_dir) -> Optional[bool]:
     if picked.name.lower() not in {name.lower() for name in LTK_MANAGER_EXECUTABLES}:
         ctypes.windll.user32.MessageBoxW(
             0,
-            f"{picked.name} is not LTK Manager.\n\nSelect ltk-manager.exe in the folder LTK Manager "
-            "is installed in.",
-            "Parasite - LTK Manager Missing",
+            f"{picked.name}, LTK Manager değil.\n\nLTK Manager'ın kurulu olduğu klasördeki "
+            "ltk-manager.exe'yi seç.",
+            "Parasite - LTK Manager bulunamadı",
             message_flags,
         )
         return None
@@ -340,9 +339,9 @@ def _set_up_ltk_manager_path(tools_dir) -> Optional[bool]:
     if ToolsManager(tools_dir).detect_ltk_manager() is None:
         ctypes.windll.user32.MessageBoxW(
             0,
-            "Parasite could not save the path in its cf.ini.\n\nCheck that Parasite can write to "
-            "%LOCALAPPDATA%\\Parasite, then try again.",
-            "Parasite - LTK Manager Missing",
+            "Parasite yolu cf.ini dosyasına kaydedemedi.\n\nParasite'ın %LOCALAPPDATA%\\Parasite "
+            "klasörüne yazabildiğini kontrol et, sonra tekrar dene.",
+            "Parasite - LTK Manager bulunamadı",
             message_flags,
         )
         return None
@@ -462,10 +461,10 @@ def _warn_pengu_activation_failed() -> None:
         try:
             ctypes.windll.user32.MessageBoxW(
                 0,
-                "Parasite could not activate Pengu Loader, so it will not appear in the League client.\n\n"
-                "Close the League client, then restart Parasite.\n"
-                "If it happens again, make sure your antivirus is not blocking Pengu Loader.\n\n"
-                "Details are in %LOCALAPPDATA%\\Parasite\\logs\\",
+                "Parasite, Pengu Loader'ı etkinleştiremedi; bu yüzden League istemcisinde görünmeyecek.\n\n"
+                "League istemcisini kapat, sonra Parasite'ı yeniden başlat.\n"
+                "Yine olursa antivirüsünün Pengu Loader'ı engellemediğinden emin ol.\n\n"
+                "Ayrıntılar %LOCALAPPDATA%\\Parasite\\logs\\ klasöründe.",
                 "Parasite - Pengu Loader",
                 0x50030,  # MB_OK | MB_ICONWARNING | MB_SETFOREGROUND | MB_TOPMOST
             )
@@ -494,12 +493,12 @@ def _warn_pengu_injection_failed(client_pid: int) -> None:
     try:
         ctypes.windll.user32.MessageBoxW(
             0,
-            "Parasite did not load into this League client: Pengu Loader's DLL is missing from it.\n\n"
-            "Right-click Parasite's system tray icon and choose Diagnose Parasite startup. "
-            "Keep League open while collecting the report.\n\n"
-            "Then attach report.txt and report.json to a GitHub issue (https://github.com/lustmyself/Parasite/issues), so we can find out why. "
-            "You can also paste them into an AI assistant for a first look.",
-            "Parasite - Client injection failed",
+            "Parasite bu League istemcisine yüklenmedi: Pengu Loader'ın DLL'i istemcide yok.\n\n"
+            "Sistem tepsisindeki Parasite simgesine sağ tıkla ve Başlangıç sorununu tanıla'yı seç. "
+            "Rapor toplanırken League açık kalsın.\n\n"
+            "Sonra nedenini bulabilmemiz için report.txt ve report.json dosyalarını bir GitHub sorun bildirimine ekle (https://github.com/lustmyself/Parasite/issues). "
+            "İlk bakış için onları bir yapay zekâ asistanına da yapıştırabilirsin.",
+            "Parasite - İstemciye yüklenemedi",
             0x50030,  # MB_OK | MB_ICONWARNING | MB_SETFOREGROUND | MB_TOPMOST
         )
     except Exception as e:
@@ -959,8 +958,8 @@ Log location: Check %LOCALAPPDATA%\\Parasite\\logs\\
             try:
                 ctypes.windll.user32.MessageBoxW(
                     0,
-                    f"Parasite crashed with an unhandled error:\n\n{str(e)}\n\nError type: {type(e).__name__}\n\nPlease check the log file in:\n%LOCALAPPDATA%\\Parasite\\logs\\",
-                    "Parasite - Fatal Error",
+                    f"Parasite beklenmeyen bir hatayla kapandı:\n\n{str(e)}\n\nHata türü: {type(e).__name__}\n\nKayıt dosyasına bak:\n%LOCALAPPDATA%\\Parasite\\logs\\",
+                    "Parasite - Ölümcül hata",
                     0x50010  # MB_OK | MB_ICONERROR | MB_SETFOREGROUND | MB_TOPMOST
                 )
             except Exception:

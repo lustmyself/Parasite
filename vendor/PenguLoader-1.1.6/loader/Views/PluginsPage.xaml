@@ -22,7 +22,7 @@
             <RowDefinition Height="50" />
         </Grid.RowDefinitions>
         <TextBlock
-            Text="Loading..." FontSize="14"
+            Text="Yükleniyor..." FontSize="14"
             Visibility="{Binding Path=IsLoading, Converter={StaticResource BoolToVis}}" HorizontalAlignment="Center" VerticalAlignment="Center"
         />
         <ListView Grid.Row="0" x:Name="_plugins" VirtualizingPanel.VirtualizationMode="Recycling" SelectionMode="Single" VerticalAlignment="Center" />

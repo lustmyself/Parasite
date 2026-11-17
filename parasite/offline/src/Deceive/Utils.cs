@@ -123,7 +123,7 @@ internal static class Utils
             {
                 // ERROR_ACCESS_DENIED
                 MessageBox.Show(
-                    "Parasite could not stop existing Riot processes because it does not have the right permissions. Please relaunch this application as an administrator and try again.",
+                    "Parasite Offline, açık Riot işlemlerini kapatamadı çünkü yetkisi yok. Parasite'ı yönetici olarak yeniden başlatıp tekrar dene.",
                     StartupHandler.DeceiveTitle,
                     MessageBoxButtons.OK,
                     MessageBoxIcon.Error,
@@ -218,7 +218,7 @@ internal static class Utils
             return;
 
         var result = MessageBox.Show(
-            "Your machine is failing to resolve some required domains. You will need to switch DNS servers or add an entry to your hosts file. Please see the FAQ for more information. Parasite will not work until this issue is resolved. Would you like to open the FAQ now?",
+            "Bilgisayarın gerekli bazı alan adlarını çözümleyemiyor. DNS sunucunu değiştirmen ya da hosts dosyana bir kayıt eklemen gerekiyor. Ayrıntılar SSS sayfasında (İngilizce). Bu sorun çözülene kadar Parasite Offline çalışmaz. SSS sayfası şimdi açılsın mı?",
             StartupHandler.DeceiveTitle,
             MessageBoxButtons.YesNo,
             MessageBoxIcon.Question,

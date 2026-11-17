@@ -270,8 +270,8 @@ def check_single_instance() -> None:
             try:
                 ctypes.windll.user32.MessageBoxW(
                     0,
-                    "Another instance of Parasite is already running!\n\nPlease close the existing instance before starting a new one.",
-                    "Parasite - Instance Already Running",
+                    "Parasite zaten çalışıyor!\n\nYenisini açmadan önce çalışan Parasite'ı kapat.",
+                    "Parasite - Zaten çalışıyor",
                     0x50010,
                 )
             except Exception:
@@ -288,8 +288,8 @@ def check_single_instance() -> None:
                 # = 0x50010 - Ensures dialog appears on top and gets focus
                 ctypes.windll.user32.MessageBoxW(
                     0, 
-                    "Another instance of Parasite is already running!\n\nPlease close the existing instance before starting a new one.",
-                    "Parasite - Instance Already Running",
+                    "Parasite zaten çalışıyor!\n\nYenisini açmadan önce çalışan Parasite'ı kapat.",
+                    "Parasite - Zaten çalışıyor",
                     0x50010  # MB_OK | MB_ICONERROR | MB_SETFOREGROUND | MB_TOPMOST
                 )
             except (OSError, AttributeError) as e:
