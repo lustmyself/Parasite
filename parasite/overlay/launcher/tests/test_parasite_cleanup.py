@@ -50,6 +50,51 @@ class CleanOldInstallsTests(unittest.TestCase):
         self.assertEqual(deleted, ["old"])
         self.assertFalse(old.exists())
 
+    def test_in_a_shared_folder_only_parasites_files_go(self):
+        games = self.root / "Games"
+        (games / "_internal" / "injection").mkdir(parents=True)
+        (games / "injection" / "overlay").mkdir(parents=True)
+        (games / "OtherGame").mkdir()
+        for name in ("Parasite.exe", "icon.ico", "unins000.exe", "unins000.dat", "OtherGame.exe", "notes.txt"):
+            (games / name).write_text("x")
+        (games / "OtherGame" / "save.dat").write_text("x")
+        deleted = self._run([(0, "old", {"DisplayName": "Parasite", "InstallLocation": str(games)})])
+        self.assertEqual(deleted, ["old"])
+        self.assertEqual(sorted(p.name for p in games.iterdir()), ["OtherGame", "OtherGame.exe", "notes.txt"])
+        self.assertTrue((games / "OtherGame" / "save.dat").exists())
+
+    def test_an_internal_folder_that_is_not_parasites_stays(self):
+        old = self.root / "Old"
+        (old / "_internal").mkdir(parents=True)
+        (old / "_internal" / "other.dll").write_text("x")
+        (old / "Parasite.exe").write_text("x")
+        self._run([(0, "old", {"DisplayName": "Parasite", "InstallLocation": str(old)})])
+        self.assertFalse((old / "Parasite.exe").exists())
+        self.assertTrue((old / "_internal" / "other.dll").exists())
+
+    def test_protected_folders_are_never_touched(self):
+        for env in ({"USERPROFILE": None}, {"ProgramFiles": None}, {"SystemRoot": "parent"}):
+            with self.subTest(env=env):
+                old = self.root / "Protected"
+                (old / "_internal" / "injection").mkdir(parents=True, exist_ok=True)
+                (old / "Parasite.exe").write_text("x")
+                name, value = next(iter(env.items()))
+                # The entry points at that folder itself, or (Windows) at a folder inside it
+                target = old / "sub" if value == "parent" else old
+                if value == "parent":
+                    (target / "_internal" / "injection").mkdir(parents=True, exist_ok=True)
+                    (target / "Parasite.exe").write_text("x")
+                with patch.dict("os.environ", {name: str(old)}):
+                    deleted = self._run([(0, "old", {"DisplayName": "Parasite", "InstallLocation": str(target)})])
+                self.assertEqual(deleted, [])
+                self.assertTrue((target / "Parasite.exe").exists())
+                self.assertTrue((target / "_internal").exists())
+
+    def test_drive_roots_are_protected(self):
+        self.assertTrue(cleanup.is_protected_folder(Path(Path.cwd().anchor)))
+        self.assertTrue(cleanup.is_protected_folder(Path("relative")))
+        self.assertFalse(cleanup.is_protected_folder(self.root / "Old"))
+
     def test_roses_entry_and_folders_with_rose_are_left_alone(self):
         rose = self.root / "Rose"
         rose.mkdir()

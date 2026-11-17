@@ -7,6 +7,11 @@
 - Uninstall entries left by older installers (Parasite once had Rose's AppId): an entry named
   Parasite whose folder is this install is only a duplicate, so the entry goes; a Parasite copy
   in another folder goes with its entry when that folder holds Parasite.exe and no Rose.exe.
+  Only the files Parasite's installer puts there are removed (`INSTALL_FILES`, `_internal`,
+  Inno Setup's unins000.*), never anything else in the folder: an old copy may sit in a
+  shared folder such as D:\\Games, and Parasite runs as administrator. The folder itself goes
+  only when nothing else is left in it, and drive roots, Windows, Program Files, ProgramData
+  and user profile folders are never touched.
 
 Old uninstallers are never run: they delete %LOCALAPPDATA%\\Parasite (custom skins, mods,
 settings) and turn Pengu Loader off, which would break the Parasite that is running.
@@ -14,6 +19,7 @@ settings) and turn Pengu Loader off, which would break the Parasite that is runn
 
 from __future__ import annotations
 
+import os
 import re
 import shutil
 import sys
@@ -85,6 +91,88 @@ def _delete_entry(view: int, app_id: str) -> None:
         winreg.DeleteKey(key, app_id)
 
 
+# What a Parasite install folder holds (installer.iss copies PyInstaller's dist\Parasite:
+# Parasite.exe and _internal; Inno Setup adds unins000.exe/.dat; updates keep icon.ico, see
+# PERSISTENT_ROOT_FILES in launcher/update/update_installer.py)
+INSTALL_FILES = ("Parasite.exe", "icon.ico")
+INSTALL_DIRS = ("_internal",)
+UNINSTALLER_FILE = re.compile(r"unins\d{3}\.(exe|dat|msg)$", re.IGNORECASE)
+# What Parasite writes under injection\ in its folder (installer.iss [UninstallDelete])
+INJECTION_DIRS = ("overlay", "mods")
+
+
+def _key(path) -> str:
+    return os.path.normcase(os.path.normpath(str(path))).rstrip("\\/")
+
+
+def _protected_roots() -> tuple[set[str], list[str]]:
+    """Folders never cleaned, and folders nothing inside of which is cleaned."""
+    exact, inside = set(), []
+    for name in ("ProgramFiles", "ProgramFiles(x86)", "ProgramW6432", "ProgramData", "ALLUSERSPROFILE",
+                 "USERPROFILE", "PUBLIC", "APPDATA", "LOCALAPPDATA", "HOMEDRIVE"):
+        if os.environ.get(name):
+            exact.add(_key(os.environ[name]))
+    for literal in (r"C:\Program Files", r"C:\Program Files (x86)", r"C:\ProgramData", r"C:\Users"):
+        exact.add(_key(literal))
+    profile = os.environ.get("USERPROFILE")
+    if profile:
+        exact.add(_key(Path(profile).parent))  # C:\Users
+    try:
+        exact.add(_key(Path.home()))
+    except RuntimeError:
+        pass
+    for name in ("SystemRoot", "windir"):
+        if os.environ.get(name):
+            inside.append(_key(os.environ[name]))
+    inside.append(_key(r"C:\Windows"))
+    return exact, inside
+
+
+def is_protected_folder(folder: Path) -> bool:
+    """A drive or share root, Windows (or inside it), Program Files, ProgramData or a profile folder."""
+    if not folder.is_absolute() or folder.parent == folder or len(folder.parts) <= 1:
+        return True
+    exact, inside = _protected_roots()
+    key = _key(folder)
+    if key in exact:
+        return True
+    return any(key == root or key.startswith((root + os.sep, root + "\\")) for root in inside)
+
+
+def _is_link(path: Path) -> bool:
+    return path.is_symlink() or getattr(os.path, "isjunction", lambda _p: False)(path)
+
+
+def _remove_install_files(folder: Path) -> list[str]:
+    """Remove only Parasite's own files from an old install folder; returns what is left there."""
+    for name in INSTALL_FILES:
+        path = folder / name
+        if path.is_file() and not _is_link(path):
+            path.unlink(missing_ok=True)
+    for path in folder.iterdir():
+        if UNINSTALLER_FILE.match(path.name) and path.is_file() and not _is_link(path):
+            path.unlink(missing_ok=True)
+    for name in INSTALL_DIRS:
+        path = folder / name
+        # PyInstaller's _internal of a Parasite (or Rose) build holds injection\
+        if path.is_dir() and not _is_link(path) and (path / "injection").is_dir():
+            shutil.rmtree(path, ignore_errors=True)
+    injection = folder / "injection"
+    if injection.is_dir() and not _is_link(injection):
+        for name in INJECTION_DIRS:
+            path = injection / name
+            if path.is_dir() and not _is_link(path):
+                shutil.rmtree(path, ignore_errors=True)
+        try:
+            injection.rmdir()  # only when empty
+        except OSError:
+            pass
+    left = sorted(path.name for path in folder.iterdir())
+    if not left:
+        folder.rmdir()
+    return left
+
+
 def clean_old_installs(install_dir: Path) -> int:
     """Remove duplicate or stray installs left by Parasite's older installers. Returns how many."""
     removed = 0
@@ -95,9 +183,17 @@ def clean_old_installs(install_dir: Path) -> int:
         folder = Path(values["InstallLocation"].strip().strip('"')) if values["InstallLocation"].strip() else None
         try:
             if folder and folder.exists() and folder.resolve() != here:
+                folder = folder.resolve()
+                if is_protected_folder(folder):
+                    log.warning(f"[Cleanup] Left the old uninstall entry {app_id} alone: it points at {folder}")
+                    continue
                 if (folder / "Parasite.exe").is_file() and not (folder / "Rose.exe").exists():
-                    shutil.rmtree(folder, ignore_errors=True)
-                    log.info(f"[Cleanup] Removed an old Parasite copy in {folder}")
+                    left = _remove_install_files(folder)
+                    if left:
+                        log.info(f"[Cleanup] Removed an old Parasite copy's files in {folder}; "
+                                 f"{len(left)} other item(s) stay there")
+                    else:
+                        log.info(f"[Cleanup] Removed an old Parasite copy in {folder}")
                 else:
                     continue  # not plainly a Parasite copy: leave the folder and its entry alone
             _delete_entry(view, app_id)

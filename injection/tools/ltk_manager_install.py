@@ -2,7 +2,8 @@
 
 Parasite applies skins through LTK Manager (LeagueToolkit, GPL-3.0). Parasite does
 not ship it: when it is missing, Parasite downloads the official, signed installer
-from LTK Manager's latest GitHub release, checks its signature and runs it. The
+from LTK Manager's latest GitHub release, checks its signature (valid, and made by
+LTK Manager's own signer, `EXPECTED_SIGNER`) and runs it. The
 installer puts LTK Manager in Program Files, so Windows asks for administrator
 rights once (UAC prompt).
 """
@@ -10,6 +11,7 @@ rights once (UAC prompt).
 from __future__ import annotations
 
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -105,21 +107,65 @@ def download_installer(dest: Path, timeout: int = 60) -> bool:
     return size > 0
 
 
+# Who signs LTK Manager's installer: LeagueToolkit signs its releases through Microsoft's
+# Trusted Signing as "Natoken LLC" (seen on LTK.Manager_x64-setup.exe of the latest release).
+# Those certificates last three days and their issuing CA rotates, so the subject is pinned,
+# not a thumbprint. A valid signature from anybody else is refused.
+EXPECTED_SIGNER = {"CN": "Natoken LLC", "O": "Natoken LLC"}
+
+
+def _windows_dir() -> str:
+    """The Windows folder from the kernel, not from %SystemRoot%, which the user can override."""
+    try:
+        import ctypes
+
+        buffer = ctypes.create_unicode_buffer(260)
+        length = ctypes.windll.kernel32.GetSystemWindowsDirectoryW(buffer, len(buffer))
+        if isinstance(length, int) and 0 < length < len(buffer) and buffer.value:
+            return buffer.value
+    except Exception:  # noqa: BLE001, S110 - the default folder below
+        pass
+    return r"C:\Windows"
+
+
+def powershell_exe() -> str:
+    """Windows PowerShell by its full path: never whatever powershell.exe comes first on PATH."""
+    return str(Path(_windows_dir()) / "System32" / "WindowsPowerShell" / "v1.0" / "powershell.exe")
+
+
+def _subject_fields(subject: str) -> dict:
+    """'CN=Natoken LLC, O=Natoken LLC, L=Austin, S=Texas, C=US' -> {'CN': ..., 'O': ..., ...}."""
+    fields = {}
+    for match in re.finditer(r'\s*([A-Za-z.0-9]+)=("(?:[^"]|"")*"|[^,]*)\s*(?:,|$)', subject or ""):
+        value = match.group(2).strip()
+        if value.startswith('"') and value.endswith('"'):
+            value = value[1:-1].replace('""', '"')
+        fields.setdefault(match.group(1).upper(), value)
+    return fields
+
+
 def signature_is_valid(path: Path) -> bool:
-    """Whether Windows reports a valid Authenticode signature on *path*."""
-    script = "(Get-AuthenticodeSignature -LiteralPath $env:PARASITE_LTK_SETUP).Status.ToString()"
+    """Whether Windows reports a valid Authenticode signature on *path*, made by LTK Manager's signer."""
+    script = ("$s = Get-AuthenticodeSignature -LiteralPath $env:PARASITE_LTK_SETUP; "
+              "$s.Status.ToString(); if ($s.SignerCertificate) { $s.SignerCertificate.Subject }")
     try:
         result = subprocess.run(
-            ["powershell", "-NoProfile", "-NonInteractive", "-Command", script],
+            [powershell_exe(), "-NoProfile", "-NonInteractive", "-Command", script],
             capture_output=True, text=True, timeout=60, creationflags=CREATE_NO_WINDOW,
             env={**os.environ, "PARASITE_LTK_SETUP": str(path)},
         )
     except (OSError, subprocess.SubprocessError) as exc:
         log.warning(f"[LTK] Could not check the installer's signature: {exc}")
         return False
-    status = (result.stdout or "").strip()
+    lines = [line.strip() for line in (result.stdout or "").splitlines() if line.strip()]
+    status = lines[0] if lines else ""
     if status != "Valid":
-        log.warning(f"[LTK] The LTK Manager installer's signature is not valid: {status or result.stderr.strip()}")
+        log.warning(f"[LTK] The LTK Manager installer's signature is not valid: {status or (result.stderr or '').strip()}")
+        return False
+    subject = lines[1] if len(lines) > 1 else ""
+    fields = _subject_fields(subject)
+    if any(fields.get(name) != value for name, value in EXPECTED_SIGNER.items()):
+        log.warning(f"[LTK] The LTK Manager installer is signed by someone else: {subject or 'unknown'}")
         return False
     return True
 
