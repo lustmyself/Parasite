@@ -45,6 +45,9 @@ injection_binaries = [
 # Data files (text files, etc.)
 injection_data_files = [
     'injection/tools/hashes.game.txt',
+    # ParasiteOffline.exe is GPL-3.0 (Deceive): its license and where its source is
+    'injection/tools/ParasiteOffline-LICENSE.txt',
+    'injection/tools/ParasiteOffline-NOTICE.txt',
 ]
 # Verify and add injection binaries
 binaries = []
@@ -179,6 +182,14 @@ hiddenimports = [
     'injection.tools.tools_manager',
     'injection.loadingname',
     'injection.loadingname.loading_name',
+    'injection.baseskin',
+    'injection.baseskin.audio',
+    'injection.baseskin.bnk',
+    'injection.baseskin.library',
+    'injection.baseskin.package',
+    'injection.baseskin.propbin',
+    'injection.baseskin.steps',
+    'injection.baseskin.wad',
     'lcu',
     'lcu.core',
     'lcu.core.client',
@@ -245,6 +256,7 @@ hiddenimports = [
     'utils.core.modpkg',
     'utils.system',
     'utils.system.admin_utils',
+    'utils.system.folder_watch',
     'utils.system.win32_base',
     'utils.system.window_utils',
     'utils.system.resolution_utils',

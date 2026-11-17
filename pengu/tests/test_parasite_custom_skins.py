@@ -68,6 +68,9 @@ class CustomSkinsTests(unittest.TestCase):
         self.assertEqual(mod["champion_id"], 103)
         self.assertEqual(mod["skin_id"], 103000)
         self.assertEqual(Path(mod["mod_path"]).name, "a.fantome")
+        # The injection links the file under its own name (ModSource)
+        self.assertEqual(mod["source"].path.name, "a.fantome")
+        self.assertEqual(mod["source"].linked_name, "parasite-custom-a")
         self.assertIsNone(mod["relative_path"])
         self.assertEqual(skins.custom_mod_for(103, 103001)["skin_id"], 103001)  # on the skin picked
         self.assertIsNone(skins.custom_mod_for(103, 84001))  # a skin of another champion

@@ -124,6 +124,20 @@ skin instead of getting the default one.
 2. Run the installer as Administrator
 3. Launch Parasite from the Start Menu or desktop shortcut
 
+### Recovering an interrupted update
+
+Parasite keeps the previous installation beside the current one. If an update is
+interrupted and Parasite will not start, close any Parasite windows and run
+`C:\Program Files\Parasite.update\Recover-Parasite.cmd` as Administrator, then open
+Parasite again. For a custom installation path, look for the sibling folder named
+`<installation-folder>.update`. Its `update.log` records the result.
+
+The standalone installer replaces the uninstall records left by previous
+installers. Automatic ZIP updates keep the existing uninstaller, so install
+with the new setup executable to pick up the safer cleanup rules. Uninstall
+can leave untracked files and the update workspace when it contains a
+recovery snapshot.
+
 ## Diagnose startup problems
 
 If Parasite is missing from the League client or game skins do not load, reproduce

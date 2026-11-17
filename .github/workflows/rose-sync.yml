@@ -168,6 +168,7 @@ jobs:
           PARASITE_RELAY_URL: ${{ secrets.PARASITE_RELAY_URL }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          PARASITE_RELAY_WORKER: ${{ vars.PARASITE_RELAY_WORKER }}
         # Parasite's relay (parasite/relay): from the secret or the Cloudflare account; without
         # either, write_config.py falls back to the relay Lust runs (skin sharing stays on)
         run: python parasite/relay/write_config.py

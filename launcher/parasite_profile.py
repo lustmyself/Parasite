@@ -28,10 +28,13 @@ CDRAGON = "https://raw.communitydragon.org/latest/plugins/rcp-be-lol-game-data/g
 CHAMPION_URL = CDRAGON + "v1/champions/{id}.json"
 PROFILE_PATH = "/lol-summoner/v1/current-summoner/summoner-profile"
 SKINS_TTL_S = 6 * 60 * 60
+# After a failed download (offline), the next try for that champion waits this long
+RETRY_S = 60
 PENDING_FILE = "profile-background.json"
 
 _lock = threading.Lock()
 _skins: dict = {}  # champion id -> (fetched at, [skins])
+_failed: dict = {}  # champion id -> when its download last failed
 
 
 def asset_url(path) -> str:
@@ -82,6 +85,9 @@ def skins(champion_id) -> list:
         cached = _skins.get(champion_id)
         if cached and time.monotonic() - cached[0] < SKINS_TTL_S:
             return cached[1]
+        failed = _failed.get(champion_id)
+        if failed is not None and time.monotonic() - failed < RETRY_S:
+            return cached[1] if cached else []
     items = []
     try:
         import requests
@@ -91,9 +97,14 @@ def skins(champion_id) -> list:
         items = clean_skins(response.json())
     except Exception as e:  # noqa: BLE001
         log.info(f"[Profile] Could not read the skins of champion {champion_id}: {e}")
-    if items:
-        with _lock:
+    with _lock:
+        if items:
             _skins[champion_id] = (time.monotonic(), items)
+            _failed.pop(champion_id, None)
+        else:
+            _failed[champion_id] = time.monotonic()
+            if cached:
+                return cached[1]
     return items
 
 

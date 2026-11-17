@@ -7,7 +7,8 @@ download for that package, and the hub's update question answers itself.
 
 The install needs Parasite to restart into its launcher. That happens only while no League
 client or game runs (checked twice, a minute apart), so nobody is cut off mid-game;
-otherwise the package waits for the next start.
+otherwise the package waits for the next start. Parasite Offline counts too: it runs from
+Parasite's folder while the Riot Client is open, and the update swaps that folder.
 """
 
 from __future__ import annotations
@@ -25,7 +26,9 @@ log = get_logger()
 
 CONFIG_KEY = "autoUpdate"
 IDLE_CHECK_S = 60
-LEAGUE = {"leagueclient.exe", "leagueclientux.exe", "league of legends.exe"}
+LEAGUE = {"leagueclient.exe", "leagueclientux.exe", "league of legends.exe",
+          # The update moves Parasite's folder, which Parasite Offline keeps open
+          "parasiteoffline.exe"}
 _lock = threading.Lock()
 _pending: Optional[str] = None  # version downloaded and waiting to be installed
 _waiter: Optional[threading.Thread] = None
@@ -64,6 +67,27 @@ def is_ready(zip_path: Path) -> bool:
         return False
 
 
+def package_path(asset: dict, version: str) -> Path:
+    """Where the background download keeps `asset` (the release's update package)."""
+    return _updates_dir() / (asset.get("name") or f"update_package_{version.lstrip('vV')}.zip")
+
+
+def predownloaded(asset: dict, version: str) -> Optional[Path]:
+    """The package downloaded in the background for `asset`, when it is complete.
+
+    The launcher's update sequence installs it instead of downloading it again (and
+    deletes it once extracted).
+    """
+    try:
+        target = package_path(asset, version)
+    except OSError:
+        return None
+    if not is_ready(target):
+        return None
+    ready_path(target).unlink(missing_ok=True)
+    return target
+
+
 def _download(url: str, target: Path, expected: int = 0) -> bool:
     part = target.with_name(target.name + ".part")
     try:
@@ -93,13 +117,18 @@ def _league_running() -> bool:
     return any((p.info.get("name") or "").lower() in LEAGUE for p in psutil.process_iter(["name"]))
 
 
-def _install_when_idle(version: str) -> None:
-    """Restart Parasite into its installer once League has been closed for a minute."""
+def _install_when_idle() -> None:
+    """Restart Parasite into its installer once League has been closed for a minute.
+
+    Installs whatever is pending by then: a newer release downloaded while this waits replaces
+    the one it started for (the update sequence takes the newest package).
+    """
     idle_checks = 0
-    while _pending == version and enabled():
+    while _pending and enabled():
         idle_checks = idle_checks + 1 if not _league_running() else 0
         if idle_checks >= 2:
             from launcher import parasite_hub
+            version = _pending
             log.info(f"[AutoUpdate] League is closed; restarting Parasite to install {version}")
             parasite_hub.toast(f"Parasite {version} kuruluyor, birkaç saniye sürecek")
             parasite_hub.mark_quiet_restart()
@@ -122,7 +151,7 @@ def on_release(client, release: dict, current: str) -> None:
     asset = client.get_zip_asset(release)
     if not asset or not asset.get("browser_download_url"):
         return
-    target = _updates_dir() / (asset.get("name") or f"update_package_{version}.zip")
+    target = package_path(asset, version)
     with _lock:
         if _pending == version:
             return
@@ -133,6 +162,8 @@ def on_release(client, release: dict, current: str) -> None:
         _pending = version
     log.info(f"[AutoUpdate] Parasite {version} is downloaded and waits for League to be closed")
     parasite_hub.toast(f"Parasite {version} indirildi; League kapalıyken kendiliğinden kurulacak")
-    if not _waiter or not _waiter.is_alive():
-        _waiter = threading.Thread(target=_install_when_idle, args=(version,), daemon=True, name="ParasiteAutoUpdate")
-        _waiter.start()
+    with _lock:
+        # A waiter already running picks up the newer version by itself
+        if not _waiter or not _waiter.is_alive():
+            _waiter = threading.Thread(target=_install_when_idle, daemon=True, name="ParasiteAutoUpdate")
+            _waiter.start()

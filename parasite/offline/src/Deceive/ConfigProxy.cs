@@ -174,8 +174,8 @@ internal class ConfigProxy
 
             // Show a message instead of failing silently.
             MessageBox.Show(
-                "Parasite was unable to rewrite a League of Legends configuration file. This normally happens because Riot changed something on their end. " +
-                "Please check if there's a new version of Parasite available, or contact the creator through GitHub (https://github.com/lustmyself/Parasite) or Discord if there's not.\n\n" +
+                "Parasite Offline bir League of Legends yapılandırma dosyasını yeniden yazamadı. Bu genellikle Riot kendi tarafında bir şeyi değiştirdiğinde olur. " +
+                "Parasite'ın yeni bir sürümü var mı bak; yoksa GitHub'da bildir (https://github.com/lustmyself/Parasite/issues).\n\n" +
                 ex,
                 StartupHandler.DeceiveTitle,
                 MessageBoxButtons.OK,

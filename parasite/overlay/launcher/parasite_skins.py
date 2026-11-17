@@ -26,8 +26,14 @@ CHAMPIONS_URL = ("https://raw.communitydragon.org/latest/plugins/rcp-be-lol-game
 CHAMPIONS_TTL_S = 6 * 60 * 60
 CHAMPIONS_FILE = "parasite-champions.json"
 
+CHAMPIONS_RETRY_S = 60
+
 _lock = threading.Lock()
-_champions: dict = {"at": 0.0, "items": []}
+# One download at a time: the hub polls pages that ask for the list every couple of seconds
+_fetch_lock = threading.Lock()
+# "at": when the list was last looked up (None: never); "retry": the download failed, so the
+# next look-up is due after CHAMPIONS_RETRY_S instead of CHAMPIONS_TTL_S
+_champions: dict = {"at": None, "items": [], "retry": False}
 
 ERRORS = {
     "file is gone": "Bu dosya artık yok",
@@ -58,33 +64,62 @@ def _cache_path() -> Path:
     return _custom().folder() / CHAMPIONS_FILE
 
 
-def champions() -> list:
-    with _lock:
-        if _champions["items"] and time.monotonic() - _champions["at"] < CHAMPIONS_TTL_S:
-            return _champions["items"]
-    items = []
+def _cached():
+    """The list while it is still fresh, else None. Call with _lock held."""
+    at = _champions["at"]
+    if at is None:
+        return None
+    ttl = CHAMPIONS_RETRY_S if _champions["retry"] else CHAMPIONS_TTL_S
+    return _champions["items"] if time.monotonic() - at < ttl else None
+
+
+def _download() -> list:
     try:
         import requests
         from config import APP_USER_AGENT
         response = requests.get(CHAMPIONS_URL, timeout=8, headers={"User-Agent": APP_USER_AGENT})
         response.raise_for_status()
         items = clean_champions(response.json())
-        if items:
-            try:
-                _cache_path().write_text(json.dumps(items, ensure_ascii=False), encoding="utf-8")
-            except OSError:
-                pass
     except Exception as e:  # noqa: BLE001
         log.info(f"[Skins] Could not read the champion list: {e}")
-    if not items:
+        return []
+    if items:
         try:
-            items = clean_champions(json.loads(_cache_path().read_text(encoding="utf-8")))
-        except (OSError, ValueError):
-            items = []
-    with _lock:
-        # Without a list, try again in a minute instead of hours
-        _champions.update(at=time.monotonic() - (0 if items else CHAMPIONS_TTL_S - 60), items=items)
+            _cache_path().write_text(json.dumps(items, ensure_ascii=False), encoding="utf-8")
+        except OSError:
+            pass
     return items
+
+
+def champions() -> list:
+    with _lock:
+        items = _cached()
+        if items is not None:
+            return items
+        stale = _champions["items"]
+    # Someone else is downloading: hand back what we have rather than wait up to 8 s for it
+    if not _fetch_lock.acquire(blocking=not stale):
+        return stale
+    try:
+        with _lock:
+            items = _cached()
+            if items is not None:
+                return items
+        items = _download()
+        retry = not items
+        if not items:
+            try:
+                items = clean_champions(json.loads(_cache_path().read_text(encoding="utf-8")))
+            except (OSError, ValueError):
+                items = []
+            items = items or stale
+        with _lock:
+            # Offline: keep the saved (or last) list and try the network again in a minute,
+            # without every poll of the hub waiting on another download in between
+            _champions.update(at=time.monotonic(), items=items, retry=retry)
+        return items
+    finally:
+        _fetch_lock.release()
 
 
 def listing() -> dict:

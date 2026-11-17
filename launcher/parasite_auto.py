@@ -151,7 +151,7 @@ def listing() -> dict:
     counters = parasite_counters.board()
     return dict(settings(), champions=[{"id": c["id"], "name": c["name"]} for c in parasite_skins.champions()],
                 max=MAX_CHOICES, reveal=_reveal(), counters=counters, lobby=_lobby(),
-                history=parasite_lobby.history(), multiSites=MULTI_SITES,
+                history=parasite_lobby.history(), hover=parasite_lobby.hover_state(), multiSites=MULTI_SITES,
                 dodge={"armed": _dodge["armed"], "state": _dodge["state"]}, atChoices=AT_CHOICES,
                 delayChoices=DELAY_CHOICES)
 
