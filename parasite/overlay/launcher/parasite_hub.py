@@ -618,6 +618,7 @@ ACTIONS: dict[str, Callable[[dict], str]] = {
     "dodge_now": lambda body: _auto().dodge_now(),
     "dodge_last": lambda body: _auto().arm_dodge(bool(body.get("on"))),
     "lobby_history_clear": lambda body: _lobby().clear_history(),
+    "lobby_hover": lambda body: _lobby().hover(body.get("championId"), str(body.get("name") or "")),
     "wallpaper_set": lambda body: _wallpaper().choose(body.get("name") if isinstance(body.get("name"), str) else None),
     "wallpaper_delete": lambda body: _wallpaper().delete(str(body.get("name") or "")),
     "wallpaper_folder": lambda body: _wallpaper().open_folder(),
