@@ -94,8 +94,8 @@ def initialize_core_components(args, injection_threshold: Optional[float] = None
             try:
                 ctypes.windll.user32.MessageBoxW(
                     0,
-                    f"Parasite failed to initialize:\n\n{str(e)}\n\nCheck the log file for details:\n{get_log_file() or 'N/A'}",
-                    "Parasite - Initialization Error",
+                    f"Parasite başlatılamadı:\n\n{str(e)}\n\nAyrıntılar kayıt dosyasında:\n{get_log_file() or 'yok'}",
+                    "Parasite - Başlatma hatası",
                     0x50010  # MB_OK | MB_ICONERROR | MB_SETFOREGROUND | MB_TOPMOST
                 )
             except Exception:
@@ -138,8 +138,8 @@ def initialize_core_components(args, injection_threshold: Optional[float] = None
             try:
                 ctypes.windll.user32.MessageBoxW(
                     0,
-                    f"Parasite failed to initialize injection system:\n\n{str(e)}\n\nCheck the log file for details:\n{get_log_file() or 'N/A'}",
-                    "Parasite - Injection Error",
+                    f"Parasite'ın skin yükleme sistemi başlatılamadı:\n\n{str(e)}\n\nAyrıntılar kayıt dosyasında:\n{get_log_file() or 'yok'}",
+                    "Parasite - Skin yükleme hatası",
                     0x50010  # MB_OK | MB_ICONERROR | MB_SETFOREGROUND | MB_TOPMOST
                 )
             except Exception:

@@ -18,6 +18,9 @@ Editing those files directly is lost on the next sync.
 - `parasite/overlay/` — Parasite's own files, copied over Rose's tree (including this file).
 - `parasite/sync.py` — `EDITS` (exact text replacements in Rose's files), `REMOVE` (Rose paths Parasite drops),
   core.dll byte patches (same length only). Every `old` must match exactly once.
+- `parasite/turkish.py` — Parasite is Turkish only (no English to choose): `TURKISH` replaces the English texts
+  players see in Rose's files (dialogs, tray, installer, Pengu Loader's window), `LOCALE_TR` fills Rose's tr.json.
+  Logs, code and developer-only text stay English.
 - `parasite/theme/build_theme.py` — builds the PARASITE client theme from Elaina (MIT); theme changes are `PATCHES` there.
 - `parasite/offline/build_offline.py` — builds Parasite Offline (`ParasiteOffline.exe`) from Deceive (GPL-3.0).
 

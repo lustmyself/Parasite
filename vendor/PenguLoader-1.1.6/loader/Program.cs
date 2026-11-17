@@ -82,7 +82,7 @@ namespace PenguLoader
 
             if (!Environment.Is64BitOperatingSystem)
             {
-                MessageBox.Show("32-BIT CLIENT DEPRECATION\n\nStarting with LoL patch 13.8, 32-bit Windows is no longer supported. Please upgrade your Windows to 64-bit.",
+                MessageBox.Show("32 BİT DESTEĞİ BİTTİ\n\nLoL 13.8 yamasından beri 32 bit Windows desteklenmiyor. Windows'unu 64 bite yükselt.",
                     Name, MessageBoxButton.OK, MessageBoxImage.Warning);
                 return 1;
             }

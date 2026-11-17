@@ -146,5 +146,5 @@ class InstallerSafetyTests(unittest.TestCase):
         self.assertRegex(
             step.group(1),
             r"(?s)'--remove-ltk-mods'.*?;\s+(?:\{[^}]*\}\s+)?if \(ResultCode <> 0\) and not UninstallSilent then\s+"
-            r"MsgBox\(.*?turn them back on in LTK Manager.*?MB_OK\s*\);",
+            r"MsgBox\(.*?yeniden aç.*?MB_OK\s*\);",
         )

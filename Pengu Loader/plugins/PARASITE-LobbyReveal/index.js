@@ -33,7 +33,7 @@
   };
   const AUTO_OPEN_DELAYS = [0, 3, 6, 10];
 
-  // Turkish for this plugin's own texts; other languages go through PARASITE-I18n
+  // This plugin's own texts, in Turkish whatever the client's language (Parasite is Turkish only)
   const TR = {
     "Open OP.GG profile": "OP.GG profilini aç",
     "Open U.GG profile": "U.GG profilini aç",
@@ -97,7 +97,7 @@
 
   function tr(text, vars) {
     const i18n = window.ParasiteI18n;
-    let out = i18n && i18n.language === "tr" && TR[text] ? TR[text] : i18n ? i18n.t(text) : text;
+    let out = TR[text] ? TR[text] : i18n ? i18n.t(text) : text;
     if (vars) out = out.replace(/\{(\w+)\}/g, (match, key) => (key in vars ? String(vars[key]) : match));
     return out;
   }
@@ -868,9 +868,14 @@
     ]).then(([mastery, names]) => topMains(mastery, names)));
   }
 
+  const TIERS = {
+    IRON: "Demir", BRONZE: "Bronz", SILVER: "Gümüş", GOLD: "Altın", PLATINUM: "Platin", EMERALD: "Zümrüt",
+    DIAMOND: "Elmas", MASTER: "Ustalık", GRANDMASTER: "Üstatlık", CHALLENGER: "Şampiyonluk",
+  };
+
   function formatTier(rank) {
     if (rank.tier === "UNRANKED") return tr(rank.provisional ? "Placements" : "Unranked");
-    const name = rank.tier.charAt(0) + rank.tier.slice(1).toLowerCase();
+    const name = TIERS[rank.tier] || rank.tier.charAt(0) + rank.tier.slice(1).toLowerCase();
     return `${name}${rank.division ? ` ${rank.division}` : ""} · ${rank.leaguePoints} LP`;
   }
 

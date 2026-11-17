@@ -2487,11 +2487,11 @@ function csRank(row) {
   const line = mk("div", "cs-rk");
   if (row.loading && !r) { line.textContent = "yükleniyor…"; return line; }
   if (!row.puuid) { line.textContent = row.gameName ? "" : "Gizli"; return line; }
-  if (!r) line.append(mk("span", "t", "Unranked"));
+  if (!r) line.append(mk("span", "t", "Derecesiz"));
   else {
     line.append(mk("span", "t", `${r.tier}${r.division ? " " + r.division : ""}`), ` · ${r.lp} LP`);
     const games = r.wins + r.losses;
-    if (games) line.append(` · ${r.wins}W ${r.losses}L · ${Math.round(r.wins * 100 / games)}%`);
+    if (games) line.append(` · ${r.wins}G ${r.losses}M · %${Math.round(r.wins * 100 / games)}`);
   }
   return line;
 }
@@ -2697,7 +2697,7 @@ function drawHistory() {
       const t = mk("div");
       const r = p.rank;
       t.append(mk("b", "", p.gameName + (p.gameTag ? ` #${p.gameTag}` : "")),
-        mk("small", "", [CS_LANES[p.position], r ? `${r.tier}${r.division ? " " + r.division : ""} ${r.lp} LP` : "Unranked"].filter(Boolean).join(" · ")));
+        mk("small", "", [CS_LANES[p.position], r ? `${r.tier}${r.division ? " " + r.division : ""} ${r.lp} LP` : "Derecesiz"].filter(Boolean).join(" · ")));
       el.append(t);
       if (p.opggUrl) el.addEventListener("click", () => act("open_link", { url: p.opggUrl }));
       grid.append(el);

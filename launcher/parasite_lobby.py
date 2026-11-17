@@ -24,6 +24,7 @@ from collections import Counter
 from pathlib import Path
 from typing import Optional
 
+from launcher.parasite_hero import TIERS
 from utils.core.logging import get_logger
 
 log = get_logger()
@@ -61,7 +62,7 @@ def parse_rank(ranked_stats, queue_type: str = "RANKED_SOLO_5x5") -> Optional[di
     if not tier or tier == "NONE":
         return None
     division = str(entry.get("division") or "")
-    return {"tier": tier.title(), "division": "" if tier in APEX or division == "NA" else division,
+    return {"tier": TIERS.get(tier, tier.title()), "division": "" if tier in APEX or division == "NA" else division,
             "lp": int(entry.get("leaguePoints") or 0), "wins": int(entry.get("wins") or 0),
             "losses": int(entry.get("losses") or 0)}
 
@@ -116,7 +117,7 @@ def off_role(position: str, roles: dict) -> bool:
 
 def rank_text(rank: Optional[dict]) -> str:
     if not rank:
-        return "Unranked"
+        return "Derecesiz"
     return f"{rank['tier']} {rank['division']}".strip() + f" · {rank['lp']} LP"
 
 

@@ -77,7 +77,7 @@ class PenguInjectionWarningTests(unittest.TestCase):
         self.assertEqual(report_issue.call_args[0][0], 'PENGU_INJECTION_FAILED')
         self.assertEqual(report_issue.call_args.kwargs['details'], {'client_pid': 123})
         text = message_box.call_args[0][1]
-        self.assertIn('Diagnose Parasite startup', text)
+        self.assertIn('Başlangıç sorununu tanıla', text)
         self.assertNotIn('discord', text.lower())  # Parasite has no Discord
         self.assertIn('github.com/lustmyself/Parasite/issues', text)
 

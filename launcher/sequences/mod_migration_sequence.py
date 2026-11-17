@@ -21,19 +21,19 @@ MB_ICONWARNING = 0x00000030
 MB_TOPMOST = 0x00040000
 IDYES = 6
 
-TITLE = "Parasite - your mods"
+TITLE = "Parasite - modların"
 BACKUP_QUESTION = (
-    "Parasite now keeps the mods you added in LTK Manager's library, without a copy of its own, "
-    "and moves your mods there now.\n\n"
-    "Do you want a backup of your mods on your desktop first? ({size}, {free} free)\n\n"
-    "Yes: copy them to a \"Parasite mods backup\" folder on your desktop, then move them.\n"
-    "No: move them without a backup."
+    "Parasite artık eklediğin modları kendi kopyası olmadan LTK Manager'ın kütüphanesinde tutuyor "
+    "ve modlarını şimdi oraya taşıyor.\n\n"
+    "Önce masaüstüne modlarının bir yedeğini almak ister misin? ({size}, boş alan {free})\n\n"
+    "Evet: masaüstündeki \"Parasite mod yedeği\" klasörüne kopyala, sonra taşı.\n"
+    "Hayır: yedeklemeden taşı."
 )
 STEP_TEXT_BY_STEP_VALUE = {
-    "convert": "Packing your mods ({index}/{total}): {name}",
-    "connect": "Opening LTK Manager to move your mods…",
-    "backup": "Backing up your mods to your desktop…",
-    "move": "Moving your mods into LTK Manager ({index}/{total}): {name}",
+    "convert": "Modların paketleniyor ({index}/{total}): {name}",
+    "connect": "Modlarını taşımak için LTK Manager açılıyor…",
+    "backup": "Modların masaüstüne yedekleniyor…",
+    "move": "Modların LTK Manager'a taşınıyor ({index}/{total}): {name}",
 }
 
 
@@ -59,7 +59,7 @@ class _DialogUi:
     def ask_backup(self, size: int, free: int) -> bool:
         from injection.mods.migration import size_text
 
-        self._detail = "Back up your mods?"
+        self._detail = "Modların yedeklensin mi?"
         self._dialog.set_detail(self._detail)
         self._dialog.clear_transfer_text()
         self._dialog.pump_messages()

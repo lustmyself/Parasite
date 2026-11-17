@@ -103,7 +103,7 @@ namespace PenguLoader.Views
                     if (!Config.UseSymlink)
                     {
                         if (MessageBox.Show(Owner,
-                            "Failed to activate the core module globally, want to use symlink mode locally?",
+                            "Çekirdek modül genel olarak etkinleştirilemedi. Yerel sembolik bağlantı modu kullanılsın mı?",
                             Program.Name, MessageBoxButton.YesNo, MessageBoxImage.Warning) == MessageBoxResult.Yes)
                         {
                             Config.UseSymlink = true;
@@ -155,13 +155,13 @@ namespace PenguLoader.Views
 
         private void HomePageButtonClick(object sender, RoutedEventArgs e)
         {
-            Utils.OpenLink(Program.HomepageUrl);
+            Utils.OpenLink(Program.GithubIssuesUrl);  // Report a problem
         }
 
         bool DoSelectLeaguePath()
         {
             var fbd = new Ookii.Dialogs.Wpf.VistaFolderBrowserDialog();
-            fbd.Description = "Select Riot Games, League of Legends or LeagueClient folder.";
+            fbd.Description = "Riot Games, League of Legends ya da LeagueClient klasörünü seç.";
             fbd.UseDescriptionForTitle = true;
 
             if (fbd.ShowDialog() == true && !string.IsNullOrWhiteSpace(fbd.SelectedPath))
@@ -175,7 +175,7 @@ namespace PenguLoader.Views
                 else if (LCU.IsValidDir(path = Path.Combine(selected, "Riot Games", "League of Legends"))) { }
                 else
                 {
-                    MessageBox.Show(Owner, "Your selected folder is not valid, please make sure it contains \"LeagueClient.exe\".",
+                    MessageBox.Show(Owner, "Seçtiğin klasör geçersiz: içinde \"LeagueClient.exe\" olduğundan emin ol.",
                         Program.Name, MessageBoxButton.OK, MessageBoxImage.Warning);
                     return false;
                 }
