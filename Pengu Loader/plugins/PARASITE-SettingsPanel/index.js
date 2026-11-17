@@ -6,8 +6,6 @@
  */
 (function initSettingsPanel() {
   const LOG_PREFIX = "[Parasite-SettingsPanel]";
-  const DISCORD_INVITE_URL = "https://discord.com/invite/roseskins";
-  const KOFI_URL = "https://ko-fi.com/roseapp";
   const GITHUB_URL = "https://github.com/lustmyself/Parasite";
 
   const PANEL_ID = "parasite-settings-panel";
@@ -5383,7 +5381,7 @@
       body.innerHTML = `
         ${sessionHtml}
         <div style="opacity:0.85; margin-bottom:8px;">${escapeHtml(t("No recent errors."))}</div>
-        <div style="opacity:0.75;">${escapeHtml(t("If something feels off, open the logs folder and share the latest log in a discord ticket."))}</div>
+        <div style="opacity:0.75;">${escapeHtml(t("If something feels off, open the logs folder and attach the latest log to a GitHub issue."))}</div>
       `.trim();
     } else {
       const clamp = (n, min, max) => Math.max(min, Math.min(max, n));

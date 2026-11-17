@@ -9,8 +9,6 @@ namespace PenguLoader
     public static class Program
     {
         public static string Name => "Parasite Loader";
-        public static string HomepageUrl => "https://ko-fi.com/roseapp";
-        public static string DiscordUrl => "https://discord.gg/roseskins";
         public static string GithubRepo => "lustmyself/Parasite";
         public static string GithubUrl => $"https://github.com/{GithubRepo}";
         public static string GithubIssuesUrl => $"https://github.com/{GithubRepo}/issues";

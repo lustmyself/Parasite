@@ -1,6 +1,6 @@
 {
   "What happened: this LTK patcher only runs inside LTK Manager, so it refused Parasite and the game started without skins.": "What happened: this LTK patcher only runs inside LTK Manager, so it refused Parasite and the game started without skins.",
-  "Fix: download ltk_patcher.zip (www.mediafire.com/file/g0lzcgpr97jd9r3/ltk_patcher.zip/file, shared in the Rose Discord #tutorial) into your Downloads folder and restart Parasite: it checks the League Toolkit signature and installs it. Or put both files in %LOCALAPPDATA%\\Parasite\\ltk-patcher.": "Fix: download ltk_patcher.zip (www.mediafire.com/file/g0lzcgpr97jd9r3/ltk_patcher.zip/file, shared in the Rose Discord #tutorial) into your Downloads folder and restart Parasite: it checks the League Toolkit signature and installs it. Or put both files in %LOCALAPPDATA%\\Parasite\\ltk-patcher.",
+  "If something feels off, open the logs folder and attach the latest log to a GitHub issue.": "Jeśli coś jest nie tak, otwórz folder logów i dołącz najnowszy log do zgłoszenia na GitHubie.",
   "Base Skin": "Skórka podstawowa",
   "Disable custom skin mod": "Wyłącz moda skórki",
   "Custom Skin {number}": "Własna skórka {number}",
@@ -149,7 +149,6 @@
   "This session: Parasite v{version}, started {time}": "Ta sesja: Parasite v{version}, uruchomiono {time}",
   "No errors in this session.": "Brak błędów w tej sesji.",
   "Earlier sessions ({count}), not from this run of Parasite": "Wcześniejsze sesje ({count}), nie z tego uruchomienia Parasite",
-  "If something feels off, open the logs folder and share the latest log in a discord ticket.": "Jeśli coś jest nie tak, otwórz folder logów i udostępnij najnowszy log w zgłoszeniu na Discordzie.",
   "Fix: you're already at the maximum Injection Threshold. This usually means the injection is extremely slow. Try lighter mods, close heavy apps, move League/mods to an SSD, and consider adding antivirus exclusions for the League and Parasite folders. Then retry.": "Rozwiązanie: próg wstrzykiwania jest już ustawiony na maksimum. Zwykle oznacza to, że wstrzykiwanie jest bardzo wolne. Spróbuj lżejszych modów, zamknij wymagające aplikacje, przenieś League/mody na dysk SSD i rozważ dodanie wyjątków w antywirusie dla folderów League i Parasite. Następnie spróbuj ponownie.",
   "Fix: based on {games} game(s), base skin confirmation takes up to {ms}ms (p90). Recommended threshold: {seconds}s. Use the \"Apply recommended\" button below, or increase \"Injection Threshold\" manually.": "Rozwiązanie: na podstawie gier ({games}) potwierdzenie skórki podstawowej trwa do {ms} ms (p90). Zalecany próg: {seconds} s. Użyj przycisku „Zastosuj” poniżej lub zwiększ „Próg wstrzykiwania” ręcznie.",
   "Fix: increase \"Injection Threshold (seconds)\" and click Save. If the warning is still there, increase it again and Save again. Once the warning is gone, retry your skin selection.": "Rozwiązanie: zwiększ „Próg wstrzykiwania (sekundy)” i kliknij Zapisz. Jeśli ostrzeżenie nadal się pojawia, zwiększ go ponownie i znów zapisz. Gdy ostrzeżenie zniknie, wybierz skórkę ponownie.",

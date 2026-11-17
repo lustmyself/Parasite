@@ -1,6 +1,6 @@
 {
   "What happened: this LTK patcher only runs inside LTK Manager, so it refused Parasite and the game started without skins.": "What happened: this LTK patcher only runs inside LTK Manager, so it refused Parasite and the game started without skins.",
-  "Fix: download ltk_patcher.zip (www.mediafire.com/file/g0lzcgpr97jd9r3/ltk_patcher.zip/file, shared in the Rose Discord #tutorial) into your Downloads folder and restart Parasite: it checks the League Toolkit signature and installs it. Or put both files in %LOCALAPPDATA%\\Parasite\\ltk-patcher.": "Fix: download ltk_patcher.zip (www.mediafire.com/file/g0lzcgpr97jd9r3/ltk_patcher.zip/file, shared in the Rose Discord #tutorial) into your Downloads folder and restart Parasite: it checks the League Toolkit signature and installs it. Or put both files in %LOCALAPPDATA%\\Parasite\\ltk-patcher.",
+  "If something feels off, open the logs folder and attach the latest log to a GitHub issue.": "Ha valami nem stimmel, nyisd meg a naplómappát, és csatold a legújabb naplót egy GitHub-issue-hoz.",
   "Base Skin": "Alap skin",
   "Disable custom skin mod": "Skinmod kikapcsolása",
   "Custom Skin {number}": "Egyéni skin {number}",
@@ -149,7 +149,6 @@
   "This session: Parasite v{version}, started {time}": "Ez a munkamenet: Parasite v{version}, indítva: {time}",
   "No errors in this session.": "Nincs hiba ebben a munkamenetben.",
   "Earlier sessions ({count}), not from this run of Parasite": "Korábbi munkamenetek ({count}), nem a Parasite mostani futásából",
-  "If something feels off, open the logs folder and share the latest log in a discord ticket.": "Ha valami nem stimmel, nyisd meg a naplómappát, és oszd meg a legújabb naplót egy Discord-jegyben.",
   "Fix: you're already at the maximum Injection Threshold. This usually means the injection is extremely slow. Try lighter mods, close heavy apps, move League/mods to an SSD, and consider adding antivirus exclusions for the League and Parasite folders. Then retry.": "Megoldás: már a maximális injektálási küszöbön vagy. Ez általában azt jelenti, hogy az injektálás rendkívül lassú. Próbálj könnyebb modokat, zárd be az erőforrásigényes alkalmazásokat, tedd a League-et és a modokat SSD-re, és fontold meg víruskereső-kivételek hozzáadását a League és a Parasite mappáihoz. Utána próbáld újra.",
   "Fix: based on {games} game(s), base skin confirmation takes up to {ms}ms (p90). Recommended threshold: {seconds}s. Use the \"Apply recommended\" button below, or increase \"Injection Threshold\" manually.": "Megoldás: {games} meccs alapján az alap skin megerősítése legfeljebb {ms} ms (p90). Ajánlott küszöb: {seconds} s. Használd a lenti „Alkalmaz” gombot, vagy növeld kézzel az „Injektálási küszöb” értékét.",
   "Fix: increase \"Injection Threshold (seconds)\" and click Save. If the warning is still there, increase it again and Save again. Once the warning is gone, retry your skin selection.": "Megoldás: növeld az „Injektálási küszöb (másodperc)” értékét, és kattints a Mentés gombra. Ha a figyelmeztetés még mindig ott van, növeld tovább, és mentsd újra. Ha eltűnt a figyelmeztetés, válaszd ki újra a skint.",

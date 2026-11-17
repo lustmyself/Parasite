@@ -1,6 +1,6 @@
 {
   "What happened: this LTK patcher only runs inside LTK Manager, so it refused Parasite and the game started without skins.": "What happened: this LTK patcher only runs inside LTK Manager, so it refused Parasite and the game started without skins.",
-  "Fix: download ltk_patcher.zip (www.mediafire.com/file/g0lzcgpr97jd9r3/ltk_patcher.zip/file, shared in the Rose Discord #tutorial) into your Downloads folder and restart Parasite: it checks the League Toolkit signature and installs it. Or put both files in %LOCALAPPDATA%\\Parasite\\ltk-patcher.": "Fix: download ltk_patcher.zip (www.mediafire.com/file/g0lzcgpr97jd9r3/ltk_patcher.zip/file, shared in the Rose Discord #tutorial) into your Downloads folder and restart Parasite: it checks the League Toolkit signature and installs it. Or put both files in %LOCALAPPDATA%\\Parasite\\ltk-patcher.",
+  "If something feels off, open the logs folder and attach the latest log to a GitHub issue.": "หากมีอะไรผิดปกติ ให้เปิดโฟลเดอร์ล็อกและแนบล็อกล่าสุดไว้ใน issue บน GitHub",
   "Base Skin": "สกินพื้นฐาน",
   "Disable custom skin mod": "ปิดมอดสกิน",
   "Custom Skin {number}": "สกินกำหนดเอง {number}",
@@ -149,7 +149,6 @@
   "This session: Parasite v{version}, started {time}": "เซสชันนี้: Parasite v{version} เริ่มเมื่อ {time}",
   "No errors in this session.": "ไม่มีข้อผิดพลาดในเซสชันนี้",
   "Earlier sessions ({count}), not from this run of Parasite": "เซสชันก่อนหน้า ({count}) ไม่ใช่จากการเปิด Parasite ครั้งนี้",
-  "If something feels off, open the logs folder and share the latest log in a discord ticket.": "หากมีอะไรผิดปกติ ให้เปิดโฟลเดอร์ล็อกและแชร์ล็อกล่าสุดในทิกเก็ตบน Discord",
   "Fix: you're already at the maximum Injection Threshold. This usually means the injection is extremely slow. Try lighter mods, close heavy apps, move League/mods to an SSD, and consider adding antivirus exclusions for the League and Parasite folders. Then retry.": "วิธีแก้: เกณฑ์การอินเจกต์ของคุณอยู่ที่ค่าสูงสุดแล้ว ซึ่งมักหมายความว่าการอินเจกต์ช้ามาก ลองใช้มอดที่เบากว่า ปิดแอปที่กินทรัพยากร ย้าย League และมอดไปไว้บน SSD และพิจารณาเพิ่มข้อยกเว้นในแอนติไวรัสสำหรับโฟลเดอร์ League และ Parasite จากนั้นลองอีกครั้ง",
   "Fix: based on {games} game(s), base skin confirmation takes up to {ms}ms (p90). Recommended threshold: {seconds}s. Use the \"Apply recommended\" button below, or increase \"Injection Threshold\" manually.": "วิธีแก้: จากข้อมูล {games} เกม การยืนยันสกินพื้นฐานใช้เวลาสูงสุด {ms} ms (p90) เกณฑ์ที่แนะนำ: {seconds} วินาที ใช้ปุ่ม \"นำไปใช้\" ด้านล่าง หรือเพิ่ม \"เกณฑ์การอินเจกต์\" ด้วยตนเอง",
   "Fix: increase \"Injection Threshold (seconds)\" and click Save. If the warning is still there, increase it again and Save again. Once the warning is gone, retry your skin selection.": "วิธีแก้: เพิ่ม \"เกณฑ์การอินเจกต์ (วินาที)\" แล้วคลิกบันทึก หากคำเตือนยังอยู่ ให้เพิ่มอีกแล้วบันทึกอีกครั้ง เมื่อคำเตือนหายไป ให้เลือกสกินใหม่อีกครั้ง",

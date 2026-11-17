@@ -1,6 +1,6 @@
 {
   "What happened: this LTK patcher only runs inside LTK Manager, so it refused Parasite and the game started without skins.": "What happened: this LTK patcher only runs inside LTK Manager, so it refused Parasite and the game started without skins.",
-  "Fix: download ltk_patcher.zip (www.mediafire.com/file/g0lzcgpr97jd9r3/ltk_patcher.zip/file, shared in the Rose Discord #tutorial) into your Downloads folder and restart Parasite: it checks the League Toolkit signature and installs it. Or put both files in %LOCALAPPDATA%\\Parasite\\ltk-patcher.": "Fix: download ltk_patcher.zip (www.mediafire.com/file/g0lzcgpr97jd9r3/ltk_patcher.zip/file, shared in the Rose Discord #tutorial) into your Downloads folder and restart Parasite: it checks the League Toolkit signature and installs it. Or put both files in %LOCALAPPDATA%\\Parasite\\ltk-patcher.",
+  "If something feels off, open the logs folder and attach the latest log to a GitHub issue.": "Dacă ceva nu merge bine, deschide folderul de loguri și atașează cel mai recent log la un issue pe GitHub.",
   "Base Skin": "Skin de bază",
   "Disable custom skin mod": "Dezactivează modul de skin",
   "Custom Skin {number}": "Skin personalizat {number}",
@@ -149,7 +149,6 @@
   "This session: Parasite v{version}, started {time}": "Această sesiune: Parasite v{version}, pornită {time}",
   "No errors in this session.": "Nicio eroare în această sesiune.",
   "Earlier sessions ({count}), not from this run of Parasite": "Sesiuni anterioare ({count}), nu din această rulare a Parasite",
-  "If something feels off, open the logs folder and share the latest log in a discord ticket.": "Dacă ceva nu merge bine, deschide folderul de loguri și trimite cel mai recent log într-un tichet pe Discord.",
   "Fix: you're already at the maximum Injection Threshold. This usually means the injection is extremely slow. Try lighter mods, close heavy apps, move League/mods to an SSD, and consider adding antivirus exclusions for the League and Parasite folders. Then retry.": "Soluție: pragul de injectare este deja la maximum. De obicei înseamnă că injectarea este extrem de lentă. Încearcă moduri mai ușoare, închide aplicațiile solicitante, mută League și modurile pe un SSD și ia în calcul adăugarea de excepții în antivirus pentru folderele League și Parasite. Apoi încearcă din nou.",
   "Fix: based on {games} game(s), base skin confirmation takes up to {ms}ms (p90). Recommended threshold: {seconds}s. Use the \"Apply recommended\" button below, or increase \"Injection Threshold\" manually.": "Soluție: pe baza a {games} meci(uri), confirmarea skinului de bază durează până la {ms} ms (p90). Prag recomandat: {seconds} s. Folosește butonul „Aplică” de mai jos sau mărește manual „Pragul de injectare”.",
   "Fix: increase \"Injection Threshold (seconds)\" and click Save. If the warning is still there, increase it again and Save again. Once the warning is gone, retry your skin selection.": "Soluție: mărește „Pragul de injectare (secunde)” și apasă Salvează. Dacă avertismentul este încă acolo, mărește-l din nou și salvează iar. După ce avertismentul dispare, alege din nou skinul.",

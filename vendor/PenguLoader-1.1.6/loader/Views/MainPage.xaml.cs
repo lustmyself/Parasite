@@ -148,11 +148,6 @@ namespace PenguLoader.Views
             DataContext = this;
         }
 
-        private void DiscordButtonClick(object sender, RoutedEventArgs e)
-        {
-            Utils.OpenLink(Program.DiscordUrl);
-        }
-
         private void GitHubButtonClick(object sender, RoutedEventArgs e)
         {
             Utils.OpenLink(Program.GithubUrl);
