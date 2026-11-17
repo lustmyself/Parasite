@@ -8,6 +8,9 @@ the counters board. Every champ select with names is kept in a history file
 
 Rank, icon and recent games come from the League client (LCU) in a background thread and are
 kept for a few minutes per player, so the page's polling never waits on them.
+
+A counter clicked on the page or in the client box can be hovered: League shows it as the
+player's pick without locking it in (as reveal 1.7 does), or says why it can't.
 """
 
 from __future__ import annotations
@@ -47,6 +50,7 @@ _wanted: list = []
 _worker: dict = {"thread": None}
 _game: dict = {"id": None, "queue": None}
 _history: dict = {"items": None, "saved": ""}
+_hover: dict = {"id": None, "ok": False, "message": "", "at": 0.0}
 
 
 # ---- reading the client's answers ----
@@ -230,13 +234,17 @@ def _stats_for(puuid: str, queue_type: str) -> Optional[dict]:
 
 def _queue(session: dict) -> Optional[int]:
     game = (session or {}).get("gameId") or 0
-    if _game["id"] == game and _game["queue"] is not None:
-        return _game["queue"]
+    with _lock:
+        if _game["id"] == game and _game["queue"] is not None:
+            return _game["queue"]
+    # The hub's polling and Lobby Reveal's thread both get here: ask the client outside the lock
     from launcher.parasite_auto import _lcu
     flow = _lcu("GET", "/lol-gameflow/v1/session") or {}
     queue = (((flow.get("gameData") or {}).get("queue") or {}).get("id")) if isinstance(flow, dict) else None
-    _game.update(id=game, queue=queue if isinstance(queue, int) else None)
-    return _game["queue"]
+    queue = queue if isinstance(queue, int) else None
+    with _lock:
+        _game.update(id=game, queue=queue)
+    return queue
 
 
 def snapshot(session: Optional[dict], reveal: dict) -> dict:
@@ -359,7 +367,8 @@ def client_counters(board: dict) -> list:
     for enemy in (board or {}).get("enemies") or []:
         out.append({"id": enemy["id"], "name": enemy.get("name", ""), "role": enemy.get("role"),
                     "roleLabel": enemy.get("roleLabel", ""),
-                    "counters": [{k: c.get(k) for k in ("id", "name", "winRate", "games", "gold15", "link")}
+                    "counters": [{k: c.get(k) for k in ("id", "name", "winRate", "delta", "games", "gold15", "cs15",
+                                                        "kills15", "link")}
                                  for c in (enemy.get("counters") or [])[:CLIENT_COUNTERS]]})
     return out
 
@@ -371,3 +380,83 @@ def enrich(payload: dict) -> dict:
     lobby = snapshot(parasite_counters.session(), payload)
     return dict(payload, lanes=lanes(lobby, board), counters=client_counters(board),
                 queueName=lobby.get("queueName", ""), countersLoading=board.get("status") == "loading")
+
+
+# ---- hovering a counter ----
+
+# A matchup with fewer games than this is a small sample (reveal's MIN_RELIABLE_GAMES)
+MIN_RELIABLE_GAMES = 200
+HOVER_NO_PICK, HOVER_LOCKED_IN, HOVER_TAKEN, HOVER_UNAVAILABLE = "no_pick", "locked_in", "taken", "unavailable"
+
+
+def hover_action(session: dict, champion_id: int, pickable=None) -> tuple:
+    """(the player's pick action a hover goes on, "") or (None, why not): HOVER_NO_PICK when the
+    mode has no pick for them, HOVER_LOCKED_IN, HOVER_TAKEN (banned or locked in by anyone) or
+    HOVER_UNAVAILABLE (not in the client's pickable list). A teammate's hover doesn't stop it,
+    as in League itself; the pick may come later in the draft (hovering before your turn)."""
+    me = (session or {}).get("localPlayerCellId")
+    actions = [a for group in (session or {}).get("actions") or [] if isinstance(group, list)
+               for a in group if isinstance(a, dict)]
+    mine = [a for a in actions if a.get("actorCellId") == me and a.get("type") == "pick"]
+    pick = next((a for a in mine if not a.get("completed")), None)
+    if pick is None:
+        return None, HOVER_LOCKED_IN if mine else HOVER_NO_PICK
+    taken = {a.get("championId") for a in actions if a.get("completed")}
+    bans = (session or {}).get("bans") or {}
+    for key in ("myTeamBans", "theirTeamBans"):
+        taken.update(bans.get(key) or [])
+    if champion_id in taken:
+        return None, HOVER_TAKEN
+    if pickable and champion_id not in pickable:
+        return None, HOVER_UNAVAILABLE
+    return pick.get("id"), ""
+
+
+def hover_refusal(reason: str, name: str) -> str:
+    return {
+        HOVER_NO_PICK: "Bu modda seçilecek bir şampiyon yok.",
+        HOVER_LOCKED_IN: "Şampiyonunu zaten kilitledin.",
+        HOVER_TAKEN: f"{name} zaten banlandı ya da seçildi.",
+        HOVER_UNAVAILABLE: f"{name} seçilemez: sende yok ya da banlı.",
+    }.get(reason, "Seçim gösterilemedi.")
+
+
+def _champion_name(champion_id: int) -> str:
+    try:
+        from launcher import parasite_counters
+        return parasite_counters._names().get(champion_id, {}).get("name") or f"#{champion_id}"
+    except Exception:  # noqa: BLE001
+        return f"#{champion_id}"
+
+
+def hover(champion_id, name: str = "") -> str:
+    """Shows *champion_id* as the player's pick in League without locking it in. Returns the
+    message for the hub's toast; the page also shows a refusal next to the counter."""
+    if isinstance(champion_id, bool) or not isinstance(champion_id, int) or champion_id <= 0:
+        return ""
+    name = (name or "").strip()[:40] or _champion_name(champion_id)
+    from launcher.parasite_auto import _lcu
+    session = _lcu("GET", "/lol-champ-select/v1/session")
+    if not isinstance(session, dict) or not session.get("myTeam"):
+        ok, message = False, "Şampiyon seçiminde değilsin."
+    else:
+        pickable = _lcu("GET", "/lol-champ-select/v1/pickable-champion-ids")
+        # Some modes answer with an empty list: that means the client doesn't say, not that nothing is allowed
+        pickable = set(pickable) if isinstance(pickable, list) and pickable else None
+        action_id, reason = hover_action(session, champion_id, pickable)
+        if action_id is None:
+            ok, message = False, hover_refusal(reason, name)
+        elif _lcu("PATCH", f"/lol-champ-select/v1/session/actions/{action_id}", {"championId": champion_id}) is None:
+            ok, message = False, "League seçimi kabul etmedi. Seçim sıran gelince tekrar dene."
+        else:
+            ok, message = True, f"{name} seçimin olarak gösterildi (kilitlenmedi)."
+            log.info(f"[Lobby] Hovered champion {champion_id} from the counters")
+    with _lock:
+        _hover.update(id=champion_id, ok=ok, message=message, at=time.time())
+    return message
+
+
+def hover_state() -> dict:
+    """The last hover's result, for the hub page."""
+    with _lock:
+        return dict(_hover)
