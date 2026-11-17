@@ -72,6 +72,25 @@
     "Loading counters...": "Counter'lar yükleniyor...",
     "Copy names": "İsimleri kopyala",
     "{games} games, Master+": "{games} maç, Master+",
+    "vs {name}": "{name} karşısında",
+    "Win rate": "Kazanma",
+    "Gold @15": "Altın @15",
+    "CS @15": "CS @15",
+    "Games": "Maç",
+    "Small sample, take it with a grain of salt.": "Az maç var; bu sayılara temkinli bak.",
+    "Show as my pick": "Seçimim olarak göster",
+    "Showing...": "Gösteriliyor…",
+    "{name} shows as your pick in League; it isn't locked in.": "{name} League'de seçimin olarak görünür; kilitlenmez.",
+    "Click for details, to hover it as your pick or open the matchup":
+      "Ayrıntılar için tıkla: seçimin olarak gösterebilir ya da eşleşmeyi açabilirsin",
+    "You're not in champ select.": "Şampiyon seçiminde değilsin.",
+    "There's no pick to hover in this mode.": "Bu modda seçilecek bir şampiyon yok.",
+    "You've already locked in.": "Şampiyonunu zaten kilitledin.",
+    "{name} is already banned or picked.": "{name} zaten banlandı ya da seçildi.",
+    "You can't pick {name}: you don't own it, or it's banned.": "{name} seçilemez: sende yok ya da banlı.",
+    "League turned the hover down. Try again on your pick turn.":
+      "League seçimi kabul etmedi. Seçim sıran gelince tekrar dene.",
+    "Close": "Kapat",
     "Leave champ select without restarting the client (the usual dodge penalty applies)":
       "Client'ı yeniden başlatmadan şampiyon seçiminden çık (normal dodge cezası uygulanır)",
   };
@@ -433,6 +452,101 @@
       font-style: normal;
       color: #6f6c78;
       font-size: 10.5px;
+    }
+
+    #${PANEL_ID} .parasite-reveal-crow {
+      cursor: pointer;
+    }
+
+    #${PANEL_ID} .parasite-reveal-crow.on {
+      background: rgba(255, 255, 255, 0.07);
+    }
+
+    /* The clicked counter: its numbers, hovering it as your pick, its matchup page */
+    #${PANEL_ID} .parasite-reveal-cd {
+      margin: 3px 0 6px;
+      padding: 8px;
+      border-radius: 9px;
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid rgba(255, 255, 255, 0.07);
+    }
+
+    #${PANEL_ID} .parasite-reveal-cd-sub {
+      font-size: 10.5px;
+      color: #8d8a95;
+      margin: 0 2px 6px;
+    }
+
+    #${PANEL_ID} .parasite-reveal-cd-tiles {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 4px;
+    }
+
+    #${PANEL_ID} .parasite-reveal-cd-tiles div {
+      padding: 4px 6px;
+      border-radius: 6px;
+      background: rgba(255, 255, 255, 0.04);
+    }
+
+    #${PANEL_ID} .parasite-reveal-cd-tiles small {
+      display: block;
+      font-size: 8.5px;
+      letter-spacing: 0.6px;
+      text-transform: uppercase;
+      color: #8d8a95;
+    }
+
+    #${PANEL_ID} .parasite-reveal-cd-tiles span {
+      font-size: 11.5px;
+      font-weight: 700;
+    }
+
+    #${PANEL_ID} .parasite-reveal-cd-note {
+      margin-top: 5px;
+      font-size: 10.5px;
+      color: #8d8a95;
+    }
+
+    #${PANEL_ID} .parasite-reveal-cd-err {
+      margin-top: 6px;
+      padding: 5px 7px;
+      border-radius: 6px;
+      font-size: 10.5px;
+      color: #fecaca;
+      background: rgba(248, 113, 113, 0.12);
+    }
+
+    #${PANEL_ID} .parasite-reveal-cd-buttons {
+      display: flex;
+      gap: 6px;
+      margin-top: 7px;
+    }
+
+    #${PANEL_ID} .parasite-reveal-cd-buttons a,
+    #${PANEL_ID} .parasite-reveal-cd-buttons div {
+      padding: 5px 9px;
+      border-radius: 7px;
+      font-size: 10.5px;
+      font-weight: 700;
+      text-decoration: none;
+      cursor: pointer;
+      color: #d8d4cc;
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    #${PANEL_ID} .parasite-reveal-cd-buttons .go {
+      flex: 1;
+      text-align: center;
+      color: #fff;
+      background: rgba(168, 85, 247, 0.75);
+      border-color: transparent;
+    }
+
+    #${PANEL_ID} .parasite-reveal-cd-buttons .go.busy {
+      opacity: 0.6;
+      cursor: default;
     }
 
     #${PANEL_ID} .parasite-reveal-copyall {
@@ -1055,6 +1169,125 @@
     return line;
   }
 
+  // ---- Hovering a counter as your pick (reveal 1.7): League shows it, nothing is locked in ----
+
+  // A matchup with fewer games than this is a small sample (reveal's MIN_RELIABLE_GAMES)
+  const MIN_RELIABLE_GAMES = 200;
+  let counterOpen = null; // the counter whose details are open
+  let hoverState = { id: null, busy: false, error: "" };
+
+  // The player's pick a hover goes on, or why not. A teammate's hover doesn't stop it, as in League.
+  function hoverAction(session, championId, pickable) {
+    const me = session.localPlayerCellId;
+    const actions = (session.actions || []).flat().filter(Boolean);
+    const mine = actions.filter((a) => a.actorCellId === me && a.type === "pick");
+    const pick = mine.find((a) => !a.completed);
+    if (!pick) return { refusal: mine.length ? "lockedIn" : "noPick" };
+    const bans = session.bans || {};
+    const taken = new Set([
+      ...actions.filter((a) => a.completed).map((a) => a.championId),
+      ...(bans.myTeamBans || []),
+      ...(bans.theirTeamBans || []),
+    ]);
+    if (taken.has(championId)) return { refusal: "taken" };
+    if (pickable && !pickable.has(championId)) return { refusal: "unavailable" };
+    return { actionId: pick.id };
+  }
+
+  async function hoverChampion(championId, name) {
+    let session;
+    try {
+      session = await lcuGet("/lol-champ-select/v1/session");
+    } catch {
+      throw new Error(tr("You're not in champ select."));
+    }
+    let pickable = null;
+    try {
+      const ids = await lcuGet("/lol-champ-select/v1/pickable-champion-ids");
+      // Some modes answer with an empty list: the client doesn't say, not that nothing is allowed
+      if (Array.isArray(ids) && ids.length) pickable = new Set(ids);
+    } catch {}
+    const { actionId, refusal } = hoverAction(session || {}, championId, pickable);
+    if (refusal) {
+      throw new Error({
+        noPick: tr("There's no pick to hover in this mode."),
+        lockedIn: tr("You've already locked in."),
+        taken: tr("{name} is already banned or picked.", { name }),
+        unavailable: tr("You can't pick {name}: you don't own it, or it's banned.", { name }),
+      }[refusal]);
+    }
+    const response = await fetch(`/lol-champ-select/v1/session/actions/${actionId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ championId }),
+    });
+    if (!response.ok) {
+      log("warn", `League turned down hovering champion ${championId}:`, response.status);
+      throw new Error(tr("League turned the hover down. Try again on your pick turn."));
+    }
+    log("info", `Hovered champion ${championId} from the counters`);
+  }
+
+  function counterDetails(counter, enemy) {
+    const box = el("div", "parasite-reveal-cd");
+    box.appendChild(el("div", "parasite-reveal-cd-sub",
+      [tr("vs {name}", { name: enemy.name }), enemy.roleLabel].filter(Boolean).join(" · ")));
+    const tone = (v) => (v == null ? "" : v >= 0 ? "up" : "dn");
+    const tiles = el("div", "parasite-reveal-cd-tiles");
+    for (const [label, text, cls] of [
+      [tr("Win rate"), counter.winRate != null ? `${Number(counter.winRate).toFixed(1)}%` : "–",
+        tone(counter.delta != null ? counter.delta : counter.winRate - 50)],
+      [tr("Gold @15"), counter.gold15 != null ? signed(counter.gold15, 0) : "–", tone(counter.gold15)],
+      [tr("CS @15"), counter.cs15 != null ? signed(counter.cs15, 0) : "–", tone(counter.cs15)],
+      [tr("Games"), counter.games != null ? Number(counter.games).toLocaleString("tr-TR") : "–", ""],
+    ]) {
+      const tile = el("div");
+      tile.append(el("small", "", label), el("span", cls, text));
+      tiles.appendChild(tile);
+    }
+    box.appendChild(tiles);
+    if (counter.games != null && counter.games < MIN_RELIABLE_GAMES) {
+      box.appendChild(el("div", "parasite-reveal-cd-note", tr("Small sample, take it with a grain of salt.")));
+    }
+    if (hoverState.id === counter.id && hoverState.error) {
+      box.appendChild(el("div", "parasite-reveal-cd-err", hoverState.error));
+    }
+    const buttons = el("div", "parasite-reveal-cd-buttons");
+    if (counter.link) {
+      const page = el("a", "", "U.GG ↗");
+      page.href = counter.link;
+      page.target = "_blank";
+      page.rel = "noreferrer";
+      buttons.appendChild(page);
+    }
+    const busy = hoverState.busy && hoverState.id === counter.id;
+    const go = el("div", `go${busy ? " busy" : ""}`, busy ? tr("Showing...") : tr("Show as my pick"));
+    go.title = tr("{name} shows as your pick in League; it isn't locked in.", { name: counter.name });
+    go.addEventListener("click", async () => {
+      if (hoverState.busy) return;
+      hoverState = { id: counter.id, busy: true, error: "" };
+      queueRender();
+      try {
+        await hoverChampion(counter.id, counter.name);
+        hoverState = { id: null, busy: false, error: "" };
+        counterOpen = null;
+      } catch (err) {
+        hoverState = { id: counter.id, busy: false, error: err.message };
+      }
+      queueRender();
+    });
+    buttons.appendChild(go);
+    const close = el("div", "", "✕");
+    close.title = tr("Close");
+    close.addEventListener("click", () => {
+      counterOpen = null;
+      queueRender();
+    });
+    buttons.appendChild(close);
+    box.appendChild(buttons);
+    return box;
+  }
+
   // The enemy picks as small icons; the chosen one's best counters below
   let counterPick = null;
   function countersBlock(data, lanes) {
@@ -1073,6 +1306,7 @@
       icon.src = champIcon(enemy.id);
       icon.title = enemy.name;
       icon.addEventListener("click", () => {
+        if (counterPick !== enemy.id) counterOpen = null;
         counterPick = enemy.id;
         queueRender();
       });
@@ -1087,20 +1321,22 @@
     if (!chosen.counters.length) {
       block.appendChild(el("div", "parasite-reveal-empty", data.countersLoading ? tr("Loading counters...") : tr("Not enough games")));
     }
+    if (!chosen.counters.some((c) => c.id === counterOpen)) counterOpen = null;
     for (const counter of chosen.counters) {
-      const row = el(counter.link ? "a" : "div", "parasite-reveal-crow");
-      if (counter.link) {
-        row.href = counter.link;
-        row.target = "_blank";
-        row.rel = "noreferrer";
-      }
+      const row = el("div", `parasite-reveal-crow${counter.id === counterOpen ? " on" : ""}`);
       const icon = el("img");
       icon.src = champIcon(counter.id);
       row.append(icon, el("span", "", counter.name));
       if (counter.gold15 != null) row.appendChild(el("i", "", `${signed(counter.gold15, 0)}g`));
       row.appendChild(el("span", counter.winRate >= 50 ? "up" : "", `${Number(counter.winRate).toFixed(1)}%`));
-      row.title = tr("{games} games, Master+", { games: counter.games });
+      row.title = `${tr("{games} games, Master+", { games: counter.games })}\n${tr("Click for details, to hover it as your pick or open the matchup")}`;
+      row.addEventListener("click", () => {
+        counterOpen = counterOpen === counter.id ? null : counter.id;
+        if (hoverState.id !== counterOpen) hoverState = { id: null, busy: hoverState.busy, error: "" };
+        queueRender();
+      });
       block.appendChild(row);
+      if (counter.id === counterOpen) block.appendChild(counterDetails(counter, chosen));
     }
     return block;
   }
@@ -1208,7 +1444,11 @@
 
   function handlePhaseChange(data) {
     // FINALIZATION is the end of champ select once every pick is locked: keep the box
-    if (data && data.phase && data.phase !== "ChampSelect" && data.phase !== "FINALIZATION") render(null);
+    if (data && data.phase && data.phase !== "ChampSelect" && data.phase !== "FINALIZATION") {
+      counterOpen = null;
+      hoverState = { id: null, busy: false, error: "" };
+      render(null);
+    }
   }
 
   async function init() {

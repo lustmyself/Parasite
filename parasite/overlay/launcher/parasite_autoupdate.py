@@ -135,13 +135,18 @@ def _league_running() -> bool:
     return any((p.info.get("name") or "").lower() in LEAGUE for p in psutil.process_iter(["name"]))
 
 
-def _install_when_idle(version: str) -> None:
-    """Restart Parasite into its installer once League has been closed for a minute."""
+def _install_when_idle() -> None:
+    """Restart Parasite into its installer once League has been closed for a minute.
+
+    Installs whatever is pending by then: a newer release downloaded while this waits replaces
+    the one it started for (the update sequence takes the newest package).
+    """
     idle_checks = 0
-    while _pending == version and enabled():
+    while _pending and enabled():
         idle_checks = idle_checks + 1 if not _league_running() else 0
         if idle_checks >= 2:
             from launcher import parasite_hub
+            version = _pending
             log.info(f"[AutoUpdate] League is closed; restarting Parasite to install {version}")
             parasite_hub.toast(f"Parasite {version} kuruluyor, birkaç saniye sürecek")
             parasite_hub.mark_quiet_restart()
@@ -181,6 +186,8 @@ def on_release(client, release: dict, current: str) -> None:
         _pending = version
     log.info(f"[AutoUpdate] Parasite {version} is downloaded and waits for League to be closed")
     parasite_hub.toast(f"Parasite {version} indirildi; League kapalıyken kendiliğinden kurulacak")
-    if not _waiter or not _waiter.is_alive():
-        _waiter = threading.Thread(target=_install_when_idle, args=(version,), daemon=True, name="ParasiteAutoUpdate")
-        _waiter.start()
+    with _lock:
+        # A waiter already running picks up the newer version by itself
+        if not _waiter or not _waiter.is_alive():
+            _waiter = threading.Thread(target=_install_when_idle, daemon=True, name="ParasiteAutoUpdate")
+            _waiter.start()

@@ -1,4 +1,5 @@
 import unittest
+from unittest.mock import MagicMock, patch
 
 from launcher import parasite_counters as counters
 
@@ -72,6 +73,56 @@ class BoardTests(unittest.TestCase):
                                           "myTeam": [{"championId": 1, "assignedPosition": "TOP"}]})
         self.assertEqual(enemies, [{"id": 86, "role": None}])
         self.assertEqual(allies, [{"id": 1, "role": "top"}])
+
+
+
+class DownloadCacheTests(unittest.TestCase):
+    def setUp(self):
+        p = patch.object(counters, "_cache", counters.OrderedDict())
+        p.start()
+        self.addCleanup(p.stop)
+        self.clock = [1000.0]
+        p = patch.object(counters.time, "time", side_effect=lambda: self.clock[0])
+        p.start()
+        self.addCleanup(p.stop)
+        self.get = MagicMock(side_effect=lambda url, **kw: MagicMock(json=MagicMock(return_value={"url": url})))
+        p = patch("requests.get", self.get)
+        p.start()
+        self.addCleanup(p.stop)
+
+    def test_a_download_is_kept_until_it_expires(self):
+        self.assertEqual(counters._get_json("a"), {"url": "a"})
+        counters._get_json("a")
+        self.assertEqual(self.get.call_count, 1)
+        self.clock[0] += counters.CACHE_S
+        counters._get_json("a")
+        self.assertEqual(self.get.call_count, 2)
+
+    def test_the_cache_is_bounded_and_drops_the_least_recently_used(self):
+        with patch.object(counters, "CACHE_MAX", 3):
+            for url in "abc":
+                counters._get_json(url)
+            counters._get_json("a")  # used again: "b" is now the oldest
+            counters._get_json("d")
+            self.assertEqual(list(counters._cache), ["c", "a", "d"])
+            self.assertEqual(self.get.call_count, 4)
+
+    def test_expired_downloads_are_dropped(self):
+        counters._get_json("a")
+        self.clock[0] += counters.CACHE_S + 1
+        counters._get_json("b")
+        self.assertEqual(list(counters._cache), ["b"])
+
+    def test_the_error_board_reads_the_champion_list_once(self):
+        enemies = [{"id": 1, "role": "top"}, {"id": 2, "role": None}]
+        with patch.object(counters, "build_board", side_effect=RuntimeError("offline")), \
+                patch.object(counters, "_names", return_value={1: {"name": "One", "slug": "one"}}) as names, \
+                patch.dict(counters._state, {"key": "k", "busy": True}):
+            counters._compute("k", enemies, [])
+            board = counters._state["board"]
+        self.assertEqual(names.call_count, 1)
+        self.assertEqual(board["status"], "error")
+        self.assertEqual([e["name"] for e in board["enemies"]], ["One", ""])
 
 
 if __name__ == "__main__":
