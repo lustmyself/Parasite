@@ -142,6 +142,10 @@ class WorkspaceAclTests(unittest.TestCase):
         ):
             self.assertFalse(integrity.dacl_is_admin_only(sddl), sddl)
 
+    def test_an_inherited_admin_only_folder_passes_the_unprotected_check(self):
+        self.assertTrue(integrity.dacl_is_admin_only(self.PROGRAM_FILES, protected=False))
+        self.assertFalse(integrity.dacl_is_admin_only(self.PROGRAM_FILES))
+
     def test_an_elevated_parasite_restricts_and_checks_it(self):
         root = Path("C:/Program Files/Parasite.update")
         with patch.object(integrity, "_windows", return_value=True), \
@@ -152,20 +156,52 @@ class WorkspaceAclTests(unittest.TestCase):
             integrity.secure_workspace(root)
         set_security.assert_called_once_with(root, integrity.WORKSPACE_SDDL)
 
-    def test_a_workspace_left_open_stops_the_update(self):
+    def secure(self, set_error=None, read_back=integrity.WORKSPACE_SDDL, as_it_is=None):
         with patch.object(integrity, "_windows", return_value=True), \
                 patch.object(integrity, "_elevated", return_value=True), \
                 patch.object(integrity, "_has_acls", return_value=True), \
-                patch.object(integrity, "_set_security"), \
-                patch.object(integrity, "_get_security", return_value="O:BAD:PAI(A;OICI;FA;;;BU)"):
-            with self.assertRaises(OSError):
-                integrity.secure_workspace(Path("C:/Parasite.update"))
-        with patch.object(integrity, "_windows", return_value=True), \
-                patch.object(integrity, "_elevated", return_value=True), \
-                patch.object(integrity, "_has_acls", return_value=True), \
-                patch.object(integrity, "_set_security", side_effect=OSError("error 5")):
-            with self.assertRaises(OSError):
-                integrity.secure_workspace(Path("C:/Parasite.update"))
+                patch.object(integrity, "_set_security", side_effect=set_error), \
+                patch.object(integrity, "_get_security", return_value=read_back), \
+                patch.object(integrity, "_read_security", return_value=as_it_is) as read:
+            integrity.secure_workspace(Path("C:/Program Files/Parasite.update"))
+        return read
+
+    # As Program Files hands it down (Get-Acl, inherited entries)
+    PROGRAM_FILES = ("O:BAG:SYD:AI(A;OICIIOID;GA;;;CO)(A;OICIID;FA;;;SY)(A;OICIIOID;GA;;;SY)"
+                     "(A;OICIID;FA;;;BA)(A;OICIIOID;GA;;;BA)(A;OICIID;0x1200a9;;;BU)(A;OICIIOID;GXGR;;;BU)"
+                     "(A;OICIID;FA;;;S-1-5-80-956008885-3418522649-1831038044-1853292631-2271478464)"
+                     "(A;OICIID;0x1200a9;;;AC)")
+
+    def test_set_fails_but_the_folder_is_admin_only_by_inheritance_so_the_update_proceeds(self):
+        read = self.secure(set_error=OSError("error 1307"), as_it_is=self.PROGRAM_FILES)
+        read.assert_called_once()
+        # A wrong read-back is a failure to set too
+        self.secure(read_back="O:BAD:AI(A;OICI;FA;;;BA)", as_it_is=self.PROGRAM_FILES)
+
+    def test_set_fails_and_users_can_write_so_the_update_stops(self):
+        for as_it_is in (
+            "O:BAD:AI(A;OICIID;FA;;;BA)(A;OICIID;0x1301bf;;;AU)",  # C:\Games: Authenticated Users modify
+            "O:BAD:AI(A;OICIID;FA;;;BA)(A;OICIID;FA;;;WD)",  # Everyone
+            "O:BAD:AI(A;OICIID;FA;;;BA)(A;OICIID;WD;;;IU)",  # INTERACTIVE may change the list
+            "O:S-1-5-21-1-2-3-1001D:AI(A;OICIID;FA;;;BA)",  # a user owns it
+            "O:BAD:AI(A;OICIID;FA;;;BA)(A;OICIIOID;FA;;;BU)",  # users get full control of children
+            None,  # unreadable
+        ):
+            with self.assertRaises(OSError, msg=as_it_is):
+                self.secure(set_error=OSError("error 5"), as_it_is=as_it_is)
+
+    def test_a_set_that_works_needs_no_fallback(self):
+        self.secure().assert_not_called()
+
+    def test_the_fallback_reader_tries_get_acl_when_advapi_fails(self):
+        done = MagicMock(returncode=0, stdout=self.PROGRAM_FILES + "\r\n", stderr="")
+        with patch.object(integrity, "_get_security", side_effect=OSError("bug")), \
+                patch("subprocess.run", return_value=done) as run:
+            self.assertEqual(integrity._read_security(Path("C:/x")), self.PROGRAM_FILES)
+        self.assertEqual(run.call_args.kwargs["env"]["PARASITE_ACL_PATH"], str(Path("C:/x")))
+        with patch.object(integrity, "_get_security", side_effect=OSError("bug")), \
+                patch("subprocess.run", side_effect=OSError("no powershell")):
+            self.assertIsNone(integrity._read_security(Path("C:/x")))
 
     def test_nothing_to_restrict_off_windows_unelevated_or_on_fat(self):
         cases = [(False, True, True), (True, False, True), (True, True, False)]

@@ -197,16 +197,24 @@ def take_verified(source: Path, target: Path, expected: Optional[str]) -> bool:
 # Owner Administrators; protected (nothing inherited from the parent); administrators and
 # SYSTEM full control, users and app packages read and run (Program Files' defaults)
 WORKSPACE_SDDL = "O:BAD:PAI(A;OICI;FA;;;SY)(A;OICI;FA;;;BA)(A;OICI;0x1200a9;;;BU)(A;OICI;0x1200a9;;;AC)"
-_ADMIN_SIDS = {"SY", "BA", "S-1-5-18", "S-1-5-32-544"}
+# SYSTEM, Administrators, TrustedInstaller (Program Files gives it full control)
+_ADMIN_SIDS = {"SY", "BA", "S-1-5-18", "S-1-5-32-544",
+               "S-1-5-80-956008885-3418522649-1831038044-1853292631-2271478464"}
+# CREATOR OWNER / OWNER RIGHTS: an inherit-only entry for whoever creates a child, which only
+# someone allowed to create one (an administrator, by the other entries) can use
+_CREATOR_SIDS = {"CO", "OW", "S-1-3-0", "S-1-3-4"}
 _READ_RUN = 0x1200A9 | 0x80000000 | 0x20000000  # read + execute, generic read + generic execute
 _READ_RUN_NAMES = {"FR", "FX", "GR", "GX"}
 
 
-def dacl_is_admin_only(sddl: str) -> bool:
-    """`sddl` (owner and DACL) leaves changes to administrators and SYSTEM only."""
+def dacl_is_admin_only(sddl: str, protected: bool = True) -> bool:
+    """`sddl` (owner and DACL) leaves changes to administrators and SYSTEM only: nobody else
+    (Users, Authenticated Users, Everyone, INTERACTIVE, a user's own SID...) may write, delete
+    or change the access list. `protected`: the DACL must not inherit from the parent either
+    (False checks the folder as it is, inherited entries included)."""
     owner = re.search(r"O:([A-Z]{2}|S-[0-9-]+)", sddl)
     dacl = re.search(r"D:([A-Z]*)((?:\([^)]*\))*)", sddl)
-    if not owner or owner.group(1) not in _ADMIN_SIDS or not dacl or "P" not in dacl.group(1):
+    if not owner or owner.group(1) not in _ADMIN_SIDS or not dacl or (protected and "P" not in dacl.group(1)):
         return False
     aces = re.findall(r"\(([^)]*)\)", dacl.group(2))
     if not aces:
@@ -215,9 +223,11 @@ def dacl_is_admin_only(sddl: str) -> bool:
         fields = ace.split(";")
         if len(fields) < 6:
             return False
-        kind, rights, sid = fields[0], fields[2], fields[5]
+        kind, flags, rights, sid = fields[0], fields[1], fields[2], fields[5]
         if kind == "D" or sid in _ADMIN_SIDS:
             continue  # a deny entry, or an administrator's
+        if sid in _CREATOR_SIDS and "IO" in flags:
+            continue
         if kind != "A":
             return False
         if rights.lower().startswith("0x"):
@@ -347,7 +357,43 @@ def secure_workspace(root: Path) -> None:
     if not _has_acls(root):
         log.warning(f"[Integrity] {root} is on a volume without access lists: it can't be restricted")
         return
-    _set_security(root, WORKSPACE_SDDL)
-    current = _get_security(root)
-    if not dacl_is_admin_only(current):
-        raise OSError(f"the update folder {root} is not restricted to administrators: {current}")
+    try:
+        _set_security(root, WORKSPACE_SDDL)
+        current = _get_security(root)
+        if not dacl_is_admin_only(current):
+            raise OSError(f"the access list read back is not the one set: {current}")
+        return
+    except Exception as exc:  # noqa: BLE001 - the folder as it is decides below
+        log.error(f"[Integrity] Could not restrict the update folder {root} to administrators: {exc}")
+    # A bug here must not strand every install (its fix only comes through an update): the
+    # folder as it is will do when users can't change it (Program Files' inherited entries)
+    current = _read_security(root)
+    if current is None:
+        raise OSError(f"the access list of the update folder {root} could not be read")
+    if not dacl_is_admin_only(current, protected=False):
+        raise OSError(f"users can change the update folder {root}: {current}")
+    log.warning(f"[Integrity] {root} keeps its own access list, which only administrators can change: {current}")
+
+
+def _read_security(path: Path) -> Optional[str]:
+    """The owner and access list of `path` (SDDL) through advapi32, else through PowerShell's
+    Get-Acl (another implementation, in case the first is the one that failed), else None."""
+    try:
+        return _get_security(path)
+    except Exception as exc:  # noqa: BLE001
+        log.error(f"[Integrity] Could not read the access list of {path}: {exc}")
+    import subprocess
+    powershell = Path(os.environ.get("SystemRoot", r"C:\Windows")) / "System32/WindowsPowerShell/v1.0/powershell.exe"
+    try:
+        result = subprocess.run(
+            [str(powershell), "-NoProfile", "-NonInteractive", "-Command",
+             "(Get-Acl -LiteralPath $env:PARASITE_ACL_PATH).Sddl"],
+            env=dict(os.environ, PARASITE_ACL_PATH=str(path)), capture_output=True, text=True,
+            timeout=60, creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+        sddl = result.stdout.strip()
+        if result.returncode == 0 and sddl:
+            return sddl
+        log.error(f"[Integrity] Get-Acl failed on {path}: {result.stderr.strip()[:500]}")
+    except Exception as exc:  # noqa: BLE001
+        log.error(f"[Integrity] Get-Acl could not run on {path}: {exc}")
+    return None
