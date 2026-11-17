@@ -1899,13 +1899,17 @@ async function pollMedia() {
   }
   setTimeout(pollMedia, 1000);
 }
+// The bars ease towards the level and wave on their own between readings, so four a second is
+// enough; nothing is asked while the page is hidden or Spotify is paused
+const LEVEL_MS = 250, LEVEL_IDLE_MS = 600;
 async function pollLevel() {
-  if (spotifyVisible() && media.playing) {
+  const live = spotifyVisible() && media.playing;
+  if (live) {
     try { level = (await api("/api/level")).level || 0; } catch (e) { level = 0; }
   } else {
     level = 0;
   }
-  setTimeout(pollLevel, 100);
+  setTimeout(pollLevel, live ? LEVEL_MS : LEVEL_IDLE_MS);
 }
 function drawMedia() {
   const on = !!media.available;
@@ -2853,7 +2857,7 @@ async function loadMaps() {
   $("cat-h").hidden = !data.catalog.length;
   data.catalog.forEach((m) => cat.appendChild(mapCard(m, true)));
 }
-setInterval(() => { if ($("page-maps").classList.contains("active")) loadMaps(); }, 3000);
+setInterval(() => { if (!document.hidden && $("page-maps").classList.contains("active")) loadMaps(); }, 3000);
 // A file dropped anywhere else must not replace the page with it
 ["dragover", "drop"].forEach((t) => document.addEventListener(t, (e) => e.preventDefault()));
 const drop = $("drop");
@@ -2916,7 +2920,7 @@ async function loadWalls() {
   list.appendChild(wallCard(null, data));
   data.files.forEach((w) => list.appendChild(wallCard(w, data)));
 }
-setInterval(() => { if ($("page-wallpaper").classList.contains("active")) loadWalls(); }, 4000);
+setInterval(() => { if (!document.hidden && $("page-wallpaper").classList.contains("active")) loadWalls(); }, 4000);
 const wallDrop = $("wall-drop");
 ["dragenter", "dragover"].forEach((t) => wallDrop.addEventListener(t, (e) => { e.preventDefault(); wallDrop.classList.add("over"); }));
 ["dragleave", "drop"].forEach((t) => wallDrop.addEventListener(t, (e) => { e.preventDefault(); wallDrop.classList.remove("over"); }));
@@ -2968,7 +2972,7 @@ async function loadFonts() {
   list.appendChild(fontCard({ id: "", name: "League", selected: !data.selected }));
   data.installed.filter((f) => !f.parasite).forEach((f) => list.appendChild(fontCard(f)));
 }
-setInterval(() => { if ($("page-fonts").classList.contains("active")) loadFonts(); }, 3000);
+setInterval(() => { if (!document.hidden && $("page-fonts").classList.contains("active")) loadFonts(); }, 3000);
 const fontDrop = $("font-drop");
 ["dragenter", "dragover"].forEach((t) => fontDrop.addEventListener(t, (e) => { e.preventDefault(); fontDrop.classList.add("over"); }));
 ["dragleave", "drop"].forEach((t) => fontDrop.addEventListener(t, (e) => { e.preventDefault(); fontDrop.classList.remove("over"); }));
@@ -3086,7 +3090,7 @@ async function loadSkins() {
 }
 $("sk-find").addEventListener("input", drawSkins);
 // Files copied into the folder show up while the page is open
-setInterval(() => { if ($("page-skins").classList.contains("active")) loadSkins(); }, 3000);
+setInterval(() => { if (!document.hidden && $("page-skins").classList.contains("active")) loadSkins(); }, 3000);
 const skinDrop = $("skin-drop");
 ["dragenter", "dragover"].forEach((t) => skinDrop.addEventListener(t, (e) => { e.preventDefault(); skinDrop.classList.add("over"); }));
 ["dragleave", "drop"].forEach((t) => skinDrop.addEventListener(t, (e) => { e.preventDefault(); skinDrop.classList.remove("over"); }));
@@ -3338,10 +3342,16 @@ document.querySelectorAll("[data-goto]").forEach((b) => b.addEventListener("clic
 document.addEventListener("contextmenu", (e) => e.preventDefault());
 buildThemes();
 showPage("home");
+// Hidden (minimized) or during a match the hub's state is read every 5 s instead of 0.8 s;
+// coming back reads it at once
+let pollTimer = 0;
 async function pollLoop() {
+  clearTimeout(pollTimer);
   await poll();
-  setTimeout(pollLoop, state && state.resting ? 5000 : 800);
+  clearTimeout(pollTimer);
+  pollTimer = setTimeout(pollLoop, document.hidden || (state && state.resting) ? 5000 : 800);
 }
+document.addEventListener("visibilitychange", () => { if (!document.hidden) pollLoop(); });
 pollLoop();
 </script>
 </body>
