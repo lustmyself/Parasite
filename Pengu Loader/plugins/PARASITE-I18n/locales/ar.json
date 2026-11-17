@@ -1,6 +1,5 @@
 {
-  "What happened: this LTK patcher only runs inside LTK Manager, so it refused Parasite and the game started without skins.": "What happened: this LTK patcher only runs inside LTK Manager, so it refused Parasite and the game started without skins.",
-  "If something feels off, open the logs folder and attach the latest log to a GitHub issue.": "إذا بدا أن هناك خطأ ما، افتح مجلد السجلات وأرفق أحدث سجل في بلاغ على GitHub.",
+  "If something feels off, open the logs folder and attach the latest log to a GitHub issue.": "If something feels off, open the logs folder and attach the latest log to a GitHub issue.",
   "Fix: LTK Manager closed while the game was running. Retry the next game. If it happens every game, report it with your Parasite logs.": "Fix: LTK Manager closed while the game was running. Retry the next game. If it happens every game, report it with your Parasite logs.",
   "Fix: LTK Manager crashed. Retry the next game. If it crashes every game, report it with your Parasite logs.": "Fix: LTK Manager crashed. Retry the next game. If it crashes every game, report it with your Parasite logs.",
   "Fix: Parasite could not start the LTK patcher. Check that ltk_launcher.exe and LeagueToolFlop.dll are still in Parasite's tools folder: an antivirus may have removed them.": "Fix: Parasite could not start the LTK patcher. Check that ltk_launcher.exe and LeagueToolFlop.dll are still in Parasite's tools folder: an antivirus may have removed them.",

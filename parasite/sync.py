@@ -269,7 +269,6 @@ NAV_CSS = r"""    /* The nav item shows the word PARASITE where Rose had its gol
 """
 NAV_ACTIVE_ANCHOR = "    /* Prevent active state styling for Golden Parasite */\n"
 UPDATE_URL = f'GITHUB_RELEASE_API = "https://api.github.com/repos/{PARASITE_REPO}/releases/latest"\n'
-REQUEST_LINE = "        try:\n            response = requests.get(GITHUB_RELEASE_API"
 ANALYTICS_ANCHOR = "    # Initialize analytics thread\n"
 SEND_ANCHOR = "    def _send_message(self, message: str) -> None:\n"
 
@@ -293,10 +292,6 @@ EDITS = [
     ("launcher/update/github_client.py", UPDATE_URL,
      "# Parasite's own releases. Never point this at Rose's: its update would replace Parasite with Rose.\n"
      "# An empty value turns update checks off.\n" + UPDATE_URL),
-    ("launcher/update/github_client.py", REQUEST_LINE,
-     "        if not GITHUB_RELEASE_API:\n"
-     '            log.info("Update check skipped: no release repository configured")\n'
-     "            return None\n" + REQUEST_LINE),
     # Lobby reveal: thread, broadcast, packaging
     ("main/core/threads.py",
      "from threads import PhaseThread, WSEventThread, LCUMonitorThread\n",
@@ -318,48 +313,6 @@ EDITS = [
      "    'lcu.features.lcu_swiftplay',\n    'lcu.features.lobby_reveal',\n"),
     ("Parasite.spec", "    'threads.core.lcu_monitor_thread',\n",
      "    'threads.core.lcu_monitor_thread',\n    'threads.core.lobby_reveal_thread',\n"),
-]
-
-# LTK patcher via LTK Manager (injection/tools/ltk_manager*.py in the overlay)
-EDITS += [
-    ('main/__init__.py',
-     '    """Return (title, status_title, status_body, steps) for an LTK patcher problem."""\n    source = "Get both files from LTK Manager."\n',
-     '    """Return (title, status_title, status_body, steps) for an LTK patcher problem."""\n    # Parasite installs a downloaded ltk_patcher.zip by itself (injection/tools/ltk_manager_setup.py)\n    install = (\n        "1. Download ltk_patcher.zip: https://www.mediafire.com/file/g0lzcgpr97jd9r3/ltk_patcher.zip/file\\n"\n        "2. Leave it in your Downloads folder (zipped or extracted).\\n"\n        "3. Restart Parasite: it checks the files and installs them by itself."\n    )\n'),
-    ('main/__init__.py',
-     '            f"The ltk_patcher_dll.dll in Parasite\'s tools folder does not support game builds released after {detail}, and League has updated since.",\n            f"1. Update LTK Manager, then get both files from it.\\n"\n            "2. Open Parasite\'s tools folder.\\n"\n            "3. Replace both files, then restart Parasite.",\n',
-     '            f"The ltk_patcher_dll.dll in Parasite\'s tools folder does not support game builds released after {detail}, and League has updated since.",\n            "1. Download the newer ltk_patcher.zip into your Downloads folder.\\n"\n            "2. Restart Parasite: it checks the files and installs them by itself.",\n'),
-    ('main/__init__.py',
-     '            "The ltk_patcher_dll.dll in Parasite\'s tools folder is not a recognized LTK patcher DLL.",\n            f"1. {source}\\n"\n            "2. Open Parasite\'s tools folder.\\n"\n            "3. Replace both files, then restart Parasite.",\n',
-     '            "The ltk_patcher_dll.dll in Parasite\'s tools folder is not a recognized LTK patcher DLL.",\n            install,\n'),
-    ('main/__init__.py',
-     '        "One Parasite component is missing",\n        f"Parasite needs {detail or \'the LTK patcher\'} in its tools folder before it can start.",\n        f"1. {source}\\n"\n        "2. Open Parasite\'s tools folder.\\n"\n        "3. Place both files there, then restart Parasite.",\n',
-     '        "One Parasite component is missing",\n        f"Parasite needs {detail or \'the LTK patcher\'} (ltk_patcher.zip) before it can start.",\n        install,\n'),
-    ('main/__init__.py',
-     '    )\n    footer = "Please do not request or share this file in Discord. Parasite cannot distribute it because of licensing restrictions."\n',
-     '    )\n    footer = (\'<a href="https://www.mediafire.com/file/g0lzcgpr97jd9r3/ltk_patcher.zip/file">ltk_patcher.zip</a> \'\n              " Parasite only installs files signed by League Toolkit.")\n'),
-    ('main/__init__.py',
-     '        f"{status_title}\\n\\n{status_body}\\n\\nHow to fix it:\\n{steps}\\n\\n"\n        "Please do not request or share this file in Discord.\\n"\n        "Discord: https://discord.gg/roseskins\\n\\n"\n',
-     '        f"{status_title}\\n\\n{status_body}\\n\\nHow to fix it:\\n{steps}\\n\\n"\n        "Parasite only installs patcher files signed by League Toolkit.\\n\\n"\n'),
-    ('main/__init__.py',
-     '    _sync_cslol_stub(tools_dir)\n    status = check_ltk_patcher(tools_dir)\n',
-     '    _sync_cslol_stub(tools_dir)\n    try:\n        # Takes an ltk_patcher.zip the player downloaded; never asks or opens a page\n        from injection.tools.ltk_manager_setup import startup_check\n        startup_check(tools_dir)\n    except Exception as e:\n        log.warning(f"[LTK] Could not set up the patcher: {e}")\n    status = check_ltk_patcher(tools_dir)\n'),
-    # Without a usable patcher Parasite keeps running (hub, theme, Spotify, Offline): no dialog, no exit.
-    # Injection reports a missing or expired patcher per game and the game starts without mods.
-    ('main/__init__.py',
-     '        return True  # Only relevant on Windows\n\n    from datetime import datetime\n    from config import get_config_option\n    from injection.tools.patcher import check_ltk_patcher\n\n    tools_dir = _get_tools_dir()\n',
-     '        return True  # Only relevant on Windows\n\n    tools_dir = _get_tools_dir()\n'),
-    ('main/__init__.py',
-     '    status = check_ltk_patcher(tools_dir)\n    if status.missing:\n        return _show_dll_dialog(tools_dir, reason="missing", detail=" and ".join(status.missing))\n    if status.eol is None:\n        return _show_dll_dialog(tools_dir, reason="invalid")\n    # The DLL keeps working past its end of life until League updates, so only\n    # block when the game Parasite last found is a build it refuses\n    league_path = get_config_option("General", "leaguePath")\n    if status.expired_for(Path(league_path) if league_path else None):\n        eol = datetime.fromtimestamp(status.eol).strftime("%Y-%m-%d %H:%M")\n        return _show_dll_dialog(tools_dir, reason="expired", detail=eol)\n    return True\n',
-     '    # Parasite starts without a usable patcher too; startup_check logged why skins won\'t load\n    return True\n'),
-    ('README.md',
-     '- **League of Legends** installed\n- **LTK patcher** - You must provide it yourself (see below)\n',
-     '- **League of Legends** installed\n- **LTK patcher** - `ltk_patcher.zip` in your Downloads folder (see below)\n'),
-    ('README.md',
-     '\nDue to DMCA restrictions, Parasite cannot distribute the LTK patcher. Get its two files, `ltk_patcher_host.exe` and `ltk_patcher_dll.dll`, from an LTK Manager install.\n',
-     '\nParasite injects with the LTK patcher (`ltk_patcher_host.exe` and `ltk_patcher_dll.dll`). LTK Manager\'s own builds since 1.30 refuse every program but LTK Manager, so Parasite uses an ltk_patcher.zip that works outside LTK Manager. Put it in your Downloads folder and Parasite finds it at its next start, checks that both files are signed by League Toolkit, and installs them. Without a usable patcher Parasite still runs; skins just don\'t load, and the hub\'s Settings tile says why.\n'),
-    ('README.md',
-     '\nOn first launch, Parasite asks for these files and opens its tools folder, where they go. The patcher stops working with game builds released after its end-of-life date: Parasite then tells you to update LTK Manager and replace both files.\n',
-     '\nThe patcher stops working with game builds released after its end-of-life date: skins then stop loading until a newer ltk_patcher.zip is in your Downloads folder.\n'),
 ]
 
 # One click on the PARASITE label toggled the panel twice (nav item + section listeners),
@@ -784,115 +737,6 @@ EDITS += [
     ('Parasite.spec', "    'launcher.core',\n", "    'launcher.core',\n    'pengu.communication.parasite_custom_skins',\n"),
 ]
 
-
-# A mod that crashes the game (made for an older League version) made the client reconnect
-# forever: each new game process was hooked and crashed again. Two exits within
-# QUICK_EXIT_S of the DLL attaching stop the injection, so the next reconnect starts clean.
-OVERLAY_PY = 'injection/overlay/overlay_manager.py'
-EDITS += [
-    (OVERLAY_PY,
-     'KILLED_EXIT_CODE = 0x40010004\n',
-     'KILLED_EXIT_CODE = 0x40010004\n'
-     '# Parasite: the game closing this soon after the DLL attached, twice in a row, is a mod crashing it\n'
-     'QUICK_EXIT_S = 20.0\n'
-     'QUICK_EXITS_TO_STOP = 2\n'),
-    (OVERLAY_PY,
-     '                        if parts[2] == "failed":\n'
-     '                            session["error"] = message or "injection failed"\n',
-     '                        if parts[2] == "failed":\n'
-     '                            session["error"] = message or "injection failed"\n'
-     '                        elif parts[2] == "injected":\n'
-     '                            session["injected_at"] = time.monotonic()\n'
-     '                        elif parts[2] == "exited" and session.get("injected_at"):\n'
-     '                            quick = time.monotonic() - session.pop("injected_at") < QUICK_EXIT_S\n'
-     '                            session["quick_exits"] = session.get("quick_exits", 0) + 1 if quick else 0\n'
-     '                            if not quick:\n'
-     '                                try:\n'
-     '                                    from pengu.communication.parasite_custom_skins import game_ran_fine\n'
-     '                                    game_ran_fine()\n'
-     '                                except Exception as e:\n'
-     '                                    log.debug(f"[INJECT] Custom skin check failed: {e}")\n'
-     '                            if session["quick_exits"] >= QUICK_EXITS_TO_STOP and not session.get("crash_loop"):\n'
-     '                                session["crash_loop"] = True\n'
-     '                                session["error"] = "the game closed right after loading the mods, every time"\n'
-     '                                log.error("[INJECT] The game closed right after loading the mods "\n'
-     '                                          f"{session[\'quick_exits\']} times in a row; stopping the injection")\n'
-     '                                try:\n'
-     '                                    from pengu.communication.parasite_custom_skins import game_keeps_crashing\n'
-     '                                    game_keeps_crashing()\n'
-     '                                except Exception as e:\n'
-     '                                    log.debug(f"[INJECT] Crash report failed: {e}")\n'),
-    (OVERLAY_PY,
-     '            while proc.poll() is None:\n'
-     '                if session["state"] == "failed":\n'
-     '                    break\n',
-     '            while proc.poll() is None:\n'
-     '                if session["state"] == "failed" or session.get("crash_loop"):\n'
-     '                    break\n'),
-    (OVERLAY_PY,
-     '            if session["error"]:\n'
-     '                log.error(f"[INJECT] LTK patcher failed: {session[\'error\']}")\n',
-     '            if session.get("crash_loop"):\n'
-     '                # Reported by game_keeps_crashing, in the player\'s words\n'
-     '                self._log_runoverlay_tail(runoverlay_log)\n'
-     '                return 1\n'
-     '            if session["error"]:\n'
-     '                log.error(f"[INJECT] LTK patcher failed: {session[\'error\']}")\n'),
-]
-
-
-# LTK patcher builds from October 2026 verify their host and refuse any program but LTK Manager
-# ("host verification failed, refusing overlay"): the game then starts without mods. The build
-# is remembered so Parasite never takes it again (injection/tools/ltk_manager.py), and the player is
-# told in Turkish what to do instead of a generic patcher failure.
-EDITS += [
-    (OVERLAY_PY,
-     '                    elif parts[0] == "dll" and " ERROR " in line:\n'
-     '                        # e.g. "overlay verification failed, disabling overlay"\n',
-     '                    elif parts[0] == "dll" and "host verification failed" in line:\n'
-     '                        # Parasite: a patcher build that runs only inside LTK Manager\n'
-     '                        session["error"] = line\n'
-     '                        session["host_locked"] = True\n'
-     '                        log.error("[INJECT] LTK patcher DLL refused Parasite as its host - overlay not applied")\n'
-     '                        try:\n'
-     '                            from ..tools.ltk_manager import patcher_refused_host\n'
-     '                            patcher_refused_host(host_exe.parent, line)\n'
-     '                        except Exception as e:\n'
-     '                            log.debug(f"[INJECT] Could not record the refused patcher: {e}")\n'
-     '                    elif parts[0] == "dll" and " ERROR " in line:\n'
-     '                        # e.g. "overlay verification failed, disabling overlay"\n'),
-    (OVERLAY_PY,
-     '            if session.get("crash_loop"):\n'
-     '                # Reported by game_keeps_crashing, in the player\'s words\n'
-     '                self._log_runoverlay_tail(runoverlay_log)\n'
-     '                return 1\n',
-     '            if session.get("crash_loop"):\n'
-     '                # Reported by game_keeps_crashing, in the player\'s words\n'
-     '                self._log_runoverlay_tail(runoverlay_log)\n'
-     '                return 1\n'
-     '            if session.get("host_locked"):\n'
-     '                # Reported by patcher_refused_host, in the player\'s words\n'
-     '                self._log_runoverlay_tail(runoverlay_log)\n'
-     '                return 1\n'),
-    # Troubleshooting names the lock and what to do, instead of "retry the next game"
-    (OVERLAY_PY,
-     '    if "SetWindowsHookEx" in reason:\n'
-     '        return "hook"\n',
-     '    if "host verification" in reason:\n'
-     '        return "locked"  # Parasite: a patcher build that runs only inside LTK Manager\n'
-     '    if "SetWindowsHookEx" in reason:\n'
-     '        return "hook"\n'),
-    ('Pengu Loader/plugins/PARASITE-SettingsPanel/index.js',
-     "            crashed: () => t('Fix: the LTK patcher crashed. Retry the next game. If it crashes every game, update your LTK patcher files.'),\n",
-     "            crashed: () => t('Fix: the LTK patcher crashed. Retry the next game. If it crashes every game, update your LTK patcher files.'),\n"
-     r'            locked: () => t("Fix: download ltk_patcher.zip into your Downloads folder and restart Parasite: it checks the League Toolkit signature and installs it. Or put both files in %LOCALAPPDATA%\\Parasite\\ltk-patcher."),'
-     '\n'),
-    ('Pengu Loader/plugins/PARASITE-SettingsPanel/index.js',
-     "              detail ? t('What happened: {detail}', { detail }) : t('What happened: the LTK patcher reported an error.'),\n",
-     "              e?.cause === 'locked' ? t('What happened: this LTK patcher only runs inside LTK Manager, so it refused Parasite and the game started without skins.')\n"
-     "                : detail ? t('What happened: {detail}', { detail }) : t('What happened: the LTK patcher reported an error.'),\n"),
-]
-
 # A click on PARASITE that reaches Rose's panel (the theme's hub didn't catch it) opens the hub
 # when the theme has one; only the hub's "Open core settings" opens Rose's panel.
 EDITS += [
@@ -906,35 +750,13 @@ EDITS += [
      '    if (navItem) {\n      // Toggle: if panel is already open, close it\n'),
 ]
 
-# Parasite's own texts in the client plugins' languages (PARASITE-I18n): Turkish where Parasite has it,
-# English in the others, so every language keeps the same keys
+# Parasite's own texts in the client plugins' languages (PARASITE-I18n): Turkish, the only language
+# Parasite serves (utils/core/i18n.py); the others get the English text so every language keeps the same keys
 LOG_HELP = "If something feels off, open the logs folder and attach the latest log to a GitHub issue."
 LOCALE_STRINGS = {
-    "What happened: this LTK patcher only runs inside LTK Manager, so it refused Parasite and the game started without skins.":
-        {"tr": "Ne oldu: bu LTK patcher yalnızca LTK Manager içinde çalışıyor; Parasite'ı reddetti ve oyun skinsiz açıldı."},
     # Parasite has no Discord: the log goes to a GitHub issue (see the SettingsPanel edit below)
     LOG_HELP: {
-        "ar": "إذا بدا أن هناك خطأ ما، افتح مجلد السجلات وأرفق أحدث سجل في بلاغ على GitHub.",
-        "cs": "Pokud něco nefunguje, otevři složku s logy a přilož nejnovější log k issue na GitHubu.",
-        "de": "Wenn etwas nicht stimmt, öffne den Log-Ordner und hänge das neueste Log an ein GitHub-Issue an.",
-        "el": "Αν κάτι δεν πάει καλά, ανοίξτε τον φάκελο αρχείων καταγραφής και επισυνάψτε το πιο πρόσφατο αρχείο σε ένα issue στο GitHub.",
-        "es_ES": "Si algo no va bien, abre la carpeta de registros y adjunta el registro más reciente a un issue de GitHub.",
-        "es_MX": "Si algo no funciona bien, abre la carpeta de registros y adjunta el registro más reciente a un issue de GitHub.",
-        "fr": "Si quelque chose semble anormal, ouvrez le dossier des logs et joignez le dernier log à une issue GitHub.",
-        "hu": "Ha valami nem stimmel, nyisd meg a naplómappát, és csatold a legújabb naplót egy GitHub-issue-hoz.",
-        "id": "Jika ada yang terasa aneh, buka folder log dan lampirkan log terbaru ke issue GitHub.",
-        "it": "Se qualcosa non va, apri la cartella dei log e allega il log più recente a una issue su GitHub.",
-        "ja": "何かおかしいと感じたら、ログフォルダーを開き、最新のログをGitHubのIssueに添付してください。",
-        "ko": "문제가 있는 것 같다면 로그 폴더를 열고 최신 로그를 GitHub 이슈에 첨부해 주세요.",
-        "pl": "Jeśli coś jest nie tak, otwórz folder logów i dołącz najnowszy log do zgłoszenia na GitHubie.",
-        "pt_BR": "Se algo parecer errado, abra a pasta de logs e anexe o log mais recente a uma issue no GitHub.",
-        "ro": "Dacă ceva nu merge bine, deschide folderul de loguri și atașează cel mai recent log la un issue pe GitHub.",
-        "ru": "Если что-то работает не так, откройте папку логов и приложите последний лог к issue на GitHub.",
-        "th": "หากมีอะไรผิดปกติ ให้เปิดโฟลเดอร์ล็อกและแนบล็อกล่าสุดไว้ใน issue บน GitHub",
         "tr": "Bir sorun varsa kayıt klasörünü aç ve en son kaydı GitHub'da açacağın bir sorun bildirimine ekle.",
-        "vi": "Nếu có gì bất thường, hãy mở thư mục nhật ký và đính kèm nhật ký mới nhất vào một issue trên GitHub.",
-        "zh_CN": "如果感觉哪里不对，请打开日志文件夹，并将最新的日志附加到 GitHub issue 中。",
-        "zh_TW": "如果覺得哪裡怪怪的，請開啟記錄檔資料夾，並將最新的記錄檔附加到 GitHub issue 中。",
     },
 }
 # Rose's texts its tr.json has no Turkish for (parasite/turkish.py): the client speaks Turkish only
@@ -982,50 +804,6 @@ EDITS += [
 EDITS += [
     ('installer.iss', 'AppId={{A1B2C3D4-E5F6-7890-ABCD-EF1234567890}}\n',
      'AppId={{D0EF746D-DCEE-4F08-BD14-FB226CB630F3}}\nUsePreviousAppDir=no\n'),
-]
-
-
-# The installer wrote a second Apps entry (Uninstall\Parasite) beside Inno's own AppId entry and nothing
-# removed it, so a dead "Parasite" stayed in Windows' Apps list after an uninstall. As Rose's main
-# (d0ae51d2, 459f7e4b): no duplicate, the old one goes on install and uninstall, and Parasite writes its
-# running version to Inno's entry.
-EDITS += [
-    # Rose 1.5.6+ defines _CleanupLegacyUninstallEntry and calls it on uninstall itself: adding
-    # the call again ran it twice (test_installer_safety counts the calls)
-    ('installer.iss',
-     "    // Create registry entries for Windows Apps list\n"
-     "    RegWriteStringValue(HKEY_LOCAL_MACHINE, 'SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\{#MyAppName}', 'DisplayName', '{#MyAppName}');\n"
-     "    RegWriteStringValue(HKEY_LOCAL_MACHINE, 'SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\{#MyAppName}', 'DisplayVersion', '{#MyAppVersion}');\n"
-     "    RegWriteStringValue(HKEY_LOCAL_MACHINE, 'SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\{#MyAppName}', 'Publisher', '{#MyAppPublisher}');\n"
-     "    RegWriteStringValue(HKEY_LOCAL_MACHINE, 'SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\{#MyAppName}', 'URLInfoAbout', '{#MyAppURL}');\n"
-     "    RegWriteStringValue(HKEY_LOCAL_MACHINE, 'SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\{#MyAppName}', 'InstallLocation', ExpandConstant('{app}'));\n"
-     "    RegWriteStringValue(HKEY_LOCAL_MACHINE, 'SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\{#MyAppName}', 'UninstallString', ExpandConstant('{uninstallexe}'));\n"
-     "    RegWriteDWordValue(HKEY_LOCAL_MACHINE, 'SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\{#MyAppName}', 'NoModify', 1);\n"
-     "    RegWriteDWordValue(HKEY_LOCAL_MACHINE, 'SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\{#MyAppName}', 'NoRepair', 1);\n"
-     "    RegWriteStringValue(HKEY_LOCAL_MACHINE, 'SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\{#MyAppName}', 'DisplayIcon', ExpandConstant('{app}\\{#MyAppExeName}'));\n",
-     "    { Inno writes the Apps entry itself: drop the duplicate older installers wrote }\n"
-     "    _CleanupLegacyUninstallEntry();\n"),
-    ('main/__init__.py',
-     '    try:\n'
-     '        import winreg\n'
-     '        key_path = r"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\Parasite"\n'
-     '        with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, key_path, 0, winreg.KEY_SET_VALUE) as key:\n'
-     '            winreg.SetValueEx(key, "DisplayVersion", 0, winreg.REG_SZ, APP_VERSION)\n'
-     '    except Exception:\n'
-     '        pass\n',
-     '    try:\n'
-     '        import winreg\n'
-     '    except ImportError:\n'
-     '        return\n'
-     '    uninstall = r"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall"\n'
-     "    # Inno's entry is named after the AppId as written (AppId={{...}} keeps the closing }}); the\n"
-     "    # duplicate Uninstall\\Parasite of older installers is kept in sync while it exists\n"
-     '    for name in ("{D0EF746D-DCEE-4F08-BD14-FB226CB630F3}}_is1", "Parasite"):\n'
-     '        try:\n'
-     '            with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, rf"{uninstall}\\{name}", 0, winreg.KEY_SET_VALUE) as key:\n'
-     '                winreg.SetValueEx(key, "DisplayVersion", 0, winreg.REG_SZ, APP_VERSION)\n'
-     '        except Exception:\n'
-     '            pass\n'),
 ]
 
 
@@ -1208,27 +986,9 @@ EDITS += [
     ("Parasite.spec", "    'launcher.parasite_maps',\n", "    'launcher.parasite_maps',\n    'launcher.parasite_profile',\n"),
 ]
 
-# Troubleshooting: a slow base skin confirmation raises Injection Threshold by itself (to the
-# tracker's recommendation) instead of asking the player to press "Apply recommended", and the
-# "Pengu Loader could not be activated" report goes away once the client plugins connect.
+# Troubleshooting: the "Pengu Loader could not be activated" report goes away once the client
+# plugins connect.
 EDITS += [
-    ('threads/handlers/injection_trigger.py',
-     '                                    rec_ms = stats.get("recommended_threshold_ms")\n'
-     '                                    hint = "Retry your skin selection. If the warning persists, increase Injection Threshold."\n',
-     '                                    rec_ms = stats.get("recommended_threshold_ms")\n'
-     '                                    # Parasite: take the recommendation itself while it is above the current threshold\n'
-     '                                    if rec_ms is not None:\n'
-     '                                        rec_s = round(float(rec_ms) / 1000.0, 2)\n'
-     '                                        if not isinstance(threshold_s, (int, float)) or rec_s > float(threshold_s) + 0.001:\n'
-     '                                            from config import set_config_option\n'
-     '                                            set_config_option("General", "injection_threshold", str(rec_s))\n'
-     '                                            if self.injection_manager is not None:\n'
-     '                                                self.injection_manager.refresh_injection_threshold()\n'
-     '                                            log.info(f"[INJECT] Injection threshold raised to the recommended {rec_s}s")\n'
-     '                                            from utils.core.issue_reporter import remove_issues\n'
-     '                                            remove_issues(lambda line, fix: "Base skin verification failed" in line)\n'
-     '                                            break\n'
-     '                                    hint = "Retry your skin selection. If the warning persists, increase Injection Threshold."\n'),
     ('pengu/core/websocket_server.py',
      '        self._connections.add(websocket)\n',
      '        self._connections.add(websocket)\n'
@@ -1284,9 +1044,11 @@ EDITS += [
 
 # Rose's files that Parasite doesn't use: dropped from the tree on every sync
 REMOVE = [
-    "relay-worker",  # Rose's party relay server (Cloudflare worker); Parasite runs no relay
-    # Party Mode needs that relay: its lobby button opened a panel that could never connect
+    "relay-worker",  # Rose's party relay server (Cloudflare worker); Parasite's own is parasite/relay
+    # Rose's Party Mode panel: Parasite shares skins by itself (launcher/parasite_share.py), and its
+    # test with it
     "Pengu Loader/plugins/PARASITE-PartyMode",
+    "test/party_ui_reconnect.test.cjs",
     # Parasite has no Discord: the Pengu Loader window has no Discord button (see the edits)
     "vendor/PenguLoader-1.1.6/loader/Resources/icon_discord.png",
 ]
@@ -1332,10 +1094,8 @@ def apply_edits(tree):
         raw = read_text(path)
         crlf = "\r\n" in raw
         text = raw.replace("\r\n", "\n")
-        # Already applied. An empty replacement is "in" every text, so it counts as applied
-        # only once its old text is gone
-        if (new and new in text) or (not new and old not in text):
-            continue
+        # Every sync starts from a fresh Rose extract, so an edit is never "already applied":
+        # its old text must be there exactly once, or the edit no longer fits Rose's code
         if text.count(old) != 1:
             failures.append(f"{rel}: expected text found {text.count(old)} times:\n{old[:200]}")
             continue
@@ -1440,38 +1200,6 @@ EDITS += [
 EDITS += [
     ("Parasite.spec", "    'launcher.parasite_auto',\n", "    'launcher.parasite_auto',\n    'launcher.parasite_counters',\n    'launcher.parasite_lobby',\n"),
 ]
-
-# Parasite keeps Rose's skin injection as it is: Rose 1.5.3 and newer inject through LTK
-# Manager (the LTF bridge), so Lust's LTK patcher fixes don't apply to it. These edits stay
-# out; everything else (hub, theme, wallpaper, lobby reveal...) is applied.
-SKIPPED_EDIT_MARKERS = [
-    "response = requests.get(GITHUB_RELEASE_API",
-    "\"\"\"Return (title, status_title, status_body, steps) for an LTK patcher problem.\"\"\"",
-    "f\"The ltk_patcher_dll.dll in Parasite's tools folder does not support game builds released after {detail}, and League has updated since.\",",
-    "\"The ltk_patcher_dll.dll in Parasite's tools folder is not a recognized LTK patcher DLL.\",",
-    "f\"Parasite needs {detail or 'the LTK patcher'} in its tools folder before it can start.\",",
-    "footer = \"Please do not request or share this file in Discord. Parasite cannot distribute it because of licensing restrictions.\"",
-    "f\"{status_title}\\n\\n{status_body}\\n\\nHow to fix it:\\n{steps}\\n\\n\"",
-    "from injection.tools.patcher import check_ltk_patcher",
-    "return _show_dll_dialog(tools_dir, reason=\"missing\", detail=\" and \".join(status.missing))",
-    "- **LTK patcher** - You must provide it yourself (see below)",
-    "Due to DMCA restrictions, Parasite cannot distribute the LTK patcher. Get its two files, `ltk_patcher_host.exe` and `ltk_patcher_dll.dll`, from an LTK Manager install.",
-    "On first launch, Parasite asks for these files and opens its tools folder, where they go. The patcher stops working with game builds released after its end-of-life date: Parasite then tells you to update LTK Manager and replace both files.",
-    "KILLED_EXIT_CODE = 0x40010004",
-    "session[\"error\"] = message or \"injection failed\"",
-    "if session[\"state\"] == \"failed\":",
-    "log.error(f\"[INJECT] LTK patcher failed: {session['error']}\")",
-    "# e.g. \"overlay verification failed, disabling overlay\"",
-    "# Reported by game_keeps_crashing, in the player's words",
-    "if \"SetWindowsHookEx\" in reason:",
-    "crashed: () => t('Fix: the LTK patcher crashed. Retry the next game. If it crashes every game, update your LTK patcher files.'),",
-    "detail ? t('What happened: {detail}', { detail }) : t('What happened: the LTK patcher reported an error.'),",
-    "RegWriteStringValue(HKEY_LOCAL_MACHINE, 'SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\{#MyAppName}', 'DisplayIcon', ExpandConstant('{app}\\{#MyAppExeName}'));",
-    "hint = \"Retry your skin selection. If the warning persists, increase Injection Threshold.\"",
-    "_sync_cslol_stub(tools_dir)",
-    "key_path = r\"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\Parasite\""
-]
-EDITS = [e for e in EDITS if not any(m in e[1] for m in SKIPPED_EDIT_MARKERS)]
 
 # Parasite's installer AppId in the registry version sync
 EDITS += [
