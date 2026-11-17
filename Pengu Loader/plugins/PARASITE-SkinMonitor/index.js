@@ -25,7 +25,7 @@ const BRIDGE_PORT_STORAGE_KEY = "parasite_bridge_port";
 const DISCOVERY_START_PORT = 50000;
 const DISCOVERY_END_PORT = 50099;
 
-async function loadBridgePort() {
+async function loadBridgePort({ legacy = true } = {}) {
   try {
     // First, check localStorage for cached port
     const cachedPort = localStorage.getItem(BRIDGE_PORT_STORAGE_KEY);
@@ -48,8 +48,8 @@ async function loadBridgePort() {
             }
           }
         } catch (e) {
-          // Cached port invalid, continue to discovery
-          localStorage.removeItem(BRIDGE_PORT_STORAGE_KEY);
+          // Not answering (Parasite may not be running yet): keep the cached port,
+          // discovery below overwrites it if Parasite is found on another one
         }
       }
     }
@@ -129,6 +129,10 @@ async function loadBridgePort() {
         return true;
       }
     }
+
+    // A retry skips the legacy scan: the server that answers /port answers
+    // /bridge-port too, so it cannot find what the scan above did not
+    if (!legacy) return false;
 
     // Fallback: try old /port endpoint (parallel as well)
     const legacyPromises = [];
@@ -365,7 +369,7 @@ function setupBridgeSocket() {
       console.warn(`${LOG_PREFIX} Bridge socket setup failed`, error);
       bridgeSetupWarned = true;
     }
-    scheduleBridgeRetry();
+    scheduleBridgeRetry(true);
     return;
   }
 
@@ -469,7 +473,7 @@ function setupBridgeSocket() {
   bridgeSocket.addEventListener("close", () => {
     bridgeReady = false;
     if (opened) _notifyDisconnect();
-    scheduleBridgeRetry();
+    scheduleBridgeRetry(!opened);
   });
 
   bridgeSocket.addEventListener("error", (error) => {
@@ -478,7 +482,7 @@ function setupBridgeSocket() {
       bridgeErrorLogged = true;
     }
     bridgeReady = false;
-    scheduleBridgeRetry();
+    scheduleBridgeRetry(!opened);
   });
 }
 
@@ -500,7 +504,7 @@ function flushBridgeQueue() {
   }
 }
 
-function scheduleBridgeRetry() {
+function scheduleBridgeRetry(rediscoverPort = false) {
   if (bridgeReady || stopped) {
     return;
   }
@@ -509,7 +513,10 @@ function scheduleBridgeRetry() {
     return;
   }
 
-  retryTimer = setTimeout(() => {
+  retryTimer = setTimeout(async () => {
+    // Parasite was not on this port: it may have started after the client, or
+    // restarted, on another one. Look again so this retry goes to the right one
+    if (rediscoverPort) await loadBridgePort({ legacy: false });
     retryTimer = null;
     setupBridgeSocket();
   }, retryDelay);

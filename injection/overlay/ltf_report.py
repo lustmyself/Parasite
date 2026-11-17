@@ -1,0 +1,262 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
+import re
+
+from utils.core.issue_reporter import report_issue
+from utils.core.logging import get_logger
+
+log = get_logger()
+
+# Exit code of a process another program terminated (DBG_TERMINATE_PROCESS),
+# most often an antivirus
+KILLED_EXIT_CODE = 0x40010004
+
+# The patcher's verdict when the game loaded its files before the DLL hooked it
+LATE_JOIN_MESSAGE = "joined too late"
+# The DLL's host verification refusing the overlay (docs/ltf-vrf-host-verification.md)
+OVERLAY_REFUSED_MESSAGE = "host verification failed"
+SIGNATURE_FAILURE_MESSAGE = "Windows could not verify the signature of LTK Manager's files"
+NOT_ATTACHED_MESSAGE = "LTK Manager's patcher never got into the game"
+OVERLAY_DISABLED_MESSAGE = "disabled the overlay"
+BRIDGE_CDP_FAILURE_MARKER = "cdp unavailable"
+CDP_UNREACHABLE_REASON = "Parasite's bridge could not reach LTK Manager's built-in browser (CDP unavailable or timed out)"
+# Tauri rejecting a command LTK Manager does not declare ("Command
+# plugin:library|get_installed_mods not allowed by ACL")
+LTK_ACL_REFUSAL = "not allowed by acl"
+PATCHER_OUT_OF_DATE_VERDICT = "patcheroutofdate"
+# ltk_launcher.exe started LTK Manager, then could not inject the bridge into
+# it (its exit code 4): the launcher's files are there, Windows or an
+# antivirus refused it
+LAUNCHER_INJECT_FAILED_MESSAGE = "it could not inject its bridge into LTK Manager"
+# Windows refusing the launcher's helper (error 740), which gives LTK Manager
+# explorer.exe as its parent: why the patcher then refused the overlay
+LAUNCHER_ELEVATED_DETAIL = (
+    "Windows refused to start ltk_launcher.exe for the desktop user: it is set to run as administrator"
+)
+LTF_API_LOG = "ltk_api.log"
+LTF_LOGS_HINT = f"Details are in {LTF_API_LOG} and ltk_launcher.log, in the ltk folder of Parasite's logs."
+
+
+def has_ltf_logs_hint(hint: str) -> bool:
+    """Whether a report's hint ends as every LTF report's does (LTF_LOGS_HINT):
+    Troubleshooting recognizes the LTF reports by it."""
+    return LTF_API_LOG in hint.lower()
+
+
+def ltk_failure_cause(reason: str) -> str:
+    """Why the LTF session failed, from the reason Parasite reported: what to do
+    about it depends on it (Troubleshooting shows a hint for each)"""
+    lowered = reason.lower()
+    if BRIDGE_CDP_FAILURE_MARKER in lowered or "built-in browser" in lowered:
+        return "cdp"
+    # Parasite's own launcher set to run as administrator: before the patcher's
+    # refusal it explains, and before LTK Manager's own programs' error 740
+    if LAUNCHER_ELEVATED_DETAIL.lower() in lowered:
+        return "launcher_admin"
+    # Before "start": the launcher's files are there, it could not get into
+    # the LTK Manager it started
+    if LAUNCHER_INJECT_FAILED_MESSAGE.lower() in lowered:
+        return "inject"
+    # LTK Manager refuses to patch across an elevation boundary (ADR-0074):
+    # League set to run as administrator, or LTK Manager itself elevated
+    if "league_elevated" in lowered or "league is set to run as administrator" in lowered:
+        return "league_admin"
+    if "manager_elevated" in lowered or "ltk manager is running as administrator" in lowered:
+        return "manager_admin"
+    # Windows refusing to start one of LTK Manager's programs unelevated: one is
+    # set to run as administrator (#456: "os error 740" spawning its host)
+    if "os error 740" in lowered or "requires elevation" in lowered:
+        return "ltk_admin"
+    # LTK Manager could not get its patcher from its delivery service: the
+    # service refused it (#482), or the request never reached it, blocked on
+    # the user's PC or network (#487: "error sending request for url")
+    if "no patcher dll is available" in lowered:
+        return "delivery_unreachable" if "error sending request" in lowered else "delivery"
+    if "ltk_patcher_host.exe not found" in lowered:
+        return "host_missing"
+    if OVERLAY_DISABLED_MESSAGE in lowered:
+        return "disabled"
+    if NOT_ATTACHED_MESSAGE.lower() in lowered:
+        return "not_attached"
+    # LTK Manager's verdict on a game its patcher does not support ("Unsupported
+    # Game Build"): an LTK Manager update brings the patcher for the new patch
+    if PATCHER_OUT_OF_DATE_VERDICT in lowered:
+        return "patcher_outdated"
+    if "corruptarchive" in lowered:
+        return "corrupt"
+    if "recorded an incident" in lowered:
+        return "incident"
+    # Tauri's answer to a command the app does not declare: an LTK Manager
+    # older than the commands Parasite drives (its library plugin came in v1.24.1).
+    # Before "import": an install refused that way is no disk problem (#473)
+    if LTK_ACL_REFUSAL in lowered:
+        return "outdated"
+    if "import" in lowered:
+        return "import"
+    if "already open" in lowered:
+        return "running"
+    if LATE_JOIN_MESSAGE in lowered:
+        return "late"
+    if SIGNATURE_FAILURE_MESSAGE.lower() in lowered:
+        return "signature"
+    if OVERLAY_REFUSED_MESSAGE in lowered or "refused the overlay" in lowered:
+        return "refused"
+    if lowered.startswith("could not start"):
+        return "start"
+    if "bridge" in lowered:
+        return "bridge"
+    exit_code = re.search(r"exited with code (-?\d+)", reason)
+    if exit_code:
+        code = int(exit_code.group(1)) & 0xFFFFFFFF
+        if code == KILLED_EXIT_CODE:
+            return "killed"
+        # NTSTATUS errors (access violation...): LTK Manager itself crashed
+        if code >= 0xC0000000:
+            return "crashed"
+    return "unknown"
+
+
+def cdp_unreachable(error: BaseException) -> bool:
+    """Whether a bridge command failed because LTK Manager's browser did not answer."""
+    return BRIDGE_CDP_FAILURE_MARKER in str(error).lower()
+
+
+def _shell_account_or_none():
+    """This account's shell account, or None when it cannot be told: a
+    diagnostic never fails the report it adds to."""
+    try:
+        from utils.system.windows_account import shell_account
+        return shell_account()
+    except Exception:
+        return None
+
+
+def cdp_unreachable_reason() -> str:
+    """CDP_UNREACHABLE_REASON, with its usual cause when this account has it:
+    both PCs where the browser never answered ran every program as
+    administrator (#425 built-in Administrator, #426 UAC turned off)."""
+    account = _shell_account_or_none()
+    if account is not None and account.elevated:
+        return f"{CDP_UNREACHABLE_REASON}; Windows runs every program as administrator on this account"
+    return CDP_UNREACHABLE_REASON
+
+
+def ltk_failure_hint(reason: str) -> str:
+    """What the user can do about a session failure, by the cause it reported."""
+    logs = LTF_LOGS_HINT
+    report = "report it with parasite_*.log and those logs"
+    cause = ltk_failure_cause(reason)
+    if cause == "cdp":
+        return ("Parasite drives LTK Manager through the debugging port of its built-in browser, which did not "
+                "answer. Restart your PC, then retry. If it keeps happening, use a regular Windows account (not "
+                f"the built-in Administrator) and check that your antivirus does not block LTK Manager. {logs}")
+    if cause == "league_admin":
+        return ("League is set to run as administrator, and LTK Manager does not patch it then. Right-click "
+                "League of Legends.exe and LeagueClient.exe (in the League of Legends folder) > Properties > "
+                'Compatibility, untick "Run this program as an administrator" (also under "Change settings '
+                f'for all users"), then restart League. {logs}')
+    if cause == "manager_admin":
+        return ("LTK Manager runs as administrator, and it does not patch League then. Turn User Account "
+                "Control back on, or use a regular Windows account (not the built-in Administrator), then "
+                f"restart the PC. {logs}")
+    if cause == "host_missing":
+        return ("LTK Manager's own patcher (ltk_patcher_host.exe) is missing from its folder, most often "
+                "removed by an antivirus. Reinstall LTK Manager, then add its folder (C:\\Program Files\\LTK "
+                f"Manager) to your antivirus exclusions. {logs}")
+    if cause == "disabled":
+        return ("LTK Manager's integrity check turned the overlay off because of a mod: the reason names its "
+                "WAD. LTK Manager refuses a skin made of another skin's files. For a custom skin, use another "
+                "one; for one of Parasite's skins or chromas, the package is at fault: pick another skin or chroma "
+                f"and report it at github.com/Alban1911/LeagueSkins/issues. {logs}")
+    if cause == "ltk_admin":
+        return ("Windows refuses to start one of LTK Manager's programs without administrator rights: it is set "
+                "to run as administrator. Untick \"Run this program as an administrator\" in the Compatibility "
+                "tab of the Properties of ltk-manager.exe and ltk_patcher_host.exe (also under \"Change settings "
+                f"for all users\"), then close LTK Manager (also from the system tray) and retry. {logs}")
+    if cause == "delivery":
+        return ("LTK Manager could not download its patcher: LTK's delivery service refused the request (the "
+                "reason above). Parasite cannot change that. Retry later, or from another network (without a VPN "
+                f"or proxy). {logs}")
+    if cause == "delivery_unreachable":
+        return ("LTK Manager could not connect to LTK's delivery service (patcher.leaguetoolkit.dev) to "
+                "download its patcher: something on this PC or network blocks it. Allow ltk-manager.exe "
+                "through your firewall and antivirus, turn off any VPN, proxy or DNS blocker, then retry. "
+                f"{logs}")
+    if cause == "patcher_outdated":
+        return ("LTK Manager is out of date: its patcher does not support this League patch. Open LTK Manager "
+                "from the Start menu, install the update it offers, then close it (also from the system tray) "
+                "and retry. If it is already up to date, it has not caught up with this League patch yet: retry "
+                f"after its next update. {logs}")
+    if cause == "corrupt":
+        return ("League could not read a file of the overlay, most often a mod made for an older patch. Turn "
+                "your mods off, then back on one at a time to find it; LTK Manager's incident file names the "
+                f"WAD and the mods that wrote it. {logs}")
+    if cause == "incident":
+        return (f"LTK Manager's incident file says what went wrong in the game and which mods it suspects. {logs}")
+    if cause == "start":
+        return ("Parasite could not start the LTK patcher. Check that ltk_launcher.exe and LeagueToolFlop.dll "
+                f"are still in Parasite's tools folder: an antivirus may have removed them. {logs}")
+    if cause == "inject":
+        return ("Parasite's launcher started LTK Manager but could not get into it to connect Parasite's bridge. With "
+                "err=5 (access denied) in the error above, Windows or an antivirus refused it: add Parasite's folder to "
+                "your antivirus exclusions, update Parasite, then retry. If Parasite runs as administrator through another "
+                "Windows account than the one you are signed in with, make your own account an administrator "
+                f"instead. {logs}")
+    if cause == "launcher_admin":
+        return ("Windows refused to start Parasite's ltk_launcher.exe for your Windows account because it is set to "
+                "run as administrator, so LTK Manager did not start under explorer.exe, which its patcher "
+                "requires. Parasite takes that setting off before it starts LTK Manager: retry the next game. If it "
+                "happens again, untick \"Run this program as an administrator\" in the Compatibility tab of the "
+                "Properties of ltk_launcher.exe, in Parasite's _internal\\injection\\tools folder (also under \"Change "
+                f"settings for all users\"), then restart Parasite. {logs}")
+    if cause == "running":
+        return ("Close LTK Manager (also from the system tray), then retry: Parasite starts it with its "
+                f"bridge and closes it again after the game. {logs}")
+    if cause == "late":
+        return ("The game started before the patcher was scanning: the skin changed in the last seconds "
+                "of the countdown and LTK Manager needed longer to build its overlay (a skin that also "
+                "changes a map file takes seconds), or LTK Manager was slow to start. Pick the skin a few "
+                f"seconds earlier, or retry the next game. {logs}")
+    if cause == "signature":
+        return ("LTK Manager's patcher checks the digital signature of LTK Manager's own files, and Windows "
+                "could not verify it: a file was modified or damaged. Reinstall LTK Manager from its official "
+                f"release (github.com/LeagueToolkit/ltk-manager/releases), then retry. {logs}")
+    if cause == "refused":
+        return ("LTK Manager's patcher refused to apply the overlay. Update Parasite (its launcher starts LTK "
+                f"Manager the way the patcher expects); if it still happens, {report}. {logs}")
+    if cause == "not_attached":
+        return ("LTK Manager's patcher found the game but could not get into it, so the game ran without the "
+                "overlay. Check that League and the Riot Client are not set to run as administrator and that "
+                f"your antivirus does not block LTK Manager, then retry; if it happens every game, {report}. "
+                f"{logs}")
+    if cause == "bridge":
+        return (f"LTK Manager closed while the game was running. Retry the next game; "
+                f"if it happens every game, {report}. {logs}")
+    if cause == "outdated":
+        return ("LTK Manager is too old for Parasite: it does not know the commands Parasite sends it. Update LTK "
+                "Manager (or reinstall it from github.com/LeagueToolkit/ltk-manager/releases), then retry. If "
+                "you picked its ltk-manager.exe yourself, check it is the up-to-date install, not an old copy. "
+                f"{logs}")
+    if cause == "import":
+        return f"Parasite could not install the mod into LTK Manager. Free some disk space, then retry. {logs}"
+    if cause == "killed":
+        return ("Another program closed LTK Manager, most often an antivirus. "
+                f"Add Parasite's folder to its exclusions, then retry. {logs}")
+    if cause == "crashed":
+        return (f"LTK Manager crashed. Retry the next game; if it crashes every game, {report}. {logs}")
+    return f"Retry the next game. If it fails every game, {report}. {logs}"
+
+
+def report_ltf_failure(reason: str, report: bool = True):
+    """Show an LTF session failure in Troubleshooting."""
+    if not report:
+        log.debug(f"[INJECT] LTF session failure (not reported): {reason}")
+        return
+    report_issue(
+        "LTF_FAILED",
+        "error",
+        f"Injection failed: {reason}",
+        details={"reason": reason, "cause": ltk_failure_cause(reason)},
+        hint=ltk_failure_hint(reason),
+    )

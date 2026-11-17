@@ -51,6 +51,19 @@ class AutoUpdateTests(unittest.TestCase):
         self.assertFalse(target.exists())
         self.assertEqual(list(self.dir.iterdir()), [])
 
+    def test_the_update_sequence_takes_the_background_package(self):
+        asset = {"name": "update_package_9.zip", "browser_download_url": "https://x", "size": 0}
+        self.assertIsNone(auto.predownloaded(asset, "v9"))
+        data = _zip_bytes()
+        with patch.object(auto.requests, "get", return_value=_response(data)):
+            self.assertTrue(auto._download("https://x", self.dir / "update_package_9.zip", len(data)))
+        self.assertEqual(auto.predownloaded(asset, "v9"), self.dir / "update_package_9.zip")
+        # Taken once: the update sequence deletes the package after extracting it
+        self.assertFalse(auto.ready_path(self.dir / "update_package_9.zip").exists())
+
+    def test_parasite_offline_keeps_the_install_waiting(self):
+        self.assertIn("parasiteoffline.exe", auto.LEAGUE)
+
     def _client(self, version):
         client = MagicMock()
         client.get_release_version.return_value = f"v{version}"

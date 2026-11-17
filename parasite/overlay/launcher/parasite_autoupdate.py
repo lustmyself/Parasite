@@ -7,7 +7,8 @@ download for that package, and the hub's update question answers itself.
 
 The install needs Parasite to restart into its launcher. That happens only while no League
 client or game runs (checked twice, a minute apart), so nobody is cut off mid-game;
-otherwise the package waits for the next start.
+otherwise the package waits for the next start. Parasite Offline counts too: it runs from
+Parasite's folder while the Riot Client is open, and the update swaps that folder.
 """
 
 from __future__ import annotations
@@ -25,7 +26,9 @@ log = get_logger()
 
 CONFIG_KEY = "autoUpdate"
 IDLE_CHECK_S = 60
-LEAGUE = {"leagueclient.exe", "leagueclientux.exe", "league of legends.exe"}
+LEAGUE = {"leagueclient.exe", "leagueclientux.exe", "league of legends.exe",
+          # The update moves Parasite's folder, which Parasite Offline keeps open
+          "parasiteoffline.exe"}
 _lock = threading.Lock()
 _pending: Optional[str] = None  # version downloaded and waiting to be installed
 _waiter: Optional[threading.Thread] = None
@@ -62,6 +65,27 @@ def is_ready(zip_path: Path) -> bool:
         return zip_path.is_file() and ready_path(zip_path).read_text(encoding="utf-8").strip() == str(zip_path.stat().st_size)
     except OSError:
         return False
+
+
+def package_path(asset: dict, version: str) -> Path:
+    """Where the background download keeps `asset` (the release's update package)."""
+    return _updates_dir() / (asset.get("name") or f"update_package_{version.lstrip('vV')}.zip")
+
+
+def predownloaded(asset: dict, version: str) -> Optional[Path]:
+    """The package downloaded in the background for `asset`, when it is complete.
+
+    The launcher's update sequence installs it instead of downloading it again (and
+    deletes it once extracted).
+    """
+    try:
+        target = package_path(asset, version)
+    except OSError:
+        return None
+    if not is_ready(target):
+        return None
+    ready_path(target).unlink(missing_ok=True)
+    return target
 
 
 def _download(url: str, target: Path, expected: int = 0) -> bool:
@@ -122,7 +146,7 @@ def on_release(client, release: dict, current: str) -> None:
     asset = client.get_zip_asset(release)
     if not asset or not asset.get("browser_download_url"):
         return
-    target = _updates_dir() / (asset.get("name") or f"update_package_{version}.zip")
+    target = package_path(asset, version)
     with _lock:
         if _pending == version:
             return

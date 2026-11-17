@@ -39,6 +39,9 @@ class TrayManager:
         self.icon = None
         self.tray_thread = None
         self._stop_event = threading.Event()
+        # A Quit or Restart clicked before its callback is set (Parasite starting)
+        self._pending_request = None
+        self._pending_lock = threading.Lock()
         self._diagnostics_lock = threading.Lock()
         self._diagnostics_thread = None
         self._diagnostics_dialog = None
@@ -154,6 +157,12 @@ class TrayManager:
     def _on_quit(self, icon, item):
         """Handle quit menu item click"""
         log.info("Quit requested from system tray")
+        with self._pending_lock:
+            if not self.quit_callback:
+                # Parasite is still starting: keep the icon, run_pending_request quits
+                log.info("Parasite is still starting - it quits once started")
+                self._pending_request = lambda: self._on_quit(icon, item)
+                return
         try:
             # Set stop event immediately to signal shutdown
             self._stop_event.set()
@@ -219,6 +228,12 @@ class TrayManager:
     def _on_restart(self, icon, item):
         """Handle restart menu item click"""
         log.info("Restart requested from system tray")
+        with self._pending_lock:
+            if not self.restart_callback:
+                # Parasite is still starting: keep the icon, run_pending_request restarts
+                log.info("Parasite is still starting - it restarts once started")
+                self._pending_request = lambda: self._on_restart(icon, item)
+                return
         try:
             # Set stop event immediately to signal shutdown
             self._stop_event.set()
@@ -238,6 +253,14 @@ class TrayManager:
                 log.debug("Tray icon stopped from restart handler")
             except Exception as e:
                 log.debug(f"Error stopping tray icon: {e}")
+
+    def run_pending_request(self):
+        """Run the Quit or Restart clicked before its callback was set. Call it
+        once both callbacks are set: a click after that runs them itself."""
+        with self._pending_lock:
+            request, self._pending_request = self._pending_request, None
+        if request:
+            request()
 
     def _refresh_diagnostics_menu(self):
         try:
@@ -441,6 +464,14 @@ class TrayManager:
         except Exception as e:
             log.error(f"Failed to update tray icon: {e}")
     
+    def set_title(self, title: str):
+        """Set the text shown when hovering the tray icon"""
+        try:
+            if self.icon:
+                self.icon.title = title
+        except Exception as e:
+            log.debug(f"Failed to update tray title: {e}")
+
     def set_downloading(self, is_downloading: bool):
         """
         Update the tray icon to show downloading status (legacy method for compatibility)

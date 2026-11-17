@@ -102,7 +102,9 @@ class StorageTests(unittest.TestCase):
         self.assertNotIn("map", self.saved)
         fonts_dir = self.storage.list_mods_for_category(fonts.CATEGORY)
         self.assertEqual([e["name"] for e in fonts_dir], ["koreanfont"])
-        self.assertTrue((self.storage.mods_root / fonts_dir[0]["path"] / "WAD" / "Bootstrap.windows.wad.client").is_file())
+        from injection.mods.mod_files import ModFiles
+        with ModFiles(self.storage.mods_root / fonts_dir[0]["path"]) as moved:  # its archive (Rose 1.5.6+)
+            self.assertTrue(moved.is_file("WAD/Bootstrap.windows.wad.client"))
 
     def test_other_files_are_refused(self):
         self.assertIn("Yalnızca", self._upload(name="notes.txt"))
