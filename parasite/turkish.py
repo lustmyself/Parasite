@@ -462,6 +462,7 @@ TURKISH += [
     ("utils/tests/test_startup_diagnostics.py", 'self.assertIn("missing", ', 'self.assertIn("eksik", '),
     ("utils/tests/test_startup_diagnostics.py", 'self.assertIn("code 1", ', 'self.assertIn("1 koduyla", '),
     ("utils/tests/test_startup_diagnostics.py", 'self.assertIn("timed out", ', 'self.assertIn("3 dakikada bitmedi", '),
+    ("utils/tests/test_startup_diagnostics.py", 'self.assertIn("1 FAIL", ', 'self.assertIn("1 HATA", '),
     ("injection/tests/test_mod_migration.py", "Parasite mods backup ", "Parasite mod yedeği "),
     ("injection/tests/test_mod_migration.py", '"Parasite could not back up your mods to your desktop"',
      '"Parasite modlarını masaüstüne yedekleyemedi"'),
