@@ -296,6 +296,7 @@ hiddenimports = [
     'launcher.parasite_autoupdate',
     'launcher.parasite_cleanup',
     'launcher.parasite_hero',
+    'launcher.parasite_integrity',
     'launcher.parasite_hub_server',
     'launcher.parasite_hub_shell',
     'launcher.parasite_hub_web',

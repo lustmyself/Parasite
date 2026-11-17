@@ -90,6 +90,12 @@ class UpdateSequence:
         if not asset or not asset.get("browser_download_url"):
             status_callback("No release asset found")
             return False
+        from launcher.parasite_integrity import NO_HASH, expected_sha256
+        asset = dict(asset, sha256=expected_sha256(release, asset))
+        if not asset["sha256"]:
+            # Not installed unverified: the next start (or release check) tries again
+            status_callback(NO_HASH)
+            return False
 
         if confirm_callback is not None:
             try:
@@ -119,16 +125,28 @@ class UpdateSequence:
             status_callback(f"Could not create update workspace: {exc}")
             return False
         zip_path = updates_root / "package.zip"
+        # Parasite: only the package GitHub published is installed. The background download
+        # sits in a folder any program of the user can write to: it is copied into the
+        # workspace (administrators only) and checked there (launcher/parasite_integrity.py)
         from launcher.parasite_autoupdate import predownloaded
+        from launcher.parasite_integrity import BAD_HASH, NO_HASH, take_verified, verify_file
+        expected = asset.get("sha256")
+        if not expected:
+            status_callback(NO_HASH)
+            return False
         background = predownloaded(asset, remote_version)
-        if background:
-            zip_path = background
+        if background and take_verified(background, zip_path, expected):
             status_callback("Update downloaded in the background")
         else:
+            background = None
             status_callback(f"Downloading update {remote_version}")
         if not background and not self.downloader.download_update(
             asset["browser_download_url"], zip_path, status_callback, bytes_callback, asset.get("size") or None,
         ):
+            return False
+        if not verify_file(zip_path, expected):
+            zip_path.unlink(missing_ok=True)
+            status_callback(BAD_HASH)
             return False
 
         status_callback("Extracting update")

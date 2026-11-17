@@ -209,6 +209,12 @@ jobs:
           python scripts/create_update_package.py
           test -f "installer/Parasite_Setup_$VERSION.exe"
           test -f "installer/update_package_$VERSION.zip"
+          # Installed copies refuse an update package whose SHA-256 GitHub doesn't publish
+          # (launcher/parasite_integrity.py): the asset digest, or this file
+          cd installer
+          sha256sum "Parasite_Setup_$VERSION.exe" "update_package_$VERSION.zip" \
+            | sed 's/ \*/  /' > SHA256SUMS
+          cat SHA256SUMS
 
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: steps.rose.outputs.skip == 'false'
@@ -300,10 +306,23 @@ jobs:
           gh release create "v$VERSION" \
             "installer/Parasite_Setup_$VERSION.exe" \
             "installer/update_package_$VERSION.zip" \
+            "installer/SHA256SUMS" \
             --repo "$GITHUB_REPOSITORY" \
             --target "$BUILT" \
             --title "$name" \
             --notes "$notes"
+          # The digest GitHub computed on upload must be the one built here (installed copies
+          # prefer it to SHA256SUMS). An older GitHub without digests leaves SHA256SUMS alone.
+          package="update_package_$VERSION.zip"
+          built_sha=$(sha256sum "installer/$package" | cut -d' ' -f1)
+          digest=$(gh api "repos/$GITHUB_REPOSITORY/releases/tags/v$VERSION" \
+            --jq ".assets[] | select(.name == \"$package\") | .digest // empty")
+          if [ -z "$digest" ]; then
+            echo "::warning::GitHub lists no digest for $package; installed copies use SHA256SUMS"
+          elif [ "$digest" != "sha256:$built_sha" ]; then
+            echo "::error::GitHub's digest of $package ($digest) is not the built one (sha256:$built_sha): installed copies will refuse it"
+            exit 1
+          fi
 
       # A failure issue is resolved once Parasite is released from that Rose release or a
       # newer one: now (published), or already (nothing to do on a scheduled run).
