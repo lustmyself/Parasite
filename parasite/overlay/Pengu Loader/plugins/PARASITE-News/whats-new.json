@@ -1,25 +1,19 @@
 {
-  "version": "2.9",
+  "version": "2.11",
   "en": [
-    "Fixed: the Champ select card on the home page lost its pick and ban slots",
-    "Skin sharing works again: Parasite uses the relay server Lust already had",
-    "The Champ select page opens on Settings (Auto Accept, Auto Requeue...), and switches to your team when a champ select starts",
-    "Fixed: in ranked, teammates were put in the wrong lanes and everyone showed OFF-ROLE. Hidden lanes now go to the player who usually plays them (marked with ?)",
-    "The Reveal box in the League client's champ select shows the same: wins/losses, off-role, each lane's matchup, counters for the enemy picks, and Copy names",
-    "Champ select page works like Reveal: your team by lane with Riot ID, rank, LP, wins and losses, off-role warning, and each lane's matchup (win rate, kill, CS and gold leads)",
-    "Counters table for the enemy you click, with Lolalytics and U.GG win rates side by side",
-    "History of your past lobbies, Copy names, and team search on op.gg, Porofessor or U.GG",
-    "Auto Accept, Ban, Pick and queue options moved to the page's Settings tab"
+    "Built on Rose 1.5.7",
+    "Lobby Reveal: hovering a champion shows its counters as your pick",
+    "Parasite is fully Turkish now: the hub, the client, the installer and Parasite Offline",
+    "Faster hub: offline look-ups are cached, counter downloads are bounded and polling slows down while the hub is hidden",
+    "Safer updates: Parasite installs only a package whose SHA-256 GitHub publishes, from an admin-only folder",
+    "Discord and Ko-fi links removed"
   ],
   "tr": [
-    "Düzeltildi: ana sayfadaki Champ select kartının pick ve ban kutuları bozulmuştu",
-    "Skin paylaşımı çalışıyor: Parasite, Lust'un zaten kurulu olan sunucusunu kullanıyor",
-    "Champ select sayfası Ayarlar ile açılıyor (Auto Accept, Auto Requeue...); şampiyon seçimi başlayınca takımına geçiyor",
-    "Düzeltildi: ranked'de takım arkadaşları yanlış koridora konuyordu ve herkeste OFF-ROLE yazıyordu. Gizli koridorlar artık o koridoru oynayan oyuncuya veriliyor (? ile işaretli)",
-    "LoL istemcisinde şampiyon seçimindeki Reveal kutusu da aynısını gösteriyor: galibiyet/mağlubiyet, off-role, her koridorun eşleşmesi, rakiplerin counter'ları ve İsimleri kopyala",
-    "Champ select sayfası artık Reveal gibi: takımın koridor koridor, Riot ID, rank, LP, galibiyet/mağlubiyet, off-role uyarısı ve her koridorun eşleşmesi (kazanma oranı, kill, CS ve altın farkı)",
-    "Tıkladığın rakip için counter tablosu, Lolalytics ve U.GG kazanma oranları yan yana",
-    "Geçmiş lobilerin, İsimleri kopyala ve takımı op.gg, Porofessor ya da U.GG'de açma",
-    "Auto Accept, Ban, Pick ve sıra ayarları sayfanın Ayarlar sekmesine taşındı"
+    "Rose 1.5.7 üzerine kuruldu",
+    "Lobby Reveal: bir şampiyonun üzerine gelince counter'ları senin seçimin olarak görünüyor",
+    "Parasite artık tamamen Türkçe: hub, istemci, kurulum ve Parasite Offline",
+    "Daha hızlı hub: çevrimdışı sorgular önbellekte, counter indirmeleri sınırlı, hub gizliyken daha seyrek yoklama",
+    "Daha güvenli güncellemeler: Parasite yalnızca GitHub'ın SHA-256'sını yayınladığı paketi, yöneticiye özel klasörden kurar",
+    "Discord ve Ko-fi linkleri kaldırıldı"
   ]
 }
