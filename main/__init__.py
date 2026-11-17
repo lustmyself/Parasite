@@ -115,7 +115,7 @@ def _show_native_dll_dialog(reason="missing", detail=""):
         TaskDialogButton(button_close, "Close Parasite"),
     )
     content = _with_links(f"{status_body}\n\nHow to fix it:\n{steps}")
-    footer = _with_links("Need help? Join the Parasite Discord: https://discord.gg/roseskins")
+    footer = _with_links("Need help? Open an issue: https://github.com/lustmyself/Parasite/issues")
     assets_dirs = []
     if hasattr(sys, "_MEIPASS"):
         assets_dirs.append(Path(sys._MEIPASS) / "assets")
@@ -245,7 +245,7 @@ def _show_fallback_dll_dialog(reason="missing", detail="") -> str:
     title, status_title, status_body, steps, action = _dll_dialog_text(reason, detail)
     message = (
         f"{status_title}\n\n{status_body}\n\nHow to fix it:\n{steps}\n\n"
-        "Discord: https://discord.gg/roseskins\n\n"
+        "Need help? Open an issue: https://github.com/lustmyself/Parasite/issues\n\n"
         f"Press OK to {action.lower()}, or Cancel to close Parasite."
     )
     response = ctypes.windll.user32.MessageBoxW(
@@ -497,8 +497,7 @@ def _warn_pengu_injection_failed(client_pid: int) -> None:
             "Parasite did not load into this League client: Pengu Loader's DLL is missing from it.\n\n"
             "Right-click Parasite's system tray icon and choose Diagnose Parasite startup. "
             "Keep League open while collecting the report.\n\n"
-            "Then send report.txt and report.json on the Parasite Discord (https://discord.gg/roseskins) "
-            "or in a GitHub issue (https://github.com/lustmyself/Parasite/issues), so we can find out why. "
+            "Then attach report.txt and report.json to a GitHub issue (https://github.com/lustmyself/Parasite/issues), so we can find out why. "
             "You can also paste them into an AI assistant for a first look.",
             "Parasite - Client injection failed",
             0x50030,  # MB_OK | MB_ICONWARNING | MB_SETFOREGROUND | MB_TOPMOST

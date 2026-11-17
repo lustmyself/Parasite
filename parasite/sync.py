@@ -213,8 +213,14 @@ def patch_welcome_popup(data):
         raise SystemExit("[sync] welcome popup badges not found in core.dll")
     hidden = b'style="display:none"'
     data = data.replace(POPUP_BADGES, hidden + b" " * (len(POPUP_BADGES) - len(hidden)))
+    # Parasite has no Discord or Ko-fi: their links in the (hidden) popup lead nowhere
+    data = _same_length(data, b"href=https://discord.gg/roseskins", b"href=#", "the popup's Discord link")
+    data = _same_length(data, b"href=https://ko-fi.com/roseapp", b"href=#", "the popup's Ko-fi link")
     # Parasite: no welcome popup at all, its whole dialog stays hidden
     return _same_length(data, POPUP_ROOT, hidden, "the welcome popup")
+
+
+OFFLINE_LICENSE = ROOT / "parasite" / "offline" / "src" / "LICENSE"
 
 
 def copy_overlay(tree):
@@ -223,6 +229,11 @@ def copy_overlay(tree):
             dst = tree / src.relative_to(OVERLAY)
             dst.parent.mkdir(parents=True, exist_ok=True)
             shutil.copyfile(src, dst)
+    # ParasiteOffline.exe is Deceive (GPL-3.0): its license ships next to it, with
+    # ParasiteOffline-NOTICE.txt (overlay) saying where its source is
+    if not OFFLINE_LICENSE.is_file():
+        raise SystemExit("[sync] parasite/offline/src/LICENSE is missing (Parasite Offline is GPL-3.0)")
+    shutil.copyfile(OFFLINE_LICENSE, tree / "injection" / "tools" / "ParasiteOffline-LICENSE.txt")
 
 
 UI_JS = "Pengu Loader/plugins/PARASITE-UI/index.js"
@@ -313,7 +324,7 @@ EDITS += [
      '    """Return (title, status_title, status_body, steps) for an LTK patcher problem."""\n    # Parasite installs a downloaded ltk_patcher.zip by itself (injection/tools/ltk_manager_setup.py)\n    install = (\n        "1. Download ltk_patcher.zip: https://www.mediafire.com/file/g0lzcgpr97jd9r3/ltk_patcher.zip/file\\n"\n        "2. Leave it in your Downloads folder (zipped or extracted).\\n"\n        "3. Restart Parasite: it checks the files and installs them by itself."\n    )\n'),
     ('main/__init__.py',
      '            f"The ltk_patcher_dll.dll in Parasite\'s tools folder does not support game builds released after {detail}, and League has updated since.",\n            f"1. Update LTK Manager, then get both files from it.\\n"\n            "2. Open Parasite\'s tools folder.\\n"\n            "3. Replace both files, then restart Parasite.",\n',
-     '            f"The ltk_patcher_dll.dll in Parasite\'s tools folder does not support game builds released after {detail}, and League has updated since.",\n            "1. Download the newer ltk_patcher.zip that Rose\'s Discord shares (#tutorial) into your Downloads folder.\\n"\n            "2. Restart Parasite: it checks the files and installs them by itself.",\n'),
+     '            f"The ltk_patcher_dll.dll in Parasite\'s tools folder does not support game builds released after {detail}, and League has updated since.",\n            "1. Download the newer ltk_patcher.zip into your Downloads folder.\\n"\n            "2. Restart Parasite: it checks the files and installs them by itself.",\n'),
     ('main/__init__.py',
      '            "The ltk_patcher_dll.dll in Parasite\'s tools folder is not a recognized LTK patcher DLL.",\n            f"1. {source}\\n"\n            "2. Open Parasite\'s tools folder.\\n"\n            "3. Replace both files, then restart Parasite.",\n',
      '            "The ltk_patcher_dll.dll in Parasite\'s tools folder is not a recognized LTK patcher DLL.",\n            install,\n'),
@@ -322,7 +333,7 @@ EDITS += [
      '        "One Parasite component is missing",\n        f"Parasite needs {detail or \'the LTK patcher\'} (ltk_patcher.zip) before it can start.",\n        install,\n'),
     ('main/__init__.py',
      '    )\n    footer = "Please do not request or share this file in Discord. Parasite cannot distribute it because of licensing restrictions."\n',
-     '    )\n    footer = (\'<a href="https://www.mediafire.com/file/g0lzcgpr97jd9r3/ltk_patcher.zip/file">ltk_patcher.zip</a> \'\n              "(Rose\'s Discord, #tutorial). Parasite only installs files signed by League Toolkit.")\n'),
+     '    )\n    footer = (\'<a href="https://www.mediafire.com/file/g0lzcgpr97jd9r3/ltk_patcher.zip/file">ltk_patcher.zip</a> \'\n              " Parasite only installs files signed by League Toolkit.")\n'),
     ('main/__init__.py',
      '        f"{status_title}\\n\\n{status_body}\\n\\nHow to fix it:\\n{steps}\\n\\n"\n        "Please do not request or share this file in Discord.\\n"\n        "Discord: https://discord.gg/roseskins\\n\\n"\n',
      '        f"{status_title}\\n\\n{status_body}\\n\\nHow to fix it:\\n{steps}\\n\\n"\n        "Parasite only installs patcher files signed by League Toolkit.\\n\\n"\n'),
@@ -871,7 +882,7 @@ EDITS += [
     ('Pengu Loader/plugins/PARASITE-SettingsPanel/index.js',
      "            crashed: () => t('Fix: the LTK patcher crashed. Retry the next game. If it crashes every game, update your LTK patcher files.'),\n",
      "            crashed: () => t('Fix: the LTK patcher crashed. Retry the next game. If it crashes every game, update your LTK patcher files.'),\n"
-     r'            locked: () => t("Fix: download ltk_patcher.zip (www.mediafire.com/file/g0lzcgpr97jd9r3/ltk_patcher.zip/file, shared in the Rose Discord #tutorial) into your Downloads folder and restart Parasite: it checks the League Toolkit signature and installs it. Or put both files in %LOCALAPPDATA%\\Parasite\\ltk-patcher."),'
+     r'            locked: () => t("Fix: download ltk_patcher.zip into your Downloads folder and restart Parasite: it checks the League Toolkit signature and installs it. Or put both files in %LOCALAPPDATA%\\Parasite\\ltk-patcher."),'
      '\n'),
     ('Pengu Loader/plugins/PARASITE-SettingsPanel/index.js',
      "              detail ? t('What happened: {detail}', { detail }) : t('What happened: the LTK patcher reported an error.'),\n",
@@ -894,16 +905,39 @@ EDITS += [
 
 # Parasite's own texts in the client plugins' languages (PARASITE-I18n): Turkish where Parasite has it,
 # English in the others, so every language keeps the same keys
+LOG_HELP = "If something feels off, open the logs folder and attach the latest log to a GitHub issue."
 LOCALE_STRINGS = {
     "What happened: this LTK patcher only runs inside LTK Manager, so it refused Parasite and the game started without skins.":
         {"tr": "Ne oldu: bu LTK patcher yalnızca LTK Manager içinde çalışıyor; Parasite'ı reddetti ve oyun skinsiz açıldı."},
-    "Fix: download ltk_patcher.zip (www.mediafire.com/file/g0lzcgpr97jd9r3/ltk_patcher.zip/file, shared in the Rose "
-    "Discord #tutorial) into your Downloads folder and restart Parasite: it checks the League Toolkit signature and "
-    "installs it. Or put both files in %LOCALAPPDATA%\\Parasite\\ltk-patcher.":
-        {"tr": "Çözüm: ltk_patcher.zip'i (www.mediafire.com/file/g0lzcgpr97jd9r3/ltk_patcher.zip/file, Rose "
-               "Discord'u #tutorial) İndirilenler klasörüne indir ve Parasite'ı yeniden başlat: Parasite League Toolkit "
-               "imzasını kontrol edip kendisi kurar. Ya da iki dosyayı %LOCALAPPDATA%\\Parasite\\ltk-patcher klasörüne koy."},
+    # Parasite has no Discord: the log goes to a GitHub issue (see the SettingsPanel edit below)
+    LOG_HELP: {
+        "ar": "إذا بدا أن هناك خطأ ما، افتح مجلد السجلات وأرفق أحدث سجل في بلاغ على GitHub.",
+        "cs": "Pokud něco nefunguje, otevři složku s logy a přilož nejnovější log k issue na GitHubu.",
+        "de": "Wenn etwas nicht stimmt, öffne den Log-Ordner und hänge das neueste Log an ein GitHub-Issue an.",
+        "el": "Αν κάτι δεν πάει καλά, ανοίξτε τον φάκελο αρχείων καταγραφής και επισυνάψτε το πιο πρόσφατο αρχείο σε ένα issue στο GitHub.",
+        "es_ES": "Si algo no va bien, abre la carpeta de registros y adjunta el registro más reciente a un issue de GitHub.",
+        "es_MX": "Si algo no funciona bien, abre la carpeta de registros y adjunta el registro más reciente a un issue de GitHub.",
+        "fr": "Si quelque chose semble anormal, ouvrez le dossier des logs et joignez le dernier log à une issue GitHub.",
+        "hu": "Ha valami nem stimmel, nyisd meg a naplómappát, és csatold a legújabb naplót egy GitHub-issue-hoz.",
+        "id": "Jika ada yang terasa aneh, buka folder log dan lampirkan log terbaru ke issue GitHub.",
+        "it": "Se qualcosa non va, apri la cartella dei log e allega il log più recente a una issue su GitHub.",
+        "ja": "何かおかしいと感じたら、ログフォルダーを開き、最新のログをGitHubのIssueに添付してください。",
+        "ko": "문제가 있는 것 같다면 로그 폴더를 열고 최신 로그를 GitHub 이슈에 첨부해 주세요.",
+        "pl": "Jeśli coś jest nie tak, otwórz folder logów i dołącz najnowszy log do zgłoszenia na GitHubie.",
+        "pt_BR": "Se algo parecer errado, abra a pasta de logs e anexe o log mais recente a uma issue no GitHub.",
+        "ro": "Dacă ceva nu merge bine, deschide folderul de loguri și atașează cel mai recent log la un issue pe GitHub.",
+        "ru": "Если что-то работает не так, откройте папку логов и приложите последний лог к issue на GitHub.",
+        "th": "หากมีอะไรผิดปกติ ให้เปิดโฟลเดอร์ล็อกและแนบล็อกล่าสุดไว้ใน issue บน GitHub",
+        "tr": "Bir sorun varsa kayıt klasörünü aç ve en son kaydı GitHub'da açacağın bir sorun bildirimine ekle.",
+        "vi": "Nếu có gì bất thường, hãy mở thư mục nhật ký và đính kèm nhật ký mới nhất vào một issue trên GitHub.",
+        "zh_CN": "如果感觉哪里不对，请打开日志文件夹，并将最新的日志附加到 GitHub issue 中。",
+        "zh_TW": "如果覺得哪裡怪怪的，請開啟記錄檔資料夾，並將最新的記錄檔附加到 GitHub issue 中。",
+    },
 }
+# Keys Rose's languages have that Parasite no longer uses: dropped from every PARASITE-I18n language
+LOCALE_DROPPED = [
+    "If something feels off, open the logs folder and share the latest log in a discord ticket.",
+]
 
 
 # Desktop hub in WebView2 (launcher/parasite_hub_shell.py): Parasite.exe --parasite-hub-window <url> shows it
@@ -1191,6 +1225,8 @@ REMOVE = [
     "relay-worker",  # Rose's party relay server (Cloudflare worker); Parasite runs no relay
     # Party Mode needs that relay: its lobby button opened a panel that could never connect
     "Pengu Loader/plugins/PARASITE-PartyMode",
+    # Parasite has no Discord: the Pengu Loader window has no Discord button (see the edits)
+    "vendor/PenguLoader-1.1.6/loader/Resources/icon_discord.png",
 ]
 
 
@@ -1208,6 +1244,12 @@ def add_locale_strings(tree):
     for path in sorted((tree / "Pengu Loader/plugins/PARASITE-I18n/locales").glob("*.json")):
         raw = read_text(path)
         newline = "\r\n" if "\r\n" in raw else "\n"
+        dropped = tuple(f"  {json.dumps(key, ensure_ascii=False)}:" for key in LOCALE_DROPPED)
+        kept = [line for line in raw.split(newline) if not line.startswith(dropped)]
+        if len(kept) != len(raw.split(newline)):
+            raw = newline.join(kept)
+            json.loads(raw)  # still valid JSON (a dropped key is never the last one)
+            write_text(path, raw)
         present = json.loads(raw)
         lines = [f"  {json.dumps(key, ensure_ascii=False)}: {json.dumps(values.get(path.stem, key), ensure_ascii=False)},"
                  for key, values in LOCALE_STRINGS.items() if key not in present]
@@ -1373,6 +1415,102 @@ EDITS = [e for e in EDITS if not any(m in e[1] for m in SKIPPED_EDIT_MARKERS)]
 EDITS += [
     ("main/__init__.py", '"{A1B2C3D4-E5F6-7890-ABCD-EF1234567890}}_is1"', '"{D0EF746D-DCEE-4F08-BD14-FB226CB630F3}}_is1"'),
     ("test/test_installer_safety.py", "A1B2C3D4-E5F6-7890-ABCD-EF1234567890", "D0EF746D-DCEE-4F08-BD14-FB226CB630F3"),
+]
+
+
+# Parasite has no Discord (and no Ko-fi): help goes through GitHub issues
+ISSUES_URL = "https://github.com/lustmyself/Parasite/issues"
+EDITS += [
+    ("main/__init__.py",
+     '    footer = _with_links("Need help? Join the Parasite Discord: https://discord.gg/roseskins")\n',
+     f'    footer = _with_links("Need help? Open an issue: {ISSUES_URL}")\n'),
+    ("main/__init__.py",
+     '        "Discord: https://discord.gg/roseskins\\n\\n"\n        f"Press OK to',
+     f'        "Need help? Open an issue: {ISSUES_URL}\\n\\n"\n        f"Press OK to'),
+    ("main/__init__.py",
+     '            "Then send report.txt and report.json on the Parasite Discord (https://discord.gg/roseskins) "\n'
+     '            "or in a GitHub issue (https://github.com/lustmyself/Parasite/issues), so we can find out why. "\n',
+     f'            "Then attach report.txt and report.json to a GitHub issue ({ISSUES_URL}), so we can find out why. "\n'),
+    ("pengu/tests/test_activation_warning.py",
+     "        self.assertIn('discord.gg/roseskins', text)\n",
+     "        self.assertNotIn('discord', text.lower())  # Parasite has no Discord\n"),
+    ("Pengu Loader/plugins/PARASITE-SettingsPanel/index.js",
+     '  const DISCORD_INVITE_URL = "https://discord.com/invite/roseskins";\n  const KOFI_URL = "https://ko-fi.com/roseapp";\n',
+     ""),
+    ("Pengu Loader/plugins/PARASITE-SettingsPanel/index.js",
+     't("If something feels off, open the logs folder and share the latest log in a discord ticket.")',
+     f't({json.dumps(LOG_HELP)})'),
+    ("Pengu Loader/plugins/PARASITE-UI/index.js",
+     '  const DISCORD_INVITE_URL = "https://discord.com/invite/roseskins";\n'
+     '  const PARASITE_DISCORD_GUILD_ID = "1490473857075642621";\n',
+     ""),
+    ("Pengu Loader/plugins/PARASITE-UI/index.js",
+     '      if (source.includes("/discord/")) {\n'
+     '        const fixedSource = source.replace(\n'
+     '          /\\/discord\\/\\d+/,\n'
+     '          "/discord/" + PARASITE_DISCORD_GUILD_ID\n'
+     '        );\n'
+     '        if (fixedSource !== source) {\n'
+     '          badge.setAttribute("src", fixedSource);\n'
+     '        }\n'
+     '        return;\n'
+     '      }\n',
+     '      if (source.includes("/discord/")) {\n'
+     '        (badge.closest("a") || badge).remove();  // Parasite has no Discord\n'
+     '        return;\n'
+     '      }\n'),
+    # The Pengu Loader window: no Ko-fi ("Support ... Team") or Discord buttons
+    ("vendor/PenguLoader-1.1.6/loader/Program.cs",
+     '        public static string HomepageUrl => "https://ko-fi.com/roseapp";\n'
+     '        public static string DiscordUrl => "https://discord.gg/roseskins";\n',
+     ""),
+    ("vendor/PenguLoader-1.1.6/loader/Views/MainPage.xaml.cs",
+     "        private void DiscordButtonClick(object sender, RoutedEventArgs e)\n"
+     "        {\n"
+     "            Utils.OpenLink(Program.DiscordUrl);\n"
+     "        }\n\n",
+     ""),
+    ("vendor/PenguLoader-1.1.6/loader/Views/MainPage.xaml.cs",
+     "            Utils.OpenLink(Program.HomepageUrl);\n",
+     "            Utils.OpenLink(Program.GithubIssuesUrl);\n"),
+    ("vendor/PenguLoader-1.1.6/loader/Views/MainPage.xaml",
+     '<TextBlock Text="Support Parasite Team" Margin="8,0,0,0" />',
+     '<TextBlock Text="Report a problem" Margin="8,0,0,0" />'),
+    ("vendor/PenguLoader-1.1.6/loader/Views/MainPage.xaml",
+     '                    <Button Click="DiscordButtonClick" Grid.Column="0" Background="Transparent" BorderBrush="#6888" Focusable="False" HorizontalAlignment="Stretch" Margin="0">\n'
+     '                        <StackPanel Orientation="Horizontal">\n'
+     '                            <Image Source="/Resources/icon_discord.png" Width="16" Height="16" />\n'
+     '                            <TextBlock Text="Discord" Margin="8,0,0,0" />\n'
+     '                        </StackPanel>\n'
+     '                    </Button>\n'
+     '                    <Button Click="GitHubButtonClick" Grid.Column="1" Background="Transparent" BorderBrush="#6888" Focusable="False" HorizontalAlignment="Stretch" Margin="5,0,0,0">\n',
+     '                    <Button Click="GitHubButtonClick" Grid.Column="0" Grid.ColumnSpan="2" Background="Transparent" BorderBrush="#6888" Focusable="False" HorizontalAlignment="Stretch" Margin="0">\n'),
+]
+
+# Parasite Offline (Deceive, GPL-3.0): its license and notice ship next to ParasiteOffline.exe
+EDITS += [
+    ("Parasite.spec",
+     "injection_data_files = [\n    'injection/tools/hashes.game.txt',\n",
+     "injection_data_files = [\n    'injection/tools/hashes.game.txt',\n"
+     "    # ParasiteOffline.exe is GPL-3.0 (Deceive): its license and where its source is\n"
+     "    'injection/tools/ParasiteOffline-LICENSE.txt',\n"
+     "    'injection/tools/ParasiteOffline-NOTICE.txt',\n"),
+]
+
+# Uninstall removes the Spicetify copy Parasite keeps in its install folder
+EDITS += [
+    ("installer.iss",
+     'Type: filesandordirs; Name: "{app}\\_internal"\n',
+     'Type: filesandordirs; Name: "{app}\\_internal"\n'
+     "; Parasite's own Spicetify (Spotify themes), downloaded at run time\n"
+     'Type: filesandordirs; Name: "{app}\\spicetify"\n'),
+    ("test/test_installer_safety.py",
+     "        # Only Parasite's runtime, which an update replaces with files the uninstall log never saw\n"
+     "        self.assertEqual(re.findall(r'Type: filesandordirs; Name: \"([^\"]+)\"', section), ['{app}\\\\_internal'])\n",
+     "        # Only Parasite's runtime, which an update replaces with files the uninstall log never saw,\n"
+     "        # and Parasite's own Spicetify, downloaded at run time\n"
+     "        self.assertEqual(re.findall(r'Type: filesandordirs; Name: \"([^\"]+)\"', section),\n"
+     "                         ['{app}\\\\_internal', '{app}\\\\spicetify'])\n"),
 ]
 
 
