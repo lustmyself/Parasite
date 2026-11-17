@@ -246,7 +246,7 @@ begin
   begin
     MsgBox(
       'League of Legends şu anda açık.'#13#10 +
-      'League of Legends\'i kapat ve kaldırmayı tekrar dene.',
+      'League of Legends''i kapat ve kaldırmayı tekrar dene.',
       mbCriticalError,
       MB_OK
     );
@@ -561,8 +561,8 @@ begin
       Exec(ExpandConstant('{app}\{#MyAppExeName}'), '--remove-ltk-mods', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
       if (ResultCode <> 0) and not UninstallSilent then
         MsgBox(
-          '{#MyAppName}, LTK Manager\'ı temizlemeyi bitiremedi.'#13#10 +
-          'LTK Manager\'daki bazı modların hâlâ kapalı olabilir: onları LTK Manager\'da yeniden aç.',
+          '{#MyAppName}, LTK Manager''ı temizlemeyi bitiremedi.'#13#10 +
+          'LTK Manager''daki bazı modların hâlâ kapalı olabilir: onları LTK Manager''da yeniden aç.',
           mbInformation,
           MB_OK
         );

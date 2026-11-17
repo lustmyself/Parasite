@@ -366,12 +366,12 @@ TURKISH = [
      "      'League of Legends is currently running.'#13#10 +\n"
      "      'Please close League of Legends and try uninstalling again.',\n",
      "      'League of Legends şu anda açık.'#13#10 +\n"
-     "      'League of Legends\\'i kapat ve kaldırmayı tekrar dene.',\n"),
+     "      'League of Legends''i kapat ve kaldırmayı tekrar dene.',\n"),
     ("installer.iss",
      "          '{#MyAppName} could not finish cleaning up LTK Manager.'#13#10 +\n"
      "          'Some of your LTK Manager mods may still be turned off: turn them back on in LTK Manager.',\n",
-     "          '{#MyAppName}, LTK Manager\\'ı temizlemeyi bitiremedi.'#13#10 +\n"
-     "          'LTK Manager\\'daki bazı modların hâlâ kapalı olabilir: onları LTK Manager\\'da yeniden aç.',\n"),
+     "          '{#MyAppName}, LTK Manager''ı temizlemeyi bitiremedi.'#13#10 +\n"
+     "          'LTK Manager''daki bazı modların hâlâ kapalı olabilir: onları LTK Manager''da yeniden aç.',\n"),
 
     # ---- Pengu Loader's window (vendor/PenguLoader-1.1.6) ----
     # Turkish whatever is saved, and no language list to pick another
