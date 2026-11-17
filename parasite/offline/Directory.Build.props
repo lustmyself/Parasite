@@ -24,7 +24,8 @@
     <!-- Packages pinned by version and content hash; CI restores in locked mode. -->
     <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
     <NuGetLockFilePath>$(MSBuildThisFileDirectory)packages.lock.json</NuGetLockFilePath>
-    <!-- Lets the SDK build this net472 WinForms app on Linux too (same output, same packages). -->
+    <!-- Lets the SDK build this net472 WinForms app on Linux too (same packages; the exe differs
+         from the Windows build only in Costura's metadata line endings, see README.md). -->
     <EnableWindowsTargeting>true</EnableWindowsTargeting>
     <!-- On Windows the SDK gives a .NET Framework exe the default runtime identifier win-x86
          (Microsoft.NET.RuntimeIdentifierInference.targets), elsewhere none, and NuGet's lock

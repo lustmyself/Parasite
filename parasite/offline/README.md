@@ -25,9 +25,12 @@ paths or git commit in the exe, reference assemblies from a NuGet package), `glo
 endings on every OS (`.gitattributes`), since C# raw strings embed them, and Costura
 embeds the dependencies uncompressed, since Deflate output depends on the machine's zlib. So
 `python parasite/offline/build_offline.py --build-only` turns the committed `src/` into
-the same `ParasiteOffline.exe` bytes on any machine with that SDK, and
+the same `ParasiteOffline.exe` bytes on any Windows machine with that SDK, and
 `.github/workflows/builds-check.yml` checks on Windows that the committed exe is exactly
 that build. If the check fails, commit the exe from the run's `ParasiteOffline-exe` artifact.
+The Windows build is the reference: built on Linux or macOS, the exe differs in one place,
+Costura's list of embedded assemblies (`costura.metadata`), which Costura writes with the
+build machine's line endings.
 
 Parasite starts League through it (`overlay/launcher/parasite_offline.py`). Players
 switch between online and offline from the Parasite Offline tray icon, or by

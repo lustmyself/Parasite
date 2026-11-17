@@ -13,7 +13,8 @@ parasite/overlay/injection/tools/ParasiteOffline.exe. The modified source stays 
 repo because the GPL requires it to ship with the binary.
 
 The build is deterministic (Directory.Build.props, global.json, packages.lock.json next
-to this script): the same src/ gives the same exe bytes. .github/workflows/builds-check.yml
+to this script): the same src/ gives the same exe bytes on Windows (on other OSes only
+Costura's metadata line endings differ). .github/workflows/builds-check.yml
 rebuilds the exe on Windows with --build-only and fails if it differs from the committed one.
 Text files in src/ are written with LF line endings on every OS (see .gitattributes).
 """
