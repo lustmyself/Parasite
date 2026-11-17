@@ -1,5 +1,4 @@
 {
-  "What happened: this LTK patcher only runs inside LTK Manager, so it refused Parasite and the game started without skins.": "Ne oldu: bu LTK patcher yalnızca LTK Manager içinde çalışıyor; Parasite'ı reddetti ve oyun skinsiz açıldı.",
   "If something feels off, open the logs folder and attach the latest log to a GitHub issue.": "Bir sorun varsa kayıt klasörünü aç ve en son kaydı GitHub'da açacağın bir sorun bildirimine ekle.",
   "Fix: LTK Manager closed while the game was running. Retry the next game. If it happens every game, report it with your Parasite logs.": "Çözüm: LTK Manager oyun sürerken kapandı. Bir sonraki maçta tekrar dene. Her maçta oluyorsa Parasite kayıtlarınla bildir.",
   "Fix: LTK Manager crashed. Retry the next game. If it crashes every game, report it with your Parasite logs.": "Çözüm: LTK Manager çöktü. Bir sonraki maçta tekrar dene. Her maçta çöküyorsa Parasite kayıtlarınla bildir.",
