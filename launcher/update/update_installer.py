@@ -190,9 +190,10 @@ elseif ($result -ne 0 -and !$Recover -and $parentExited -and [System.IO.File]::E
 if ($result -ne 0 -and $Notify -and !$restarted) {
     Add-Type -AssemblyName System.Windows.Forms
     [void][System.Windows.Forms.MessageBox]::Show(
-        "Parasite could not complete the update. The log is at " + $log +
-        ". If Parasite cannot start, run Recover-Parasite.cmd as administrator from " + $PSScriptRoot + ".",
-        'Parasite update failed', 'OK', 'Error')
+        ([regex]::Unescape('Parasite g\u00fcncellemeyi tamamlayamad\u0131. Kay\u0131t dosyas\u0131: ') + $log +
+        [regex]::Unescape('. Parasite a\u00e7\u0131lmazsa ') + $PSScriptRoot +
+        [regex]::Unescape(' klas\u00f6r\u00fcndeki Recover-Parasite.cmd dosyas\u0131n\u0131 y\u00f6netici olarak \u00e7al\u0131\u015ft\u0131r.')),
+        [regex]::Unescape('Parasite g\u00fcncellemesi ba\u015far\u0131s\u0131z'), 'OK', 'Error')
 }
 exit $result
 """

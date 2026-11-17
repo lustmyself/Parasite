@@ -39,8 +39,8 @@ internal static class StartupHandler
             Trace.WriteLine(ex);
             // Show some kind of message so that Deceive doesn't just disappear.
             MessageBox.Show(
-                "Parasite encountered an error and couldn't properly initialize itself. " +
-                "Please contact the creator through GitHub (https://github.com/lustmyself/Parasite) or Discord.\n\n" + ex,
+                "Parasite Offline bir hatayla karşılaştı ve düzgün başlatılamadı. " +
+                "Lütfen GitHub'da bildir (https://github.com/lustmyself/Parasite/issues).\n\n" + ex,
                 DeceiveTitle,
                 MessageBoxButtons.OK,
                 MessageBoxIcon.Error,
@@ -57,8 +57,8 @@ internal static class StartupHandler
         if (Utils.IsClientRunning() && !(riotClientParams?.Contains("allow-multiple-clients") ?? false))
         {
             var result = MessageBox.Show(
-                "The Riot Client is currently running. In order to mask your online status, the Riot Client needs to be started by Parasite. " +
-                "Do you want Parasite to stop the Riot Client and games launched by it, so that it can restart with the proper configuration?",
+                "Riot Client şu anda açık. Çevrimiçi durumunu gizleyebilmek için Riot Client'ın Parasite Offline tarafından başlatılması gerekiyor. " +
+                "Parasite Offline, Riot Client'ı ve onun açtığı oyunları kapatıp doğru ayarlarla yeniden başlatsın mı?",
                 DeceiveTitle,
                 MessageBoxButtons.YesNo,
                 MessageBoxIcon.Question,
@@ -101,8 +101,8 @@ internal static class StartupHandler
         if (riotClientPath is null)
         {
             MessageBox.Show(
-                "Parasite was unable to find the path to the Riot Client. Usually this can be resolved by launching any Riot Games game once, then launching Parasite again. " +
-                "If this does not resolve the issue, please file a bug report through GitHub (https://github.com/lustmyself/Parasite) or Discord.",
+                "Parasite Offline, Riot Client'ın yolunu bulamadı. Genellikle herhangi bir Riot Games oyununu bir kez açıp Parasite Offline'ı yeniden başlatmak bunu çözer. " +
+                "Çözmezse lütfen GitHub'da bildir (https://github.com/lustmyself/Parasite/issues).",
                 DeceiveTitle,
                 MessageBoxButtons.OK,
                 MessageBoxIcon.Error,
@@ -146,9 +146,9 @@ internal static class StartupHandler
         if (serverCertificate is null)
         {
             MessageBox.Show(
-                "Parasite was unable to obtain a necessary security certificate for intercepting and modifying the chat connection. This normally happens when there's " +
-                "a problem with the server that provides the certificate, but it can also be caused by network issues on your end. Please check if there's a new version" +
-                " of Parasite available, check your network connection, or contact the creator through GitHub (https://github.com/lustmyself/Parasite) or Discord.",
+                "Parasite Offline, sohbet bağlantısı için gereken güvenlik sertifikasını alamadı. Bu genellikle sertifikayı veren sunucudaki bir sorundan olur, " +
+                "ama senin ağındaki bir sorundan da olabilir. Parasite'ın yeni bir sürümü var mı bak, internet bağlantını kontrol et" +
+                " ya da GitHub'da bildir (https://github.com/lustmyself/Parasite/issues).",
                 DeceiveTitle,
                 MessageBoxButtons.OK,
                 MessageBoxIcon.Error,

@@ -57,7 +57,7 @@ def _show_error(message: str) -> None:
         user32.MessageBoxW(
             None,
             message,
-            "Parasite - Launcher",
+            "Parasite - Başlatıcı",
             MB_OK | MB_ICONERROR | MB_TOPMOST,
         )
         updater_log.error(f"Error dialog shown to user: {message}")
@@ -85,14 +85,14 @@ def _confirm_update(dialog: UpdateDialog, remote_version: str, local_version: st
     """Ask whether the user wants to download an available Parasite update."""
     dialog.set_marquee(False)
     dialog.set_detail("Update available")
-    dialog.set_status(f"Parasite {remote_version} is ready to install.")
+    dialog.set_status(f"Parasite {remote_version} kurulmaya hazır.")
     dialog.pump_messages()
 
     message = (
-        f"A new version of Parasite is available.\n\n"
-        f"Current version: {local_version}\n"
-        f"New version: {remote_version}\n\n"
-        "Do you want to download and install it now?"
+        f"Parasite'ın yeni bir sürümü var.\n\n"
+        f"Şu anki sürüm: {local_version}\n"
+        f"Yeni sürüm: {remote_version}\n\n"
+        "Şimdi indirip kurmak ister misin?"
     )
     # The desktop hub asks in its window; None means no hub page, so ask with a message box
     hub_answer = dialog.confirm_update(remote_version, local_version) if hasattr(dialog, "confirm_update") else None
@@ -102,7 +102,7 @@ def _confirm_update(dialog: UpdateDialog, remote_version: str, local_version: st
         result = user32.MessageBoxW(
             dialog.hwnd or None,
             message,
-            "Parasite update available",
+            "Parasite güncellemesi var",
             MB_YESNO | MB_ICONINFORMATION | MB_DEFBUTTON2 | MB_TOPMOST,
         )
         accepted = result == IDYES
@@ -235,7 +235,7 @@ def _run_launcher_dialog(dev_mode: bool, test_download_fail: bool, *, holds_inst
             except Exception as exc:  # noqa: BLE001
                 result["error"] = exc
                 log.error(f"Launcher error: {exc}", exc_info=True)
-                _show_error(f"Failed to prepare Parasite:\n\n{exc}")
+                _show_error(f"Parasite hazırlanamadı:\n\n{exc}")
                 updater_log.exception("Launcher sequence crashed", exc_info=True)
             finally:
                 dialog.allow_close()

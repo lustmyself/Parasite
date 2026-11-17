@@ -2339,7 +2339,7 @@
       versionBadge.style.fontWeight = "normal";
       versionBadge.style.whiteSpace = "nowrap";
       title.appendChild(versionBadge);
-      titleRow.appendChild(createLanguagePicker());
+      // Parasite is Turkish only: no language picker
     }
 
     form.appendChild(titleRow);

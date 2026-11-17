@@ -11,7 +11,7 @@
             <ResourceDictionary.MergedDictionaries>
                 <ui:ThemeResources AccentColor="#00a1ff" />
                 <ui:XamlControlsResources UseCompactResources="True" />
-                <ResourceDictionary Source="Languages/en-US.xaml"/>
+                <ResourceDictionary Source="Languages/tr-TR.xaml"/>
             </ResourceDictionary.MergedDictionaries>
         </ResourceDictionary>
     </Application.Resources>

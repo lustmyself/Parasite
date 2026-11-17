@@ -39,7 +39,7 @@ from .storage import ModStorageService
 
 log = get_logger()
 
-BACKUP_FOLDER = "Parasite mods backup {date:%Y-%m-%d}"
+BACKUP_FOLDER = "Parasite mod yedeği {date:%Y-%m-%d}"
 BACKUP_ASKED = "backupAsked"
 INJECTION_LINK_FOLDERS = ("mods", "stage", "ltf_staging")
 REASONS_THE_DLL_CHECK_REPORTS = tuple(MissingComponent)
@@ -320,9 +320,9 @@ class _Migration:
         if free < need:
             raise MigrationStopped(
                 f"{size_text(free)} free on LTK Manager's drive, {size_text(need)} needed",
-                f"Your mods need {size_text(need)} free on the drive of LTK Manager's library ({_existing(root)}), "
-                f"and {size_text(free)} is free there.\n\nFree some space: your mods stay in Parasite and work as "
-                "before until then, and Parasite moves them the next time it starts.",
+                f"Modların için LTK Manager kütüphanesinin sürücüsünde ({_existing(root)}) {size_text(need)} "
+                f"boş alan gerekiyor, orada {size_text(free)} boş.\n\nBiraz yer aç: o zamana kadar modların "
+                "Parasite'ta kalır ve eskisi gibi çalışır, Parasite onları bir sonraki açılışta taşır.",
             )
 
     def _move_all(self, moves: List[_Move]) -> None:
@@ -512,19 +512,19 @@ def size_text(size: int) -> str:
 
 
 def _unavailable_notice(reason: str) -> str:
-    return (f"Parasite could not move your mods into LTK Manager: {reason}.\n\n"
-            "Your mods stay in Parasite and work as before. Parasite tries again the next time it starts "
-            "(close LTK Manager first if it is open).")
+    return (f"Parasite modlarını LTK Manager'a taşıyamadı: {reason}.\n\n"
+            "Modların Parasite'ta kalır ve eskisi gibi çalışır. Parasite bir sonraki açılışta tekrar dener "
+            "(LTK Manager açıksa önce onu kapat).")
 
 
 def _backup_notice(why: str) -> str:
-    return (f"Parasite could not back up your mods to your desktop: {why}.\n\n"
-            "Nothing was moved or deleted: your mods stay in Parasite and work as before, "
-            "and Parasite asks again the next time it starts.")
+    return (f"Parasite modlarını masaüstüne yedekleyemedi: {why}.\n\n"
+            "Hiçbir şey taşınmadı ya da silinmedi: modların Parasite'ta kalır ve eskisi gibi çalışır, "
+            "Parasite bir sonraki açılışta yeniden sorar.")
 
 
 def _failures_notice(report: MigrationReport) -> str:
     failures = "\n".join(f"- {name}: {why}" for name, why in report.failed)
     total = len(report.moved) + len(report.failed)
-    return (f"Parasite moved {len(report.moved)} of your {total} mods into LTK Manager. These stay in Parasite and work "
-            f"as before, and Parasite tries to move them again the next time it starts:\n\n{failures}")
+    return (f"Parasite {total} modundan {len(report.moved)} tanesini LTK Manager'a taşıdı. Şunlar Parasite'ta kalır, "
+            f"eskisi gibi çalışır ve Parasite bir sonraki açılışta onları yeniden taşımayı dener:\n\n{failures}")

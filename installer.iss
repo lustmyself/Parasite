@@ -7,7 +7,7 @@
 #define MyAppPublisher "Parasite Team"
 #define MyAppURL "https://github.com/lustmyself/Parasite"
 #define MyAppExeName "Parasite.exe"
-#define MyAppDescription "Effortless skin changer for League of Legends"
+#define MyAppDescription "League of Legends için zahmetsiz skin değiştirici"
 ; Must match config.SINGLE_INSTANCE_MUTEX_NAME (used by the app to enforce single-instance)
 #define MyAppMutex "Local\ParasiteSingleInstance"
 
@@ -47,7 +47,7 @@ VersionInfoProductName={#MyAppName}
 AppMutex={#MyAppMutex}
 
 [Languages]
-Name: "english"; MessagesFile: "compiler:Default.isl"
+Name: "turkish"; MessagesFile: "compiler:Languages\Turkish.isl"
 
 [Tasks]
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
@@ -66,7 +66,7 @@ Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Tasks: de
 Name: "{userappdata}\Microsoft\Internet Explorer\Quick Launch\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Tasks: quicklaunchicon; IconFilename: "{app}\icon.ico"
 
 [Run]
-Filename: "{app}\{#MyAppExeName}"; Description: "{cm:LaunchProgram,{#StringChange(MyAppName, '&', '&&')}} (as Administrator)"; Flags: nowait postinstall skipifsilent shellexec; Verb: runas
+Filename: "{app}\{#MyAppExeName}"; Description: "{cm:LaunchProgram,{#StringChange(MyAppName, '&', '&&')}} (yönetici olarak)"; Flags: nowait postinstall skipifsilent shellexec; Verb: runas
 
 [UninstallRun]
 ; Uninstall Pengu Loader (removes its IFEO activation and disables the native hook)
@@ -143,14 +143,14 @@ begin
   IntroText.Height := ScaleY(36);
   IntroText.AutoSize := False;
   IntroText.ShowAccelChar := False;
-  IntroText.Caption := 'Your settings, skin history and downloaded skins are kept unless you untick this.';
+  IntroText.Caption := 'Bu kutunun işaretini kaldırmazsan ayarların, skin geçmişin ve indirilen skinler saklanır.';
 
   KeepUserDataBox := TNewCheckBox.Create(UninstallProgressForm);
   KeepUserDataBox.Parent := Page;
   KeepUserDataBox.Left := Left0;
   KeepUserDataBox.Top := Top0 + ScaleY(48);
   KeepUserDataBox.Width := Width0;
-  KeepUserDataBox.Caption := 'Keep my data in ' + _UserDataFolder();
+  KeepUserDataBox.Caption := 'Verilerim kalsın: ' + _UserDataFolder();
   KeepUserDataBox.Checked := True;
 
   { The uninstaller form only has a Cancel button, on the right. Take its spot
@@ -161,7 +161,7 @@ begin
   UninstallButton.Height := UninstallProgressForm.CancelButton.Height;
   UninstallButton.Left := UninstallProgressForm.CancelButton.Left;
   UninstallButton.Top := UninstallProgressForm.CancelButton.Top;
-  UninstallButton.Caption := 'Uninstall';
+  UninstallButton.Caption := 'Kaldır';
   UninstallButton.ModalResult := mrOK;
   UninstallButton.TabOrder := UninstallProgressForm.CancelButton.TabOrder;
 
@@ -170,9 +170,9 @@ begin
     SavedCancelLeft - UninstallButton.Width - ScaleX(10);
   UninstallProgressForm.CancelButton.TabOrder := UninstallButton.TabOrder + 1;
 
-  UninstallProgressForm.PageNameLabel.Caption := 'Uninstall {#MyAppName}';
+  UninstallProgressForm.PageNameLabel.Caption := '{#MyAppName} kaldır';
   UninstallProgressForm.PageDescriptionLabel.Caption :=
-    'Tick the data you want to keep, then continue.';
+    'Saklamak istediğin verileri işaretle, sonra devam et.';
   UninstallProgressForm.CancelButton.Enabled := True;
   UninstallProgressForm.CancelButton.ModalResult := mrCancel;
 
@@ -221,8 +221,8 @@ begin
   if ParasiteRunning and LeagueRunning then
   begin
     MsgBox(
-      '{#MyAppName} and League of Legends are both currently running.'#13#10 +
-      'Please close both applications and try uninstalling again.',
+      '{#MyAppName} ve League of Legends şu anda açık.'#13#10 +
+      'İkisini de kapat ve kaldırmayı tekrar dene.',
       mbCriticalError,
       MB_OK
     );
@@ -233,8 +233,8 @@ begin
   if ParasiteRunning then
   begin
     MsgBox(
-      '{#MyAppName} is currently running.'#13#10 +
-      'Please close it completely (including the tray) and try uninstalling again.',
+      '{#MyAppName} şu anda açık.'#13#10 +
+      'Onu tamamen kapat (sistem tepsisinden de) ve kaldırmayı tekrar dene.',
       mbCriticalError,
       MB_OK
     );
@@ -245,8 +245,8 @@ begin
   if LeagueRunning then
   begin
     MsgBox(
-      'League of Legends is currently running.'#13#10 +
-      'Please close League of Legends and try uninstalling again.',
+      'League of Legends şu anda açık.'#13#10 +
+      'League of Legends\'i kapat ve kaldırmayı tekrar dene.',
       mbCriticalError,
       MB_OK
     );
@@ -561,8 +561,8 @@ begin
       Exec(ExpandConstant('{app}\{#MyAppExeName}'), '--remove-ltk-mods', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
       if (ResultCode <> 0) and not UninstallSilent then
         MsgBox(
-          '{#MyAppName} could not finish cleaning up LTK Manager.'#13#10 +
-          'Some of your LTK Manager mods may still be turned off: turn them back on in LTK Manager.',
+          '{#MyAppName}, LTK Manager\'ı temizlemeyi bitiremedi.'#13#10 +
+          'LTK Manager\'daki bazı modların hâlâ kapalı olabilir: onları LTK Manager\'da yeniden aç.',
           mbInformation,
           MB_OK
         );

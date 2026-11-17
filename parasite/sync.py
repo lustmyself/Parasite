@@ -12,6 +12,7 @@ is replaced by the Rose tree at <rose-git-ref>, then:
 3. the "Rose" labels inside the prebuilt Pengu Loader core.dll -> "Parasite"
 4. parasite/overlay/ is copied on top (Kai'Sa icons, lobby reveal)
 5. EDITS below are applied to Rose files Parasite changes
+6. Turkish texts (parasite/turkish.py) replace the English ones players see
 
 Any step that no longer fits Rose's code fails loudly instead of guessing.
 """
@@ -25,6 +26,8 @@ import sys
 import tarfile
 import tempfile
 from pathlib import Path
+
+from turkish import LOCALE_TR, apply_turkish  # parasite/turkish.py: Parasite is Turkish only
 
 ROOT = Path(__file__).resolve().parents[1]
 OVERLAY = ROOT / "parasite" / "overlay"
@@ -934,6 +937,9 @@ LOCALE_STRINGS = {
         "zh_TW": "如果覺得哪裡怪怪的，請開啟記錄檔資料夾，並將最新的記錄檔附加到 GitHub issue 中。",
     },
 }
+# Rose's texts its tr.json has no Turkish for (parasite/turkish.py): the client speaks Turkish only
+for _key, _turkish in LOCALE_TR.items():
+    LOCALE_STRINGS.setdefault(_key, {})["tr"] = _turkish
 # Keys Rose's languages have that Parasite no longer uses: dropped from every PARASITE-I18n language
 LOCALE_DROPPED = [
     "If something feels off, open the logs folder and share the latest log in a discord ticket.",
@@ -1470,9 +1476,15 @@ EDITS += [
      "            Utils.OpenLink(Program.DiscordUrl);\n"
      "        }\n\n",
      ""),
+    # The whole method: its line alone is also inside a longer, more indented line that already
+    # opens GithubIssuesUrl, so apply_edits took it for applied and Program.HomepageUrl stayed
     ("vendor/PenguLoader-1.1.6/loader/Views/MainPage.xaml.cs",
+     "        private void HomePageButtonClick(object sender, RoutedEventArgs e)\n"
+     "        {\n"
      "            Utils.OpenLink(Program.HomepageUrl);\n",
-     "            Utils.OpenLink(Program.GithubIssuesUrl);\n"),
+     "        private void HomePageButtonClick(object sender, RoutedEventArgs e)\n"
+     "        {\n"
+     "            Utils.OpenLink(Program.GithubIssuesUrl);  // Report a problem\n"),
     ("vendor/PenguLoader-1.1.6/loader/Views/MainPage.xaml",
      '<TextBlock Text="Support Parasite Team" Margin="8,0,0,0" />',
      '<TextBlock Text="Report a problem" Margin="8,0,0,0" />'),
@@ -1574,6 +1586,7 @@ def main():
         copy_overlay(tree)
         apply_edits(tree)
         add_locale_strings(tree)
+        apply_turkish(tree, read_text, write_text)
         apply_parasite_version(tree)
         install(tree)
     print(f"[sync] Parasite tree rebuilt from Rose {ref}")
