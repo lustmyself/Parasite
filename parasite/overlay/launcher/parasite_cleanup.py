@@ -105,26 +105,39 @@ def _key(path) -> str:
     return os.path.normcase(os.path.normpath(str(path))).rstrip("\\/")
 
 
-def _protected_roots() -> tuple[set[str], list[str]]:
+def _keys(path) -> set[str]:
+    """The path as written and resolved: environment variables may hold 8.3 short names
+    (C:\\Users\\RUNNER~1), while the folder checked against them is resolved to long names."""
+    keys = {_key(path)}
+    if not Path(path).is_absolute():
+        return keys  # "C:" alone would resolve to the current folder
+    try:
+        keys.add(_key(Path(path).resolve()))
+    except (OSError, RuntimeError, ValueError):
+        pass
+    return keys
+
+
+def _protected_roots() -> tuple[set[str], set[str]]:
     """Folders never cleaned, and folders nothing inside of which is cleaned."""
-    exact, inside = set(), []
+    exact, inside = set(), set()
     for name in ("ProgramFiles", "ProgramFiles(x86)", "ProgramW6432", "ProgramData", "ALLUSERSPROFILE",
                  "USERPROFILE", "PUBLIC", "APPDATA", "LOCALAPPDATA", "HOMEDRIVE"):
         if os.environ.get(name):
-            exact.add(_key(os.environ[name]))
+            exact |= _keys(os.environ[name])
     for literal in (r"C:\Program Files", r"C:\Program Files (x86)", r"C:\ProgramData", r"C:\Users"):
         exact.add(_key(literal))
     profile = os.environ.get("USERPROFILE")
     if profile:
-        exact.add(_key(Path(profile).parent))  # C:\Users
+        exact |= _keys(Path(profile).parent)  # C:\Users
     try:
-        exact.add(_key(Path.home()))
+        exact |= _keys(Path.home())
     except RuntimeError:
         pass
     for name in ("SystemRoot", "windir"):
         if os.environ.get(name):
-            inside.append(_key(os.environ[name]))
-    inside.append(_key(r"C:\Windows"))
+            inside |= _keys(os.environ[name])
+    inside.add(_key(r"C:\Windows"))
     return exact, inside
 
 

@@ -90,6 +90,21 @@ class CleanOldInstallsTests(unittest.TestCase):
                 self.assertTrue((target / "Parasite.exe").exists())
                 self.assertTrue((target / "_internal").exists())
 
+    def test_a_protected_folder_named_another_way_is_still_protected(self):
+        # Windows' %TEMP% / %USERPROFILE% can hold 8.3 short names; here a link stands in for one
+        old = self.root / "Profile"
+        (old / "_internal" / "injection").mkdir(parents=True)
+        (old / "Parasite.exe").write_text("x")
+        alias = self.root / "PROFIL~1"
+        try:
+            alias.symlink_to(old, target_is_directory=True)
+        except OSError:
+            self.skipTest("this account can't create links")
+        with patch.dict("os.environ", {"USERPROFILE": str(alias)}):
+            deleted = self._run([(0, "old", {"DisplayName": "Parasite", "InstallLocation": str(old)})])
+        self.assertEqual(deleted, [])
+        self.assertTrue((old / "Parasite.exe").exists())
+
     def test_drive_roots_are_protected(self):
         self.assertTrue(cleanup.is_protected_folder(Path(Path.cwd().anchor)))
         self.assertTrue(cleanup.is_protected_folder(Path("relative")))
