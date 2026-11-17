@@ -1,5 +1,5 @@
 import unittest
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 from lcu.features.lobby_reveal import (
     RevealedPlayer,
@@ -130,6 +130,16 @@ class PorofessorLinkTests(unittest.TestCase):
 
 
 class LobbyRevealThreadTests(unittest.TestCase):
+    def setUp(self):
+        # Hermetic: no counters downloads (U.GG, Lolalytics), no League client, no settings file
+        self.board = {"status": "idle"}
+        for target, value in (("launcher.parasite_counters.board", lambda: dict(self.board)),
+                              ("launcher.parasite_counters.session", lambda: None),
+                              ("launcher.parasite_settings.enabled", lambda key: True)):
+            patcher = patch(target, side_effect=value)
+            patcher.start()
+            self.addCleanup(patcher.stop)
+
     def _thread(self, phase):
         lcu = MagicMock(ok=True, region_locale={"webRegion": "EUW"}, session={"myTeam": []})
         state = MagicMock(phase=phase)
@@ -159,6 +169,19 @@ class LobbyRevealThreadTests(unittest.TestCase):
         self.assertFalse(broadcaster.broadcast_lobby_reveal.call_args[0][0]["active"])
         thread._tick()  # cleared only once
         self.assertEqual(broadcaster.broadcast_lobby_reveal.call_count, 2)
+
+    def test_adds_the_enemy_counters_for_the_client_box(self):
+        self.board = {"status": "ready", "enemies": [{
+            "id": 7, "name": "LeBlanc", "role": "middle", "roleLabel": "Orta",
+            "counters": [{"id": 1, "name": "Annie", "winRate": 53.1, "delta": 1.2, "games": 900, "gold15": 120,
+                          "cs15": 4.5, "kills15": 0.1, "link": "https://u.gg/x", "slug": "annie"}]}]}
+        thread, _, broadcaster = self._thread("ChampSelect")
+        thread._tick()
+        payload = broadcaster.broadcast_lobby_reveal.call_args[0][0]
+        self.assertFalse(payload["countersLoading"])
+        self.assertEqual(payload["counters"][0]["counters"][0],
+                         {"id": 1, "name": "Annie", "winRate": 53.1, "delta": 1.2, "games": 900, "gold15": 120,
+                          "cs15": 4.5, "kills15": 0.1, "link": "https://u.gg/x"})
 
     def test_team_stays_until_the_game_starts(self):
         thread, state, broadcaster = self._thread("ChampSelect")
