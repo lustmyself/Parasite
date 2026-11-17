@@ -1118,15 +1118,71 @@ EDITS += [
      "        status_callback(f\"Downloading update {remote_version}\")\n"
      "        if not self.downloader.download_update(\n",
      "        zip_path = updates_root / \"package.zip\"\n"
+     "        # Parasite: only the package GitHub published is installed. The background download\n"
+     "        # sits in a folder any program of the user can write to: it is copied into the\n"
+     "        # workspace (administrators only) and checked there (launcher/parasite_integrity.py)\n"
      "        from launcher.parasite_autoupdate import predownloaded\n"
+     "        from launcher.parasite_integrity import BAD_HASH, NO_HASH, take_verified, verify_file\n"
+     "        expected = asset.get(\"sha256\")\n"
+     "        if not expected:\n"
+     "            status_callback(NO_HASH)\n"
+     "            return False\n"
      "        background = predownloaded(asset, remote_version)\n"
-     "        if background:\n"
-     "            zip_path = background\n"
+     "        if background and take_verified(background, zip_path, expected):\n"
      "            status_callback(\"Update downloaded in the background\")\n"
      "        else:\n"
+     "            background = None\n"
      "            status_callback(f\"Downloading update {remote_version}\")\n"
      "        if not background and not self.downloader.download_update(\n"),
-    ("Parasite.spec", "    'launcher.core',\n", "    'launcher.core',\n    'launcher.parasite_autoupdate',\n    'launcher.parasite_cleanup',\n    'launcher.parasite_hero',\n"),
+    # ... and checked again right before it is extracted
+    ("launcher/update/update_sequence.py",
+     "            return False\n"
+     "\n"
+     "        status_callback(\"Extracting update\")\n",
+     "            return False\n"
+     "        if not verify_file(zip_path, expected):\n"
+     "            zip_path.unlink(missing_ok=True)\n"
+     "            status_callback(BAD_HASH)\n"
+     "            return False\n"
+     "\n"
+     "        status_callback(\"Extracting update\")\n"),
+    # The expected SHA-256 comes from GitHub (asset digest or SHA256SUMS) before anything is asked
+    ("launcher/update/update_sequence.py",
+     "            status_callback(\"No release asset found\")\n"
+     "            return False\n",
+     "            status_callback(\"No release asset found\")\n"
+     "            return False\n"
+     "        from launcher.parasite_integrity import NO_HASH, expected_sha256\n"
+     "        asset = dict(asset, sha256=expected_sha256(release, asset))\n"
+     "        if not asset[\"sha256\"]:\n"
+     "            # Not installed unverified: the next start (or release check) tries again\n"
+     "            status_callback(NO_HASH)\n"
+     "            return False\n"),
+    # The workspace (package, staging, apply.ps1) is restricted to administrators
+    ("launcher/update/update_installer.py",
+     "            raise OSError(f\"Update workspace is a link: {root}\")\n",
+     "            raise OSError(f\"Update workspace is a link: {root}\")\n"
+     "        # Parasite: only administrators may change what the elevated update installs and runs\n"
+     "        from launcher.parasite_integrity import secure_workspace\n"
+     "        secure_workspace(root)\n"),
+    ("Parasite.spec", "    'launcher.core',\n", "    'launcher.core',\n    'launcher.parasite_autoupdate',\n    'launcher.parasite_cleanup',\n    'launcher.parasite_hero',\n    'launcher.parasite_integrity',\n"),
+    # Rose's test of the update sequence: the package it "downloads" now has to match its SHA-256
+    ("launcher/tests/test_update_sequence.py",
+     "        self.sequence.downloader.download_update.return_value = True\n",
+     "        self.sequence.downloader.download_update.side_effect = (\n"
+     "            lambda url, path, *rest: path.write_bytes(b\"package\") or True)\n"),
+    ("launcher/tests/test_update_sequence.py",
+     "        self.sequence.installer.workspace.return_value = Path(temp_dir.name) / \"Parasite.update\"\n",
+     "        self.sequence.installer.workspace.return_value = Path(temp_dir.name) / \"Parasite.update\"\n"
+     "        self.sequence.installer.workspace.return_value.mkdir()\n"
+     "        background = patch(\"launcher.parasite_autoupdate.predownloaded\", return_value=None)\n"
+     "        background.start()\n"
+     "        self.addCleanup(background.stop)\n"),
+    ("launcher/tests/test_update_sequence.py",
+     "                {}, \"9.9.9\", {\"browser_download_url\": \"https://example.invalid/u\"}, Mock(), Mock(), None,\n",
+     "                {}, \"9.9.9\", {\"browser_download_url\": \"https://example.invalid/u\",\n"
+     "                              \"sha256\": hashlib.sha256(b\"package\").hexdigest()}, Mock(), Mock(), None,\n"),
+    ("launcher/tests/test_update_sequence.py", "import tempfile\n", "import hashlib\nimport tempfile\n"),
 ]
 
 

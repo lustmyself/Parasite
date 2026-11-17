@@ -2,8 +2,13 @@
 
 The hub's release check calls `on_release()`: with "auto update" on (the default) the
 update package is downloaded in the background into Parasite's updates folder, next to a
-`.ready` file holding its size. The launcher's update sequence then skips its own
+`.ready` file holding its size and SHA-256. The launcher's update sequence then skips its own
 download for that package, and the hub's update question answers itself.
+
+Only a package matching the SHA-256 GitHub publishes for it is kept (launcher/parasite_integrity.py);
+a release without one is not downloaded, and the next release check (every 30 minutes) tries again.
+The updates folder is the user's: the update sequence copies the package into its own
+administrators-only folder and checks it again there before installing it.
 
 The install needs Parasite to restart into its launcher. That happens only while no League
 client or game runs (checked twice, a minute apart), so nobody is cut off mid-game;
@@ -59,12 +64,18 @@ def ready_path(zip_path: Path) -> Path:
     return zip_path.with_name(zip_path.name + ".ready")
 
 
-def is_ready(zip_path: Path) -> bool:
-    """The package was fully downloaded in the background."""
+def is_ready(zip_path: Path, expected: Optional[str] = None) -> bool:
+    """The package was fully downloaded in the background (and, given `expected`, is that package)."""
     try:
-        return zip_path.is_file() and ready_path(zip_path).read_text(encoding="utf-8").strip() == str(zip_path.stat().st_size)
+        recorded = ready_path(zip_path).read_text(encoding="utf-8").split()
+        if not zip_path.is_file() or not recorded or recorded[0] != str(zip_path.stat().st_size):
+            return False
     except OSError:
         return False
+    if expected is None:
+        return True
+    from launcher.parasite_integrity import verify_file
+    return verify_file(zip_path, expected)
 
 
 def package_path(asset: dict, version: str) -> Path:
@@ -75,36 +86,43 @@ def package_path(asset: dict, version: str) -> Path:
 def predownloaded(asset: dict, version: str) -> Optional[Path]:
     """The package downloaded in the background for `asset`, when it is complete.
 
-    The launcher's update sequence installs it instead of downloading it again (and
-    deletes it once extracted).
+    The launcher's update sequence copies it into its own folder, checks it against the
+    release's SHA-256 there (`asset["sha256"]`) and deletes this copy.
     """
     try:
         target = package_path(asset, version)
     except OSError:
         return None
-    if not is_ready(target):
+    if not is_ready(target, asset.get("sha256")):
         return None
     ready_path(target).unlink(missing_ok=True)
     return target
 
 
-def _download(url: str, target: Path, expected: int = 0) -> bool:
+def _download(url: str, target: Path, expected: int = 0, sha256: Optional[str] = None) -> bool:
+    import hashlib
     part = target.with_name(target.name + ".part")
     try:
+        if not sha256:
+            raise OSError("no SHA-256 to check the package against")
+        digest = hashlib.sha256()
         with requests.get(url, stream=True, timeout=60) as response:
             response.raise_for_status()
             with part.open("wb") as handle:
                 for chunk in response.iter_content(1024 * 256):
+                    digest.update(chunk)
                     handle.write(chunk)
         size = part.stat().st_size
         if size == 0 or (expected and size != expected):
             raise OSError(f"size {size}, expected {expected}")
+        if digest.hexdigest() != sha256.lower():
+            raise OSError(f"SHA-256 {digest.hexdigest()}, expected {sha256.lower()}")
         import zipfile
         with zipfile.ZipFile(part) as archive:
             if archive.testzip() is not None:
                 raise OSError("the package is damaged")
         part.replace(target)
-        ready_path(target).write_text(str(size), encoding="utf-8")
+        ready_path(target).write_text(f"{size} {sha256.lower()}", encoding="utf-8")
         return True
     except Exception as exc:  # noqa: BLE001
         log.warning(f"[AutoUpdate] Download failed: {exc}")
@@ -150,9 +168,15 @@ def on_release(client, release: dict, current: str) -> None:
     with _lock:
         if _pending == version:
             return
-        if not is_ready(target):
+        from launcher.parasite_integrity import expected_sha256
+        sha256 = expected_sha256(release, asset)
+        if not sha256:
+            # Nothing unverified is downloaded; the next release check tries again
+            log.warning(f"[AutoUpdate] Parasite {version} has no published SHA-256 yet; retrying at the next check")
+            return
+        if not is_ready(target, sha256):
             log.info(f"[AutoUpdate] Downloading Parasite {version} in the background")
-            if not _download(asset["browser_download_url"], target, int(asset.get("size") or 0)):
+            if not _download(asset["browser_download_url"], target, int(asset.get("size") or 0), sha256):
                 return
         _pending = version
     log.info(f"[AutoUpdate] Parasite {version} is downloaded and waits for League to be closed")

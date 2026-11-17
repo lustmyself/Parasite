@@ -1,3 +1,4 @@
+import hashlib
 import tempfile
 import unittest
 from pathlib import Path
@@ -23,16 +24,22 @@ class ReleaseHashesTests(unittest.TestCase):
         self.sequence.github_client = Mock()
         self.sequence.github_client.get_hash_asset.return_value = {"browser_download_url": "https://example.invalid/h"}
         self.sequence.downloader = Mock()
-        self.sequence.downloader.download_update.return_value = True
+        self.sequence.downloader.download_update.side_effect = (
+            lambda url, path, *rest: path.write_bytes(b"package") or True)
         self.sequence.installer = Mock()
         self.sequence.installer.workspace.return_value = Path(temp_dir.name) / "Parasite.update"
+        self.sequence.installer.workspace.return_value.mkdir()
+        background = patch("launcher.parasite_autoupdate.predownloaded", return_value=None)
+        background.start()
+        self.addCleanup(background.stop)
         self.sequence.installer.extract_update.return_value = self.extracted
         self.sequence.installer.install.return_value = True
 
     def prepare(self):
         with patch.object(update_sequence.sys, "executable", str(self.install_dir / "Parasite.exe")):
             return self.sequence._prepare_update(
-                {}, "9.9.9", {"browser_download_url": "https://example.invalid/u"}, Mock(), Mock(), None,
+                {}, "9.9.9", {"browser_download_url": "https://example.invalid/u",
+                              "sha256": hashlib.sha256(b"package").hexdigest()}, Mock(), Mock(), None,
             )
 
     def test_an_installed_copy_is_kept_without_downloading_the_release_one(self):

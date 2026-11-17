@@ -321,6 +321,9 @@ class UpdateInstaller:
         root.mkdir(exist_ok=True)
         if _is_reparse_point(root):
             raise OSError(f"Update workspace is a link: {root}")
+        # Parasite: only administrators may change what the elevated update installs and runs
+        from launcher.parasite_integrity import secure_workspace
+        secure_workspace(root)
         marker = root / WORKSPACE_MARKER
         if not any(root.iterdir()):
             marker.write_bytes(WORKSPACE_VERSION)
