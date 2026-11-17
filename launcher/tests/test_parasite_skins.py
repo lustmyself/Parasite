@@ -79,5 +79,97 @@ class SkinsTests(unittest.TestCase):
         self.assertEqual(parasite_skins.delete("../secret.zip"), "")
 
 
+
+class ChampionListCacheTests(unittest.TestCase):
+    """champions() is called by hub pages polled every couple of seconds: offline it must not
+    download again on every call, and callers must not all download at once."""
+
+    def setUp(self):
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        self.folder = Path(tmp.name)
+        p = patch.object(parasite_custom_skins, "folder", return_value=self.folder)
+        p.start()
+        self.addCleanup(p.stop)
+        p = patch.dict(parasite_skins._champions, {"at": None, "items": [], "retry": False})
+        p.start()
+        self.addCleanup(p.stop)
+        self.clock = [1000.0]
+        p = patch.object(parasite_skins.time, "monotonic", side_effect=lambda: self.clock[0])
+        p.start()
+        self.addCleanup(p.stop)
+
+    def test_offline_without_a_saved_list_waits_a_minute_before_trying_again(self):
+        with patch.object(parasite_skins, "_download", return_value=[]) as download:
+            self.assertEqual(parasite_skins.champions(), [])
+            self.assertEqual(parasite_skins.champions(), [])
+            self.clock[0] += 30
+            parasite_skins.champions()
+            self.assertEqual(download.call_count, 1)
+            self.clock[0] += parasite_skins.CHAMPIONS_RETRY_S
+            parasite_skins.champions()
+            self.assertEqual(download.call_count, 2)
+
+    def test_offline_uses_the_saved_list_and_retries_the_network_later(self):
+        (self.folder / parasite_skins.CHAMPIONS_FILE).write_text(json.dumps(CHAMPIONS), encoding="utf-8")
+        with patch.object(parasite_skins, "_download", return_value=[]) as download:
+            self.assertEqual([c["name"] for c in parasite_skins.champions()], ["Aatrox", "Ahri"])
+            parasite_skins.champions()
+            self.assertEqual(download.call_count, 1)
+        self.clock[0] += parasite_skins.CHAMPIONS_RETRY_S + 1
+        fresh = parasite_skins.clean_champions(CHAMPIONS[:2])
+        with patch.object(parasite_skins, "_download", return_value=fresh) as download:
+            self.assertEqual(parasite_skins.champions(), fresh)
+            self.clock[0] += parasite_skins.CHAMPIONS_RETRY_S * 10
+            parasite_skins.champions()
+            self.assertEqual(download.call_count, 1)
+
+    def test_a_downloaded_list_is_kept_for_hours(self):
+        items = parasite_skins.clean_champions(CHAMPIONS)
+        with patch.object(parasite_skins, "_download", return_value=items) as download:
+            parasite_skins.champions()
+            self.clock[0] += parasite_skins.CHAMPIONS_TTL_S - 1
+            parasite_skins.champions()
+            self.assertEqual(download.call_count, 1)
+            self.clock[0] += 2
+            parasite_skins.champions()
+            self.assertEqual(download.call_count, 2)
+
+    def test_concurrent_callers_share_one_download(self):
+        import threading
+        started, release = threading.Event(), threading.Event()
+        items = parasite_skins.clean_champions(CHAMPIONS)
+
+        def slow():
+            started.set()
+            release.wait(5)
+            return items
+
+        results = []
+        with patch.object(parasite_skins, "_download", side_effect=slow) as download:
+            threads = [threading.Thread(target=lambda: results.append(parasite_skins.champions()))
+                       for _ in range(4)]
+            threads[0].start()
+            self.assertTrue(started.wait(5))
+            for t in threads[1:]:
+                t.start()
+            release.set()
+            for t in threads:
+                t.join(5)
+        self.assertEqual(download.call_count, 1)
+        self.assertEqual(results, [items] * 4)
+
+    def test_a_stale_list_is_handed_back_while_another_caller_downloads(self):
+        old = parasite_skins.clean_champions(CHAMPIONS[:2])
+        parasite_skins._champions.update(at=0.0, items=old, retry=True)
+        parasite_skins._fetch_lock.acquire()
+        try:
+            with patch.object(parasite_skins, "_download") as download:
+                self.assertEqual(parasite_skins.champions(), old)
+                download.assert_not_called()
+        finally:
+            parasite_skins._fetch_lock.release()
+
+
 if __name__ == "__main__":
     unittest.main()

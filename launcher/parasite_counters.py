@@ -18,6 +18,7 @@ import itertools
 import math
 import threading
 import time
+from collections import OrderedDict
 from typing import Optional
 
 from utils.core.logging import get_logger
@@ -33,6 +34,8 @@ WORLD, MASTER_PLUS = "12", "14"
 # A new patch has too few Master+ games for matchups at first: keep the previous one until then
 MIN_PATCH_GAMES = 100_000
 CACHE_S = 6 * 3600
+# Downloads kept at most (each matchup page is one): the least recently used go first
+CACHE_MAX = 48
 TIMEOUT_S = 20
 COUNTERS = 8
 # A counter needs this share of the enemy's games in the lane, between the two limits
@@ -50,7 +53,7 @@ LOG_ROLE = {"top": "top", "jungle": "jungle", "middle": "mid", "bottom": "adc", 
 ROLE_LABEL = {"top": "Üst", "jungle": "Orman", "middle": "Orta", "bottom": "Alt", "utility": "Destek"}
 
 _lock = threading.Lock()
-_cache: dict = {}  # url -> (time, json)
+_cache: OrderedDict = OrderedDict()  # url -> (time, json), least recently used first
 _state: dict = {"key": None, "board": {"status": "idle"}, "checked": 0.0, "busy": False, "phase": None,
                 "session": None}
 
@@ -62,6 +65,7 @@ def _get_json(url: str):
     with _lock:
         hit = _cache.get(url)
         if hit and now - hit[0] < CACHE_S:
+            _cache.move_to_end(url)
             return hit[1]
     import requests
     from config import APP_USER_AGENT
@@ -70,6 +74,11 @@ def _get_json(url: str):
     data = response.json()
     with _lock:
         _cache[url] = (now, data)
+        _cache.move_to_end(url)
+        for old in [k for k, (at, _) in _cache.items() if now - at >= CACHE_S]:
+            del _cache[old]
+        while len(_cache) > CACHE_MAX:
+            _cache.popitem(last=False)
     return data
 
 
@@ -348,9 +357,13 @@ def _compute(key, enemies, allies) -> None:
         board = build_board(enemies, allies)
     except Exception as exc:  # noqa: BLE001
         log.warning(f"[Counters] Could not load the counters: {exc}")
+        try:
+            names = _names()
+        except Exception:  # noqa: BLE001
+            names = {}
         board = {"status": "error", "enemies": [
-            {"id": e["id"], "name": _names().get(e["id"], {}).get("name", ""), "role": e.get("role"),
-             "links": links(_names().get(e["id"], {}).get("slug", ""), e.get("role") or "middle"), "counters": []}
+            {"id": e["id"], "name": names.get(e["id"], {}).get("name", ""), "role": e.get("role"),
+             "links": links(names.get(e["id"], {}).get("slug", ""), e.get("role") or "middle"), "counters": []}
             for e in enemies]}
     with _lock:
         if _state["key"] == key:
