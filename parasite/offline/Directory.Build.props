@@ -1,0 +1,45 @@
+<!--
+  Build settings for Parasite Offline (src/Deceive/Deceive.csproj), kept outside src/ because
+  build_offline.py regenerates src/ from Deceive. MSBuild picks this file up from the parent
+  folder. Together with global.json (pinned SDK) and packages.lock.json (pinned packages),
+  they make ParasiteOffline.exe a deterministic function of the committed source, so
+  .github/workflows/builds-check.yml can rebuild it on Windows and require the committed exe
+  to be byte-identical.
+-->
+<Project>
+  <PropertyGroup>
+    <Deterministic>true</Deterministic>
+    <ContinuousIntegrationBuild>true</ContinuousIntegrationBuild>
+    <!-- No machine paths in the binary: the checkout folder becomes /_/. -->
+    <PathMap>$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)src'))=/_/</PathMap>
+    <DeterministicSourcePaths>false</DeterministicSourcePaths>
+    <!-- No PDB, so no PDB path or PDB id in the exe's debug directory. -->
+    <DebugType>none</DebugType>
+    <DebugSymbols>false</DebugSymbols>
+    <!-- No git commit in the version info: it would change the exe on every Parasite commit. -->
+    <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
+    <EnableSourceLink>false</EnableSourceLink>
+    <EnableSourceControlManagerQueries>false</EnableSourceControlManagerQueries>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+    <!-- Packages pinned by version and content hash; CI restores in locked mode. -->
+    <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
+    <NuGetLockFilePath>$(MSBuildThisFileDirectory)packages.lock.json</NuGetLockFilePath>
+    <!-- Lets the SDK build this net472 WinForms app on Linux too (same packages; the exe differs
+         from the Windows build only in Costura's metadata line endings, see README.md). -->
+    <EnableWindowsTargeting>true</EnableWindowsTargeting>
+    <!-- On Windows the SDK gives a .NET Framework exe the default runtime identifier win-x86
+         (Microsoft.NET.RuntimeIdentifierInference.targets), elsewhere none, and NuGet's lock
+         file records it. Set exactly what the Windows default sets, on every OS, so restore and
+         build evaluate the same everywhere (the exe still becomes AnyCPU when no native
+         package assets are found, as with the Windows default). -->
+    <RuntimeIdentifier>win-x86</RuntimeIdentifier>
+    <_UsingDefaultRuntimeIdentifier>true</_UsingDefaultRuntimeIdentifier>
+    <!-- Fody would otherwise write FodyWeavers.xsd into src/ on every build. -->
+    <FodyGenerateXsd>false</FodyGenerateXsd>
+  </PropertyGroup>
+  <ItemGroup>
+    <!-- .NET Framework reference assemblies from a pinned package, never from whatever
+         targeting pack the build machine has installed. -->
+    <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies" Version="1.0.3" PrivateAssets="all" />
+  </ItemGroup>
+</Project>

@@ -1,0 +1,4 @@
+# Parasite Offline is checked to be byte-identical to a rebuild of src/. C# raw string
+# literals keep the source's line endings, so src/ must check out exactly as committed
+# (LF) on every machine, whatever core.autocrlf says. build_offline.py writes LF.
+src/** -text
