@@ -92,8 +92,46 @@ class AutoUpdateTests(unittest.TestCase):
                 patch.object(auto, "enabled", return_value=True), patch.object(auto, "IDLE_CHECK_S", 0), \
                 patch.object(auto.time, "sleep"), patch("launcher.parasite_hub.toast"), \
                 patch("launcher.parasite_hub.run_action") as run:
-            auto._install_when_idle("1.4.9.9")
+            auto._install_when_idle()
         run.assert_called_once_with("update")
+
+    def test_a_newer_release_found_while_waiting_is_the_one_installed(self):
+        auto._pending = "1.4.9.8"
+        toasts = []
+        checks = iter([True, True, False, False])
+
+        def league_running():
+            running = next(checks)
+            if not running:
+                auto._pending = "1.4.9.9"  # downloaded meanwhile by another release check
+            return running
+
+        with patch.object(auto, "_league_running", side_effect=league_running), \
+                patch.object(auto, "enabled", return_value=True), patch.object(auto.time, "sleep"), \
+                patch("launcher.parasite_hub.toast", side_effect=toasts.append), \
+                patch("launcher.parasite_hub.mark_quiet_restart"), \
+                patch("launcher.parasite_hub.run_action") as run:
+            auto._install_when_idle()
+        run.assert_called_once_with("update")
+        self.assertIn("1.4.9.9", toasts[-1])
+
+    def test_a_newer_release_reuses_the_running_waiter(self):
+        alive = MagicMock()
+        alive.is_alive.return_value = True
+        with patch.object(auto, "_download", return_value=True), \
+                patch.object(auto, "enabled", return_value=True), \
+                patch.object(auto, "_waiter", alive), \
+                patch.object(auto.threading, "Thread") as thread, patch("launcher.parasite_hub.toast"):
+            auto.on_release(self._client("1.4.9.9"), {}, "1.4.9.5")
+            self.assertEqual(auto.pending(), "1.4.9.9")
+            thread.assert_not_called()
+        with patch.object(auto, "_download", return_value=True), \
+                patch.object(auto, "enabled", return_value=True), \
+                patch.object(auto, "_waiter", None), \
+                patch.object(auto.threading, "Thread") as thread, patch("launcher.parasite_hub.toast"):
+            auto.on_release(self._client("1.5.0.0"), {}, "1.4.9.5")
+            thread.assert_called_once()
+            thread.return_value.start.assert_called_once()
 
 
 if __name__ == "__main__":
