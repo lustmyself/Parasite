@@ -18,30 +18,6 @@ if sys.version_info < MIN_PYTHON:
     )
 
 
-def _get_tools_dir() -> Path:
-    """Get the tools directory path (works in both frozen and development environments)"""
-    if getattr(sys, 'frozen', False):
-        # Running as compiled executable (PyInstaller)
-        if hasattr(sys, '_MEIPASS'):
-            # One-file mode: tools are in _MEIPASS
-            base_path = Path(sys._MEIPASS)
-            return base_path / "injection" / "tools"
-        else:
-            # One-dir mode: tools are alongside executable
-            base_dir = Path(sys.executable).parent
-            possible_dirs = [
-                base_dir / "injection" / "tools",
-                base_dir / "_internal" / "injection" / "tools",
-            ]
-            for dir_path in possible_dirs:
-                if dir_path.exists():
-                    return dir_path
-            return possible_dirs[0]
-    else:
-        # Running as Python script
-        return Path(__file__).parent.parent / "injection" / "tools"
-
-
 LTK_MANAGER_DOWNLOAD_URL = "https://github.com/LeagueToolkit/ltk-manager/releases"
 
 
@@ -406,8 +382,9 @@ def _check_dll_present() -> bool:
         return True  # Only relevant on Windows
 
     from injection.tools.tools_manager import LTF_BRIDGE_DLL, LTF_LAUNCHER, ToolsManager
+    from utils.core.paths import get_tools_dir
 
-    tools_dir = _get_tools_dir()
+    tools_dir = get_tools_dir()
     missing = [name for name in (LTF_LAUNCHER, LTF_BRIDGE_DLL) if not (tools_dir / name).exists()]
     if missing:
         return _show_dll_dialog(tools_dir, reason="missing", detail=" and ".join(missing))
@@ -439,7 +416,7 @@ setup_signal_handlers()
 
 # Now import everything else
 from .setup.arguments import setup_arguments
-from .setup.initialization import setup_logging_and_cleanup, initialize_tray_manager
+from .setup.initialization import convert_stored_mods, setup_logging_and_cleanup, initialize_tray_manager
 from .core.lockfile import check_single_instance
 from .core.initialization import initialize_core_components
 from .core.threads import initialize_threads
@@ -451,10 +428,12 @@ import utils.integration.pengu_loader as pengu_loader
 from state import AppStatus
 from utils.core.logging import get_logger, log_success
 from utils.core.issue_reporter import report_issue
-from utils.threading.thread_manager import create_daemon_thread
+from utils.threading.thread_manager import ThreadManager, create_daemon_thread
 from config import APP_VERSION, MAIN_LOOP_FORCE_QUIT_TIMEOUT_S, get_config_option, set_config_option
 from injection.config.config_manager import ConfigManager
 from injection.game.game_detector import GameDetector
+from injection.mods.ltk_sync import start_saved_mods_sync
+from injection.mods.mod_facts import remove_unpacked_leftovers
 import time
 
 log = get_logger()
@@ -671,11 +650,24 @@ def _schedule_restart() -> bool:
         log.error(f"Failed to schedule restart: {e}")
         return False
 
+def _remove_unpacked_mods_while_alone() -> None:
+    """Remove the .modpkg copies earlier reads left unpacked: Parasite runs alone
+    now and nothing has read a mod yet, so none is being unpacked."""
+    remove_unpacked_leftovers()
+
+
+def _sync_mods_changed_while_closed() -> None:
+    """Sync the saved mods with LTK Manager's library, which may have lost or
+    changed one while Parasite was closed."""
+    start_saved_mods_sync(only_if_changed=False)
+
+
 def run_league_unlock(args: Optional[argparse.Namespace] = None,
                       injection_threshold: Optional[float] = None) -> None:
     """Run the core Parasite application startup and main loop."""
     # Check for single instance before doing anything else
     check_single_instance()
+    _remove_unpacked_mods_while_alone()
 
     # Keep the Windows "Apps & features" version in sync after auto-updates
     _update_registry_version()
@@ -700,7 +692,14 @@ def run_league_unlock(args: Optional[argparse.Namespace] = None,
     
     # Check initial status (will show locked until all components are ready)
     app_status.update_status(force=True)
-    
+
+    # Mods an earlier Parasite stored as folders become the archives LTK Manager
+    # installs as they are. Before anything else starts: no injection, import
+    # or mod list may touch a folder while it is converted
+    convert_stored_mods(tray_manager)
+
+    _sync_mods_changed_while_closed()
+
     # Start with Windows is on by default, set once on the first run
     from launcher.autostart_default import apply_autostart_default
     apply_autostart_default()
@@ -804,6 +803,15 @@ def run_league_unlock(args: Optional[argparse.Namespace] = None,
         # The desktop hub takes over from the launcher and uses the tray's quit and restart
         from launcher.parasite_hub import attach as attach_hub
         attach_hub(tray_manager)
+
+        # A Quit or Restart clicked while Parasite was starting runs now
+        tray_manager.run_pending_request()
+
+    # Stopped while starting (a Quit or Restart clicked then): end before the
+    # threads start and Pengu's activation restarts a running client
+    if state.stop:
+        perform_cleanup(state, ThreadManager(), tray_manager, injection_manager)
+        return
     
     # Initialize threads (this starts the WebSocket server)
     thread_manager, t_phase, t_ui, t_ws, t_lcu_monitor = initialize_threads(
@@ -844,16 +852,47 @@ def run_league_unlock(args: Optional[argparse.Namespace] = None,
         perform_cleanup(state, thread_manager, tray_manager, injection_manager)
 
 
+def _remove_ltk_mods() -> int:
+    """Remove from LTK Manager's library the mods Parasite added there
+    (ltk_library.remove_parasite_mods): Parasite's uninstaller runs Parasite with
+    --remove-ltk-mods when the user does not keep Parasite's data. It checked
+    that Parasite is closed and waits for this, hidden: no single-instance check,
+    no launcher, no dialog, and a watchdog ends it should LTK Manager hang."""
+    import threading
+
+    from config import UNINSTALL_CLEANUP_DEADLINE_S
+    from injection.overlay.ltf_session import LtfHost
+    from injection.overlay.ltk_library import remove_parasite_mods
+    from utils.core.logging import exit_now, setup_logging
+    from utils.core.paths import get_injection_dir, get_tools_dir
+
+    setup_logging('customer')
+    watchdog = threading.Timer(UNINSTALL_CLEANUP_DEADLINE_S, exit_now, args=(1,))
+    watchdog.daemon = True
+    watchdog.start()
+    try:
+        return remove_parasite_mods(LtfHost(get_tools_dir(), get_injection_dir()))
+    except Exception as e:
+        log.error(f"[MODS] Could not remove Parasite's mods from LTK Manager's library: {e}", exc_info=True)
+        return 1
+
+
 def main() -> None:
     """Program entry point that prepares and launches Parasite."""
-    # The desktop hub window runs as a second Parasite process (pywebview needs a main thread)
-    from launcher.parasite_hub_shell import main_if_window
-    if main_if_window():
-        return
+    # The desktop hub window runs as a second Parasite process (pywebview needs a main thread).
+    # Only that process loads the hub here: any other start (the uninstaller's
+    # --remove-ltk-mods...) goes through Parasite's own flags first, as in Rose
+    if "--parasite-hub-window" in sys.argv:
+        from launcher.parasite_hub_shell import main_if_window
+        if main_if_window():
+            return
     args = setup_arguments()
+    if args.uninstaller_removes_ltk_mods:
+        sys.exit(_remove_ltk_mods())
     # Update before checking the DLL: a Parasite that refuses to start still
     # receives the version that fixes its check
     if sys.platform == "win32":
+        check_single_instance()
         if not args.dev:
             try:
                 from launcher import run_launcher

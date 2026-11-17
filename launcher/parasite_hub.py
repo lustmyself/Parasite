@@ -1001,8 +1001,9 @@ class HubDialog:
         return bool(_prompt_answer)
 
 
-def make_launcher_dialog():
-    """The hub when its window can be shown, else Rose's Win32 progress dialog."""
+def make_launcher_dialog(fallback=None):
+    """The hub when its window can be shown, else Rose's Win32 progress dialog (*fallback*:
+    the launcher's UpdateDialog, so what replaces it there replaces it here too)."""
     if sys.platform == "win32":
         try:
             from launcher import parasite_hub_window
@@ -1013,5 +1014,6 @@ def make_launcher_dialog():
                 return HubDialog(show=not quiet and not _started_quietly() and not parasite_hub_window._in_game())
         except Exception as exc:  # noqa: BLE001
             log.warning(f"[Hub] Window unavailable: {exc}")
-    from launcher.ui.update_dialog import UpdateDialog
-    return UpdateDialog()
+    if fallback is None:
+        from launcher.ui.update_dialog import UpdateDialog as fallback
+    return fallback()

@@ -18,6 +18,21 @@ class FakeLcu:
         return {"/lol-lobby/v2/lobby": self.lobby, "/lol-gameflow/v1/session": self.flow}.get(path)
 
 
+def member(summoner_id, name, **extra):
+    """A room member as a protocol-2 relay lists it: with the key of the installation it joined from"""
+    return {"summoner_id": summoner_id, "summoner_name": name, "member_key": f"{summoner_id:064x}", **extra}
+
+
+def room(manager, key, members, connected=True):
+    """Put a relay with *members* in the manager's rooms, trusted as Rose's manager trusts
+    them (_on_relay_members_changed keeps each summoner's first key)"""
+    relay = SimpleNamespace(members=members, connected=connected)
+    manager._relays[key] = relay
+    for m in members:
+        manager._member_keys.setdefault(m["summoner_id"], m["member_key"])
+    return relay
+
+
 def team(cell=0, side=1, size=5):
     return [{"cellId": i, "team": side, "summonerId": 10 + i, "puuid": f"p{i}"} for i in range(size)]
 
@@ -108,13 +123,11 @@ class ManagerTest(unittest.TestCase):
 
     def test_shared_icons_and_no_room_following(self):
         manager = self.make()
-        relay = SimpleNamespace(connected=True, members=[
-            {"summoner_id": 1, "summoner_name": "Me", "skin": {"icon_id": 9}},
-            {"summoner_id": 2, "summoner_name": "Duo", "skin": {"icon_id": 29, "puuid": "duo",
-                                                               "rooms": ["a" * 32]}},
-            {"summoner_id": 3, "summoner_name": "Plain", "skin": {"champion_id": 1, "skin_id": 1001}},
+        room(manager, "k", [
+            member(1, "Me", skin={"icon_id": 9}),
+            member(2, "Duo", skin={"icon_id": 29, "puuid": "duo", "rooms": ["a" * 32]}),
+            member(3, "Plain", skin={"champion_id": 1, "skin_id": 1001}),
         ])
-        manager._relays["k"] = relay
         self.assertEqual(manager.shared_icons(), [{"summonerId": "2", "iconId": 29, "puuid": "duo"}])
         manager._follow_advertised_rooms()
         self.assertEqual(list(manager._relays), ["k"])
@@ -236,8 +249,7 @@ class FriendsTest(unittest.TestCase):
         state = SimpleNamespace(phase="None", locked_champ_id=None, hovered_champ_id=None, party_manager=None)
         manager = parasite_share._manager_class()(FakeLcu(), state)
         asyncio.run(ManagerTest._enable(None, manager))
-        manager._relays[manager._home_room] = SimpleNamespace(
-            members=[{"summoner_id": 77, "summoner_name": "Mert"}], connected=True)
+        room(manager, manager._home_room, [member(77, "Mert")])
         self.assertEqual(manager.friends(), [{"id": "77", "name": "Mert", "online": True}])
         self.assertEqual(parasite_share.load_friends()["joined"], [{"id": 77, "name": "Mert"}])
         # still listed while they are away
@@ -247,7 +259,7 @@ class FriendsTest(unittest.TestCase):
             self.assertEqual(parasite_share.status()["friends"], [{"id": "77", "name": "Mert", "online": False}])
         parasite_share.remove_friend(77)
         self.assertEqual(parasite_share.load_friends()["joined"], [])
-        manager._relays[manager._home_room].members = [{"summoner_id": 77, "summoner_name": "Mert"}]
+        manager._relays[manager._home_room].members = [member(77, "Mert")]
         manager.pair_rooms()
         self.assertEqual(manager.friends(), [])
 
@@ -256,8 +268,7 @@ class FriendsTest(unittest.TestCase):
         manager = parasite_share._manager_class()(FakeLcu(), state)
         asyncio.run(ManagerTest._enable(None, manager))
         skin = {"riot": "Mert#TR1", "dc": "Mert", "dcu": "mert_", "dca": "https://cdn.discordapp.com/embed/avatars/1.png"}
-        manager._relays[manager._home_room] = SimpleNamespace(
-            members=[{"summoner_id": 77, "summoner_name": "Mert", "skin": dict(skin, dca2="x")}], connected=True)
+        room(manager, manager._home_room, [member(77, "Mert", skin=dict(skin, dca2="x"))])
         self.assertEqual(manager.friends(), [dict({"id": "77", "name": "Mert", "online": True}, **skin)])
         manager._relays[manager._home_room].members = []
         self.assertEqual(manager.friends(), [dict({"id": "77", "name": "Mert", "online": False}, **skin)])

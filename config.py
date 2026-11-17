@@ -200,6 +200,9 @@ WS_PING_INTERVAL_DEFAULT = 20  # Seconds between WebSocket pings
 WS_PING_TIMEOUT_DEFAULT = 10   # Seconds before WebSocket ping times out
 WS_RECONNECT_DELAY = 1.0       # Seconds to wait before WebSocket reconnect
 WS_RECONNECT_MAX_DELAY = 15.0  # Maximum delay after repeated connection failures
+# A starting client opens its WebSocket some seconds after its lockfile: retried at
+# WS_RECONNECT_DELAY this many times before the delay grows
+WS_RECONNECT_FAST_ATTEMPTS = 30
 WS_RECONNECT_JITTER = 0.25     # Randomized delay fraction to avoid synchronized retries
 
 # Lock detection timing
@@ -290,6 +293,7 @@ INJECTION_LOCK_TIMEOUT_S = 2.0          # Timeout for acquiring injection lock
 # Main loop watchdog timeouts (seconds)
 MAIN_LOOP_STALL_THRESHOLD_S = 5.0       # Threshold for detecting main loop stalls
 MAIN_LOOP_FORCE_QUIT_TIMEOUT_S = 2.0    # Timeout before forcing quit when stop flag is set
+UNINSTALL_CLEANUP_DEADLINE_S = 120
 CHROMA_PANEL_PROCESSING_THRESHOLD_S = 1.0  # Warning threshold for chroma panel processing
 
 # Process priority settings
@@ -365,6 +369,7 @@ _IS_DEV_BUILD = bool(getattr(sys, "frozen", False)) and (
     "parasitedev" in Path(sys.executable).stem.lower() or "parasite-dev" in Path(sys.executable).stem.lower()
 )
 SINGLE_INSTANCE_MUTEX_NAME = r"Local\ParasiteDevSingleInstance" if _IS_DEV_BUILD else r"Local\ParasiteSingleInstance"
+MOD_MIGRATION_MUTEX_NAME = r"Local\ParasiteModMigration"
 
 # Log file patterns (handles .log files)
 LOG_FILE_PATTERN = "parasite_*.log*"

@@ -22,7 +22,8 @@ class LtkManagerAutoInstallTests(unittest.TestCase):
             (self.tools / name).write_bytes(b"x")
         self.exe = self.tools / "ltk-manager.exe"
         for patcher in (
-            patch.object(parasite_main, "_get_tools_dir", return_value=self.tools),
+            # Rose 1.5.6+ reads it from utils.core.paths when the check runs
+            patch("utils.core.paths.get_tools_dir", return_value=self.tools),
             patch.object(ToolsManager, "detect_ltk_manager", return_value=None),
             # Never this PC's own cf.ini
             patch("config.set_config_option"),

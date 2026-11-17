@@ -484,7 +484,7 @@ EDITS += [
      '    updater_log.info("Launcher sequence starting.")\n    dialog = UpdateDialog()\n',
      '    updater_log.info("Launcher sequence starting.")\n'
      '    from launcher.parasite_hub import make_launcher_dialog\n'
-     '    dialog = make_launcher_dialog()\n'),
+     '    dialog = make_launcher_dialog(UpdateDialog)\n'),
     ('launcher/core/launcher.py',
      '    result = user32.MessageBoxW(\n'
      '        dialog.hwnd or None,\n'
@@ -559,16 +559,38 @@ EDITS += [
 ]
 
 
-# Updates: a Parasite process left running from the install folder (an old hub window) locked
-# Parasite.exe and its DLLs, robocopy gave up on them and the update hung on "restarting"
+# Updates (Rose 1.5.6+ stages the update beside the install and swaps the two folders in
+# apply.ps1): a Parasite process left running from the install folder (an old hub window)
+# keeps files open and the folder cannot be moved, so it is closed first. Parasite Offline
+# can't be closed (League chat goes through it): the update waits for the next start instead.
+APPLY_WAIT = "        if (!$parasite.WaitForExit(30000)) { throw 'Timed out waiting for Parasite to exit.' }\n"
 EDITS += [
     ('launcher/update/update_installer.py',
-     'echo [%date% %time%] Mirroring files >> "%LOG%"\n',
-     'echo [%date% %time%] Closing Parasite windows left open >> "%LOG%"\n'
-     'powershell -NoProfile -NonInteractive -Command "Get-Process -Name Parasite -ErrorAction SilentlyContinue'
-     ' | Where-Object { $_.Path -and $_.Path.StartsWith($env:DEST, [StringComparison]::OrdinalIgnoreCase) }'
-     ' | Stop-Process -Force -ErrorAction SilentlyContinue; Start-Sleep -Milliseconds 800" >nul 2>&1\n'
-     'echo [%date% %time%] Mirroring files >> "%LOG%"\n'),
+     '$swapStarted = $false\n',
+     '$swapStarted = $false\n'
+     '$parentExited = $false\n'
+     '$restarted = $false\n'
+     '\n'
+     'function Get-InstalledProcess([string]$name) {\n'
+     '    $prefix = $destination.TrimEnd([char]92) + [char]92\n'
+     '    Get-Process -Name $name -ErrorAction SilentlyContinue |\n'
+     '        Where-Object { $_.Path -and $_.Path.StartsWith($prefix, [StringComparison]::OrdinalIgnoreCase) }\n'
+     '}\n'),
+    ('launcher/update/update_installer.py',
+     APPLY_WAIT,
+     APPLY_WAIT +
+     '        $parentExited = $true\n'
+     '        # Parasite: Parasite Offline runs from this folder while the Riot Client is open\n'
+     '        if (Get-InstalledProcess \'ParasiteOffline\') {\n'
+     '            throw \'Parasite Offline is running (League chat goes through it): the update waits for the next start.\'\n'
+     '        }\n'
+     '        # Parasite: windows left open from this folder (an old hub window) lock its files\n'
+     '        $leftOpen = @(Get-InstalledProcess ([System.IO.Path]::GetFileNameWithoutExtension($plan.executable)))\n'
+     '        if ($leftOpen.Count) {\n'
+     '            Write-UpdateLog (\'Closing Parasite windows left open: \' + (($leftOpen | ForEach-Object { $_.Id }) -join \', \'))\n'
+     '            $leftOpen | Stop-Process -Force -ErrorAction SilentlyContinue\n'
+     '            Start-Sleep -Milliseconds 800\n'
+     '        }\n'),
 ]
 
 
@@ -667,16 +689,23 @@ EDITS += [
 ]
 
 
-# Updates: Parasite Offline keeps running while the Riot Client is open, so its exe was locked and
-# the copy failed; that file is left alone while it runs. A failed copy no longer waits on a
-# "press any key" window with Parasite closed: it starts Parasite again.
+# Updates: a failed update no longer leaves Parasite closed behind an error box: once the old
+# Parasite has exited, the installed one starts again (the reason is in update.log). The box is
+# kept for when Parasite could not be started at all (Recover-Parasite.cmd is needed then).
 EDITS += [
     ('launcher/update/update_installer.py',
-     'robocopy "%SOURCE%" "%DEST%" /MIR /R:5 /W:2 /NFL /NDL /NJH /NJS /XD __pycache__ "%SOURCE%\\Pengu Loader\\plugins" /XF config.ini hashes.game.txt >> "%LOG%" 2>&1\n',
-     'set "KEEP_OFFLINE="\npowershell -NoProfile -NonInteractive -Command "if (Get-Process -Name ParasiteOffline -ErrorAction SilentlyContinue | Where-Object { $_.Path -and $_.Path.StartsWith($env:DEST, [StringComparison]::OrdinalIgnoreCase) }) { exit 1 }" >nul 2>&1\nif errorlevel 1 (\n    set "KEEP_OFFLINE=ParasiteOffline.exe"\n    echo [%date% %time%] Parasite Offline is running ^(League chat goes through it^): its file stays as it is >> "%LOG%"\n)\nrobocopy "%SOURCE%" "%DEST%" /MIR /R:5 /W:2 /NFL /NDL /NJH /NJS /XD __pycache__ "%SOURCE%\\Pengu Loader\\plugins" /XF config.ini hashes.game.txt %KEEP_OFFLINE% >> "%LOG%" 2>&1\n'),
+     'elseif ($result -ne 0 -and $swapStarted -and [System.IO.File]::Exists($executable)) {\n'
+     '    # The swap failed and was undone (or never moved anything): Parasite has\n'
+     '    # exited for it, so start the installed one again\n'
+     '    try { $null = Start-Parasite; Write-UpdateLog \'Restarted the installed Parasite.\' }\n',
+     'elseif ($result -ne 0 -and !$Recover -and $parentExited -and [System.IO.File]::Exists($executable)) {\n'
+     '    # The update failed before or during the swap (undone): Parasite has exited\n'
+     '    # for it, so start the installed one again (Parasite: also when Parasite\n'
+     '    # Offline kept the folder from moving)\n'
+     '    try { $null = Start-Parasite; $restarted = $true; Write-UpdateLog \'Restarted the installed Parasite.\' }\n'),
     ('launcher/update/update_installer.py',
-     'echo [%date% %time%] Update failed >> "%LOG%"\necho Update failed, details in "%LOG%"\necho Press any key to close.\npause >nul\nexit 1\n',
-     'echo [%date% %time%] Update failed; starting Parasite again >> "%LOG%"\nstart "" /D "%DEST%" "%DEST%\\%EXE%"\nexit 1\n'),
+     'if ($result -ne 0 -and $Notify) {\n',
+     'if ($result -ne 0 -and $Notify -and !$restarted) {\n'),
 ]
 
 
@@ -882,10 +911,13 @@ EDITS += [
     ('main/__init__.py',
      '    """Program entry point that prepares and launches Parasite."""\n    args = setup_arguments()\n',
      '    """Program entry point that prepares and launches Parasite."""\n'
-     '    # The desktop hub window runs as a second Parasite process (pywebview needs a main thread)\n'
-     '    from launcher.parasite_hub_shell import main_if_window\n'
-     '    if main_if_window():\n'
-     '        return\n'
+     '    # The desktop hub window runs as a second Parasite process (pywebview needs a main thread).\n'
+     '    # Only that process loads the hub here: any other start (the uninstaller\'s\n'
+     '    # --remove-ltk-mods...) goes through Parasite\'s own flags first, as in Rose\n'
+     '    if "--parasite-hub-window" in sys.argv:\n'
+     '        from launcher.parasite_hub_shell import main_if_window\n'
+     '        if main_if_window():\n'
+     '            return\n'
      '    args = setup_arguments()\n'),
     ('requirements.txt', 'requests==2.31.0\n', 'requests==2.31.0\npywebview==6.2.1\n'),
     ('Parasite.spec', "    'launcher.core',\n",
@@ -918,38 +950,8 @@ EDITS += [
 # (d0ae51d2, 459f7e4b): no duplicate, the old one goes on install and uninstall, and Parasite writes its
 # running version to Inno's entry.
 EDITS += [
-    ('installer.iss',
-     "procedure _DeleteLocalAppDataParasite();\n",
-     "const\n"
-     "  LegacyUninstallKey = 'SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\{#MyAppName}';\n"
-     "\n"
-     "procedure _CleanupLegacyUninstallEntry();\n"
-     "var\n"
-     "  InstallLocation: string;\n"
-     "  DisplayName: string;\n"
-     "  Publisher: string;\n"
-     "begin\n"
-     "  { Inno owns the AppId-based Apps entry. Remove only our duplicate from older\n"
-     "    installers, and only when it belongs to this installation. }\n"
-     "  if RegQueryStringValue(HKLM, LegacyUninstallKey, 'InstallLocation', InstallLocation) and\n"
-     "     RegQueryStringValue(HKLM, LegacyUninstallKey, 'DisplayName', DisplayName) and\n"
-     "     RegQueryStringValue(HKLM, LegacyUninstallKey, 'Publisher', Publisher) and\n"
-     "     (CompareText(AddBackslash(InstallLocation), AddBackslash(ExpandConstant('{app}'))) = 0) and\n"
-     "     (DisplayName = '{#MyAppName}') and (Publisher = '{#MyAppPublisher}') then\n"
-     "  begin\n"
-     "    RegDeleteKeyIncludingSubkeys(HKLM, LegacyUninstallKey);\n"
-     "  end;\n"
-     "end;\n"
-     "\n"
-     "procedure _DeleteLocalAppDataParasite();\n"),
-    ('installer.iss',
-     "  if CurUninstallStep = usUninstall then\n"
-     "  begin\n"
-     "    _CleanupStartupRegistry();\n",
-     "  if CurUninstallStep = usUninstall then\n"
-     "  begin\n"
-     "    _CleanupStartupRegistry();\n"
-     "    _CleanupLegacyUninstallEntry();\n"),
+    # Rose 1.5.6+ defines _CleanupLegacyUninstallEntry and calls it on uninstall itself: adding
+    # the call again ran it twice (test_installer_safety counts the calls)
     ('installer.iss',
      "    // Create registry entries for Windows Apps list\n"
      "    RegWriteStringValue(HKEY_LOCAL_MACHINE, 'SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\{#MyAppName}', 'DisplayName', '{#MyAppName}');\n"
@@ -1072,15 +1074,18 @@ EDITS += [
 # installed as it is, without downloading it again
 EDITS += [
     ("launcher/update/update_sequence.py",
-     "        status_callback(f\"Downloading update {remote_version or ''}\")\n"
+     "        zip_path = updates_root / \"package.zip\"\n"
+     "        status_callback(f\"Downloading update {remote_version}\")\n"
      "        if not self.downloader.download_update(\n",
-     "        from launcher.parasite_autoupdate import is_ready\n"
-     "        predownloaded = is_ready(zip_path)\n"
-     "        if predownloaded:\n"
+     "        zip_path = updates_root / \"package.zip\"\n"
+     "        from launcher.parasite_autoupdate import predownloaded\n"
+     "        background = predownloaded(asset, remote_version)\n"
+     "        if background:\n"
+     "            zip_path = background\n"
      "            status_callback(\"Update downloaded in the background\")\n"
      "        else:\n"
-     "            status_callback(f\"Downloading update {remote_version or ''}\")\n"
-     "        if not predownloaded and not self.downloader.download_update(\n"),
+     "            status_callback(f\"Downloading update {remote_version}\")\n"
+     "        if not background and not self.downloader.download_update(\n"),
     ("Parasite.spec", "    'launcher.core',\n", "    'launcher.core',\n    'launcher.parasite_autoupdate',\n    'launcher.parasite_cleanup',\n    'launcher.parasite_hero',\n"),
 ]
 
