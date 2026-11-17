@@ -230,7 +230,7 @@ def _cli() -> Path:
     response.raise_for_status()
     data = response.content
     if len(data) > MAX_CLI_BYTES:
-        raise RuntimeError("Spicetify download is larger than expected")
+        raise RuntimeError("Spicetify indirmesi beklenenden büyük")
     actual = hashlib.sha256(data).hexdigest()
     if actual != expected:
         log.warning(f"[Spotify] Spicetify {tag} SHA-256 mismatch: {actual}, expected {expected}")
