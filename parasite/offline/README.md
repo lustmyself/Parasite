@@ -22,7 +22,8 @@ python parasite/offline/build_offline.py Deceive      # regenerates src/, refres
 The build is deterministic: `Directory.Build.props` (deterministic compiler, no PDB, no
 paths or git commit in the exe, reference assemblies from a NuGet package), `global.json`
 (exact .NET SDK) and `packages.lock.json` (exact packages, by hash). `src/` keeps LF line
-endings on every OS (`.gitattributes`), since C# raw strings embed them. So
+endings on every OS (`.gitattributes`), since C# raw strings embed them, and Costura
+embeds the dependencies uncompressed, since Deflate output depends on the machine's zlib. So
 `python parasite/offline/build_offline.py --build-only` turns the committed `src/` into
 the same `ParasiteOffline.exe` bytes on any machine with that SDK, and
 `.github/workflows/builds-check.yml` checks on Windows that the committed exe is exactly

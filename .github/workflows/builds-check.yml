@@ -124,6 +124,9 @@ jobs:
             exit 1
           fi
           if [ "$committed" != "$built" ]; then
+            # Where they differ (header, IL/metadata, or an embedded resource).
+            git cat-file blob "HEAD:$EXE" > "$RUNNER_TEMP/committed.exe"
+            python parasite/offline/exe_digest.py "$RUNNER_TEMP/committed.exe" "$EXE" || true
             echo "::error file=$EXE::The committed ParasiteOffline.exe is not the build of parasite/offline/src (committed $committed, CI $built). Download the ParasiteOffline-exe artifact of this run, put it at $EXE (and injection/tools/ via sync), and commit it."
             exit 1
           fi

@@ -62,6 +62,10 @@ PATCHES = [
      "Please see the FAQ for more information."),
     ("Deceive/Utils.cs", 'Process.Start("https://github.com/molenzwiebel/Deceive#FAQ");',
      'Process.Start("https://github.com/molenzwiebel/Deceive#faq");'),
+    # Costura embeds the dependencies uncompressed: Deflate output depends on the zlib the
+    # build machine's .NET uses (zlib-ng in Microsoft's builds, system zlib in distro builds),
+    # which would make the exe differ between machines. See builds-check.yml.
+    ("Deceive/FodyWeavers.xml", "  <Costura />", '  <Costura DisableCompression="true" />'),
     ("Deceive/Deceive.csproj",
      "    <OutputType>WinExe</OutputType>\n",
      "    <OutputType>WinExe</OutputType>\n    <AssemblyName>ParasiteOffline</AssemblyName>\n"
