@@ -97,7 +97,7 @@ jobs:
         id: build
         shell: bash
         run: |
-          dotnet --version
+          (cd parasite/offline && dotnet --version)  # the SDK global.json picks
           python parasite/offline/build_offline.py --build-only
       - name: Upload the CI-built exe
         if: ${{ !cancelled() && steps.build.outcome == 'success' }}

@@ -26,6 +26,13 @@
     <NuGetLockFilePath>$(MSBuildThisFileDirectory)packages.lock.json</NuGetLockFilePath>
     <!-- Lets the SDK build this net472 WinForms app on Linux too (same output, same packages). -->
     <EnableWindowsTargeting>true</EnableWindowsTargeting>
+    <!-- On Windows the SDK gives a .NET Framework exe the default runtime identifier win-x86
+         (Microsoft.NET.RuntimeIdentifierInference.targets), elsewhere none, and NuGet's lock
+         file records it. Set exactly what the Windows default sets, on every OS, so restore and
+         build evaluate the same everywhere (the exe still becomes AnyCPU when no native
+         package assets are found, as with the Windows default). -->
+    <RuntimeIdentifier>win-x86</RuntimeIdentifier>
+    <_UsingDefaultRuntimeIdentifier>true</_UsingDefaultRuntimeIdentifier>
     <!-- Fody would otherwise write FodyWeavers.xsd into src/ on every build. -->
     <FodyGenerateXsd>false</FodyGenerateXsd>
   </PropertyGroup>
