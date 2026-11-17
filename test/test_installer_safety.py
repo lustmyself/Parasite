@@ -19,8 +19,10 @@ class InstallerSafetyTests(unittest.TestCase):
         section = re.search(r'(?s)\n\[UninstallDelete\](.*?)\n\[', self.script).group(1)
         for directory in ('injection\\overlay', 'injection\\mods'):
             self.assertIn(f'Type: dirifempty; Name: "{{app}}\\{directory}"', section)
-        # Only Parasite's runtime, which an update replaces with files the uninstall log never saw
-        self.assertEqual(re.findall(r'Type: filesandordirs; Name: "([^"]+)"', section), ['{app}\\_internal'])
+        # Only Parasite's runtime, which an update replaces with files the uninstall log never saw,
+        # and Parasite's own Spicetify, downloaded at run time
+        self.assertEqual(re.findall(r'Type: filesandordirs; Name: "([^"]+)"', section),
+                         ['{app}\\_internal', '{app}\\spicetify'])
 
     def test_installer_upgrades_replace_legacy_uninstall_actions(self):
         self.assertRegex(self.script, r'(?m)^UninstallLogMode=overwrite$')

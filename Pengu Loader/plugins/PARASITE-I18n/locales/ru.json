@@ -1,6 +1,6 @@
 {
   "What happened: this LTK patcher only runs inside LTK Manager, so it refused Parasite and the game started without skins.": "What happened: this LTK patcher only runs inside LTK Manager, so it refused Parasite and the game started without skins.",
-  "Fix: download ltk_patcher.zip (www.mediafire.com/file/g0lzcgpr97jd9r3/ltk_patcher.zip/file, shared in the Rose Discord #tutorial) into your Downloads folder and restart Parasite: it checks the League Toolkit signature and installs it. Or put both files in %LOCALAPPDATA%\\Parasite\\ltk-patcher.": "Fix: download ltk_patcher.zip (www.mediafire.com/file/g0lzcgpr97jd9r3/ltk_patcher.zip/file, shared in the Rose Discord #tutorial) into your Downloads folder and restart Parasite: it checks the League Toolkit signature and installs it. Or put both files in %LOCALAPPDATA%\\Parasite\\ltk-patcher.",
+  "If something feels off, open the logs folder and attach the latest log to a GitHub issue.": "Если что-то работает не так, откройте папку логов и приложите последний лог к issue на GitHub.",
   "Base Skin": "Базовый образ",
   "Disable custom skin mod": "Отключить мод образа",
   "Custom Skin {number}": "Свой образ {number}",
@@ -149,7 +149,6 @@
   "This session: Parasite v{version}, started {time}": "Этот сеанс: Parasite v{version}, запущен {time}",
   "No errors in this session.": "В этом сеансе ошибок нет.",
   "Earlier sessions ({count}), not from this run of Parasite": "Прошлые сеансы ({count}), не из этого запуска Parasite",
-  "If something feels off, open the logs folder and share the latest log in a discord ticket.": "Если что-то работает не так, откройте папку логов и приложите последний лог к тикету в Discord.",
   "Fix: you're already at the maximum Injection Threshold. This usually means the injection is extremely slow. Try lighter mods, close heavy apps, move League/mods to an SSD, and consider adding antivirus exclusions for the League and Parasite folders. Then retry.": "Решение: порог внедрения уже на максимуме. Обычно это значит, что внедрение идёт крайне медленно. Попробуйте более лёгкие моды, закройте тяжёлые приложения, перенесите League и моды на SSD и добавьте исключения антивируса для папок League и Parasite. Затем попробуйте снова.",
   "Fix: based on {games} game(s), base skin confirmation takes up to {ms}ms (p90). Recommended threshold: {seconds}s. Use the \"Apply recommended\" button below, or increase \"Injection Threshold\" manually.": "Решение: по данным игр ({games}) подтверждение базового образа занимает до {ms} мс (p90). Рекомендуемый порог: {seconds} с. Нажмите кнопку «Применить» ниже или увеличьте «Порог внедрения» вручную.",
   "Fix: increase \"Injection Threshold (seconds)\" and click Save. If the warning is still there, increase it again and Save again. Once the warning is gone, retry your skin selection.": "Решение: увеличьте «Порог внедрения (секунды)» и нажмите «Сохранить». Если предупреждение не исчезло, увеличьте его ещё раз и снова сохраните. Когда предупреждение пропадёт, выберите образ заново.",

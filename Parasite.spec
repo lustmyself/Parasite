@@ -45,6 +45,9 @@ injection_binaries = [
 # Data files (text files, etc.)
 injection_data_files = [
     'injection/tools/hashes.game.txt',
+    # ParasiteOffline.exe is GPL-3.0 (Deceive): its license and where its source is
+    'injection/tools/ParasiteOffline-LICENSE.txt',
+    'injection/tools/ParasiteOffline-NOTICE.txt',
 ]
 # Verify and add injection binaries
 binaries = []

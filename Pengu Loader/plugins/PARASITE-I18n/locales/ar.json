@@ -1,6 +1,6 @@
 {
   "What happened: this LTK patcher only runs inside LTK Manager, so it refused Parasite and the game started without skins.": "What happened: this LTK patcher only runs inside LTK Manager, so it refused Parasite and the game started without skins.",
-  "Fix: download ltk_patcher.zip (www.mediafire.com/file/g0lzcgpr97jd9r3/ltk_patcher.zip/file, shared in the Rose Discord #tutorial) into your Downloads folder and restart Parasite: it checks the League Toolkit signature and installs it. Or put both files in %LOCALAPPDATA%\\Parasite\\ltk-patcher.": "Fix: download ltk_patcher.zip (www.mediafire.com/file/g0lzcgpr97jd9r3/ltk_patcher.zip/file, shared in the Rose Discord #tutorial) into your Downloads folder and restart Parasite: it checks the League Toolkit signature and installs it. Or put both files in %LOCALAPPDATA%\\Parasite\\ltk-patcher.",
+  "If something feels off, open the logs folder and attach the latest log to a GitHub issue.": "إذا بدا أن هناك خطأ ما، افتح مجلد السجلات وأرفق أحدث سجل في بلاغ على GitHub.",
   "Base Skin": "المظهر الأساسي",
   "Disable custom skin mod": "تعطيل تعديل المظهر",
   "Custom Skin {number}": "مظهر مخصص {number}",
@@ -149,7 +149,6 @@
   "This session: Parasite v{version}, started {time}": "هذه الجلسة: Parasite v{version}، بدأت {time}",
   "No errors in this session.": "لا أخطاء في هذه الجلسة.",
   "Earlier sessions ({count}), not from this run of Parasite": "جلسات سابقة ({count})، ليست من تشغيل Parasite الحالي",
-  "If something feels off, open the logs folder and share the latest log in a discord ticket.": "إذا بدا أن هناك خطأ ما، افتح مجلد السجلات وشارك أحدث سجل في تذكرة على Discord.",
   "Fix: you're already at the maximum Injection Threshold. This usually means the injection is extremely slow. Try lighter mods, close heavy apps, move League/mods to an SSD, and consider adding antivirus exclusions for the League and Parasite folders. Then retry.": "الحل: أنت بالفعل عند الحد الأقصى لحد الحقن. هذا يعني عادةً أن الحقن بطيء للغاية. جرّب تعديلات أخف، وأغلق التطبيقات الثقيلة، وانقل League والتعديلات إلى قرص SSD، وفكّر في إضافة استثناءات في برنامج مكافحة الفيروسات لمجلدات League وParasite. ثم أعد المحاولة.",
   "Fix: based on {games} game(s), base skin confirmation takes up to {ms}ms (p90). Recommended threshold: {seconds}s. Use the \"Apply recommended\" button below, or increase \"Injection Threshold\" manually.": "الحل: بناءً على {games} مباراة، يستغرق تأكيد المظهر الأساسي حتى {ms} ms (p90). الحد الموصى به: {seconds} s. استخدم زر \"تطبيق\" أدناه، أو ارفع \"حد الحقن\" يدويًا.",
   "Fix: increase \"Injection Threshold (seconds)\" and click Save. If the warning is still there, increase it again and Save again. Once the warning is gone, retry your skin selection.": "الحل: ارفع \"حد الحقن (بالثواني)\" وانقر على حفظ. إذا بقي التحذير، فارفعه مرة أخرى واحفظ مجددًا. بعد اختفاء التحذير، أعد اختيار مظهرك.",

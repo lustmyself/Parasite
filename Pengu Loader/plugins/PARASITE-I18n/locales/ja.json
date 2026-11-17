@@ -1,6 +1,6 @@
 {
   "What happened: this LTK patcher only runs inside LTK Manager, so it refused Parasite and the game started without skins.": "What happened: this LTK patcher only runs inside LTK Manager, so it refused Parasite and the game started without skins.",
-  "Fix: download ltk_patcher.zip (www.mediafire.com/file/g0lzcgpr97jd9r3/ltk_patcher.zip/file, shared in the Rose Discord #tutorial) into your Downloads folder and restart Parasite: it checks the League Toolkit signature and installs it. Or put both files in %LOCALAPPDATA%\\Parasite\\ltk-patcher.": "Fix: download ltk_patcher.zip (www.mediafire.com/file/g0lzcgpr97jd9r3/ltk_patcher.zip/file, shared in the Rose Discord #tutorial) into your Downloads folder and restart Parasite: it checks the League Toolkit signature and installs it. Or put both files in %LOCALAPPDATA%\\Parasite\\ltk-patcher.",
+  "If something feels off, open the logs folder and attach the latest log to a GitHub issue.": "何かおかしいと感じたら、ログフォルダーを開き、最新のログをGitHubのIssueに添付してください。",
   "Base Skin": "ベーススキン",
   "Disable custom skin mod": "スキンMODを無効化",
   "Custom Skin {number}": "カスタムスキン {number}",
@@ -149,7 +149,6 @@
   "This session: Parasite v{version}, started {time}": "このセッション: Parasite v{version}、{time} に起動",
   "No errors in this session.": "このセッションではエラーはありません。",
   "Earlier sessions ({count}), not from this run of Parasite": "以前のセッション（{count}）、今回の Parasite の実行のものではありません",
-  "If something feels off, open the logs folder and share the latest log in a discord ticket.": "何かおかしいと感じたら、ログフォルダーを開き、最新のログをDiscordのチケットで共有してください。",
   "Fix: you're already at the maximum Injection Threshold. This usually means the injection is extremely slow. Try lighter mods, close heavy apps, move League/mods to an SSD, and consider adding antivirus exclusions for the League and Parasite folders. Then retry.": "対処法: インジェクションしきい値はすでに最大です。通常、インジェクションが非常に遅いことを意味します。軽いMODを試す、重いアプリを閉じる、LeagueとMODをSSDに移す、LeagueとParasiteのフォルダーをウイルス対策の除外に追加する、などを検討してから再試行してください。",
   "Fix: based on {games} game(s), base skin confirmation takes up to {ms}ms (p90). Recommended threshold: {seconds}s. Use the \"Apply recommended\" button below, or increase \"Injection Threshold\" manually.": "対処法: {games}試合のデータでは、ベーススキンの確定に最大{ms}ms(p90)かかっています。推奨しきい値: {seconds}秒。下の「適用」ボタンを使うか、「インジェクションしきい値」を手動で上げてください。",
   "Fix: increase \"Injection Threshold (seconds)\" and click Save. If the warning is still there, increase it again and Save again. Once the warning is gone, retry your skin selection.": "対処法: 「インジェクションしきい値(秒)」を上げて保存をクリックしてください。警告が消えない場合は、さらに上げて再度保存してください。警告が消えたら、スキンを選び直してください。",

@@ -76,6 +76,8 @@ Filename: "{app}\_internal\Pengu Loader\Pengu Loader.exe"; Parameters: "--uninst
 ; _internal is Parasite's runtime alone. An update swaps in a whole new tree, whose
 ; files the uninstall log never recorded, so remove it with everything in it.
 Type: filesandordirs; Name: "{app}\_internal"
+; Parasite's own Spicetify (Spotify themes), downloaded at run time
+Type: filesandordirs; Name: "{app}\spicetify"
 ; Inno tracks installed files. A shared install root can leave untracked files
 ; in these folders, so remove the directories only when empty.
 Type: dirifempty; Name: "{app}\injection\overlay"

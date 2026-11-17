@@ -1,6 +1,6 @@
 {
   "What happened: this LTK patcher only runs inside LTK Manager, so it refused Parasite and the game started without skins.": "What happened: this LTK patcher only runs inside LTK Manager, so it refused Parasite and the game started without skins.",
-  "Fix: download ltk_patcher.zip (www.mediafire.com/file/g0lzcgpr97jd9r3/ltk_patcher.zip/file, shared in the Rose Discord #tutorial) into your Downloads folder and restart Parasite: it checks the League Toolkit signature and installs it. Or put both files in %LOCALAPPDATA%\\Parasite\\ltk-patcher.": "Fix: download ltk_patcher.zip (www.mediafire.com/file/g0lzcgpr97jd9r3/ltk_patcher.zip/file, shared in the Rose Discord #tutorial) into your Downloads folder and restart Parasite: it checks the League Toolkit signature and installs it. Or put both files in %LOCALAPPDATA%\\Parasite\\ltk-patcher.",
+  "If something feels off, open the logs folder and attach the latest log to a GitHub issue.": "Nếu có gì bất thường, hãy mở thư mục nhật ký và đính kèm nhật ký mới nhất vào một issue trên GitHub.",
   "Base Skin": "Trang phục gốc",
   "Disable custom skin mod": "Tắt mod trang phục",
   "Custom Skin {number}": "Trang phục tùy chỉnh {number}",
@@ -149,7 +149,6 @@
   "This session: Parasite v{version}, started {time}": "Phiên này: Parasite v{version}, bắt đầu lúc {time}",
   "No errors in this session.": "Không có lỗi trong phiên này.",
   "Earlier sessions ({count}), not from this run of Parasite": "Các phiên trước ({count}), không phải từ lần chạy Parasite này",
-  "If something feels off, open the logs folder and share the latest log in a discord ticket.": "Nếu có gì bất thường, hãy mở thư mục nhật ký và chia sẻ nhật ký mới nhất trong một phiếu hỗ trợ trên Discord.",
   "Fix: you're already at the maximum Injection Threshold. This usually means the injection is extremely slow. Try lighter mods, close heavy apps, move League/mods to an SSD, and consider adding antivirus exclusions for the League and Parasite folders. Then retry.": "Cách khắc phục: ngưỡng tiêm của bạn đã ở mức tối đa. Điều này thường có nghĩa là quá trình tiêm cực kỳ chậm. Hãy thử mod nhẹ hơn, đóng các ứng dụng nặng, chuyển League và mod sang ổ SSD và cân nhắc thêm ngoại lệ trong phần mềm diệt virus cho thư mục League và Parasite. Sau đó thử lại.",
   "Fix: based on {games} game(s), base skin confirmation takes up to {ms}ms (p90). Recommended threshold: {seconds}s. Use the \"Apply recommended\" button below, or increase \"Injection Threshold\" manually.": "Cách khắc phục: dựa trên {games} trận, việc xác nhận trang phục gốc mất tối đa {ms} ms (p90). Ngưỡng đề xuất: {seconds} giây. Hãy dùng nút \"Áp dụng\" bên dưới hoặc tự tăng \"Ngưỡng tiêm\".",
   "Fix: increase \"Injection Threshold (seconds)\" and click Save. If the warning is still there, increase it again and Save again. Once the warning is gone, retry your skin selection.": "Cách khắc phục: tăng \"Ngưỡng tiêm (giây)\" rồi bấm Lưu. Nếu cảnh báo vẫn còn, hãy tăng tiếp và lưu lại. Khi cảnh báo biến mất, hãy chọn lại trang phục.",

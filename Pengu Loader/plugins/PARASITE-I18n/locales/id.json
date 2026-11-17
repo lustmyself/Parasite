@@ -1,6 +1,6 @@
 {
   "What happened: this LTK patcher only runs inside LTK Manager, so it refused Parasite and the game started without skins.": "What happened: this LTK patcher only runs inside LTK Manager, so it refused Parasite and the game started without skins.",
-  "Fix: download ltk_patcher.zip (www.mediafire.com/file/g0lzcgpr97jd9r3/ltk_patcher.zip/file, shared in the Rose Discord #tutorial) into your Downloads folder and restart Parasite: it checks the League Toolkit signature and installs it. Or put both files in %LOCALAPPDATA%\\Parasite\\ltk-patcher.": "Fix: download ltk_patcher.zip (www.mediafire.com/file/g0lzcgpr97jd9r3/ltk_patcher.zip/file, shared in the Rose Discord #tutorial) into your Downloads folder and restart Parasite: it checks the League Toolkit signature and installs it. Or put both files in %LOCALAPPDATA%\\Parasite\\ltk-patcher.",
+  "If something feels off, open the logs folder and attach the latest log to a GitHub issue.": "Jika ada yang terasa aneh, buka folder log dan lampirkan log terbaru ke issue GitHub.",
   "Base Skin": "Skin dasar",
   "Disable custom skin mod": "Nonaktifkan mod skin",
   "Custom Skin {number}": "Skin kustom {number}",
@@ -149,7 +149,6 @@
   "This session: Parasite v{version}, started {time}": "Sesi ini: Parasite v{version}, dimulai {time}",
   "No errors in this session.": "Tidak ada kesalahan di sesi ini.",
   "Earlier sessions ({count}), not from this run of Parasite": "Sesi sebelumnya ({count}), bukan dari Parasite yang berjalan sekarang",
-  "If something feels off, open the logs folder and share the latest log in a discord ticket.": "Jika ada yang terasa aneh, buka folder log dan bagikan log terbaru di tiket Discord.",
   "Fix: you're already at the maximum Injection Threshold. This usually means the injection is extremely slow. Try lighter mods, close heavy apps, move League/mods to an SSD, and consider adding antivirus exclusions for the League and Parasite folders. Then retry.": "Solusi: ambang injeksimu sudah maksimum. Ini biasanya berarti injeksi sangat lambat. Coba mod yang lebih ringan, tutup aplikasi berat, pindahkan League/mod ke SSD, dan pertimbangkan menambahkan pengecualian antivirus untuk folder League dan Parasite. Lalu coba lagi.",
   "Fix: based on {games} game(s), base skin confirmation takes up to {ms}ms (p90). Recommended threshold: {seconds}s. Use the \"Apply recommended\" button below, or increase \"Injection Threshold\" manually.": "Solusi: berdasarkan {games} game, konfirmasi skin dasar butuh hingga {ms} ms (p90). Ambang yang disarankan: {seconds} dtk. Gunakan tombol \"Terapkan\" di bawah, atau naikkan \"Ambang injeksi\" secara manual.",
   "Fix: increase \"Injection Threshold (seconds)\" and click Save. If the warning is still there, increase it again and Save again. Once the warning is gone, retry your skin selection.": "Solusi: naikkan \"Ambang injeksi (detik)\" lalu klik Simpan. Jika peringatannya masih ada, naikkan lagi dan simpan lagi. Setelah peringatannya hilang, pilih skin-mu lagi.",
