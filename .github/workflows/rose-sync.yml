@@ -132,6 +132,7 @@ jobs:
           PARASITE_RELAY_URL: ${{ secrets.PARASITE_RELAY_URL }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          PARASITE_RELAY_WORKER: ${{ vars.PARASITE_RELAY_WORKER }}
         # Parasite's relay (parasite/relay): empty without its Cloudflare account, and skin sharing stays off
         run: python parasite/relay/write_config.py
 
