@@ -55,8 +55,7 @@ namespace PenguLoader
 
         public static void SetLanguage(string lang)
         {
-            if (!LanguageMap.ContainsKey(lang))
-                lang = "English";
+            lang = "Türkçe";  // Parasite is Turkish only
 
             var dict = new ResourceDictionary();
             var file = LanguageMap[lang];

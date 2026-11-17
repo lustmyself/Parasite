@@ -1,5 +1,6 @@
-"""After a deploy: two players join one room and see each other's pick, and two League
-friends find each other in the friends directory (run from the repo root)."""
+"""After a deploy: two players join one room and see each other's pick (protocol 1, Parasite
+<= 2.10 and Lust), a Parasite 2.11+ joins with protocol 2, and two League friends find each
+other in the friends directory (run from the repo root)."""
 
 import asyncio
 import json
@@ -40,8 +41,23 @@ async def main():
     print("Rooms work: player 2 saw", seen)
 
 
+async def check_protocol_2():
+    """Parasite 2.11+ (party/network/ws_relay.py): identity in headers, protocol 2 confirmed."""
+    url = f"{RELAY_URL}/room?key={'dc' + '0' * 30}&v=2.11&p=2"  # noqa: F821
+    headers = {"X-Parasite-Summoner-Id": "1", "X-Parasite-Summoner-Name": "check",
+               "Authorization": "Bearer " + "0" * 64}
+    async with websockets.connect(url, additional_headers=headers, open_timeout=20) as ws:
+        if ws.response.headers.get("X-Parasite-Party-Protocol") != "2":
+            raise SystemExit("The relay did not answer with X-Parasite-Party-Protocol: 2 (still the old code?)")
+        msg = json.loads(await asyncio.wait_for(ws.recv(), 10))
+        members = msg.get("members") or [{}]
+        if members[0].get("summoner_id") != "1" or len(members[0].get("member_key", "")) != 64:
+            raise SystemExit(f"Protocol 2 member list is wrong: {msg}")
+    print("Protocol 2 works")
+
+
 def directory(me, friends):
-    base = RELAY_URL.replace("wss://", "https://", 1)  # noqa: F821
+    base = RELAY_URL.replace("wss://", "https://", 1).replace("ws://", "http://", 1)  # noqa: F821
     request = urllib.request.Request(f"{base}/friends?v=1.4.9.92", data=json.dumps({"me": me, "friends": friends}).encode(),
                                      method="POST",
                                      headers={"Content-Type": "application/json", "User-Agent": "Parasite/1.4.9.92"})
@@ -60,4 +76,5 @@ def check_directory():
 
 
 asyncio.run(main())
+asyncio.run(check_protocol_2())
 check_directory()

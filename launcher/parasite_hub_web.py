@@ -971,6 +971,19 @@ PAGE = r"""<!doctype html>
   .cs-crow .pk { display: flex; align-items: center; gap: 8px; font-weight: 600; min-width: 0; }
   .cs-crow .pk img { width: 24px; height: 24px; border-radius: 6px; }
   .cs-crow .gm { color: var(--sub); } .cs-crow .ok { color: #facc15; } .cs-crow .na { color: var(--faint); }
+  .cs-crow.sel { background: rgba(255, 255, 255, .08); }
+  .cs-cd { margin: 6px 0 4px; padding: 12px; border-radius: 12px; background: rgba(255, 255, 255, .04); border: 1px solid rgba(255, 255, 255, .07); }
+  .cs-cd-h { display: flex; align-items: center; gap: 10px; }
+  .cs-cd-h img { width: 36px; height: 36px; border-radius: 9px; }
+  .cs-cd-h b { display: block; font-size: 14px; } .cs-cd-h small { color: var(--sub); font-size: 11.5px; }
+  .cs-cd-h .x { margin-left: auto; background: none; border: 0; color: var(--sub); font-size: 16px; cursor: pointer; padding: 4px 8px; }
+  .cs-cd-t { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; margin-top: 10px; }
+  .cs-cd-t div { padding: 6px 8px; border-radius: 8px; background: rgba(255, 255, 255, .04); }
+  .cs-cd-t small { display: block; font-size: 9.5px; letter-spacing: .6px; text-transform: uppercase; color: var(--sub); }
+  .cs-cd-t span { font-size: 13px; font-weight: 700; } .cs-cd-t .up { color: #4ade80; } .cs-cd-t .dn { color: #f87171; }
+  .cs-cd .note { margin-top: 8px; }
+  .cs-cd-err { margin-top: 8px; padding: 7px 10px; border-radius: 8px; background: rgba(248, 113, 113, .12); color: #fecaca; font-size: 12px; }
+  .cs-cd-b { display: flex; gap: 8px; margin-top: 10px; } .cs-cd-b .primary { flex: 1; }
   .cs-foot { display: flex; align-items: center; gap: 10px; margin-top: 12px; flex-wrap: wrap; }
   .cs-foot #cs-multi { flex: 1; padding: 12px; }
   .cs-site { margin-left: 0; } .cs-site button { padding: 6px 12px; font-size: 12px; }
@@ -1628,7 +1641,8 @@ PAGE = r"""<!doctype html>
         <div class="rv-wait" id="rv-wait" hidden></div>
         <div class="cs-crow cs-head"><span id="cs-cpick"></span><span>LoLa</span><span>U.GG</span><span>Kill</span><span>CS</span><span>Altın</span><span>Maç</span><span title="İki site de destekliyor">✓</span></div>
         <div id="cs-crows"></div>
-        <div class="note">Master+ maçlar, bütün bölgeler, Ranked Solo/Duo. Kill, CS ve altın 15. dakikadaki farklar (U.GG). Başka bir rakibin counter'ları için tablodaki satırına tıkla; bir counter'a tıklayınca U.GG'de o eşleşme açılır.</div>
+        <div class="cs-cd" id="cs-cdetail" hidden></div>
+        <div class="note">Master+ maçlar, bütün bölgeler, Ranked Solo/Duo. Kill, CS ve altın 15. dakikadaki farklar (U.GG). Başka bir rakibin counter'ları için tablodaki satırına tıkla; bir counter'a tıklayınca ayrıntıları açılır: oradan League'de seçimin olarak gösterebilir (kilitlemez) ya da U.GG'de eşleşmeyi açabilirsin.</div>
       </div>
       <div class="rv-dodge" id="rv-dodge" hidden>
       <div><b>Dodge</b><span>Client'ı yeniden başlatmadan şampiyon seçiminden çık (normal dodge cezası uygulanır)</span></div>
@@ -1885,13 +1899,17 @@ async function pollMedia() {
   }
   setTimeout(pollMedia, 1000);
 }
+// The bars ease towards the level and wave on their own between readings, so four a second is
+// enough; nothing is asked while the page is hidden or Spotify is paused
+const LEVEL_MS = 250, LEVEL_IDLE_MS = 600;
 async function pollLevel() {
-  if (spotifyVisible() && media.playing) {
+  const live = spotifyVisible() && media.playing;
+  if (live) {
     try { level = (await api("/api/level")).level || 0; } catch (e) { level = 0; }
   } else {
     level = 0;
   }
-  setTimeout(pollLevel, 100);
+  setTimeout(pollLevel, live ? LEVEL_MS : LEVEL_IDLE_MS);
 }
 function drawMedia() {
   const on = !!media.available;
@@ -2452,7 +2470,9 @@ const CS_LANES = { top: "TOP", jungle: "JGL", middle: "MID", bottom: "ADC", util
 const CS_LANE_TR = { top: "Üst", jungle: "Orman", middle: "Orta", bottom: "Alt", utility: "Destek" };
 const CS_SITES = [["opgg", "op.gg"], ["porofessor", "Porofessor"], ["ugg", "U.GG"]];
 // The page opens on its settings; during a champ select, on the live team instead
-let csTab = "settings", csPick = null, csWasLive = false;
+let csTab = "settings", csPick = null, csWasLive = false, csCounter = null, csHovering = null;
+// A counter matchup with fewer games is a small sample (reveal's MIN_RELIABLE_GAMES)
+const CS_MIN_GAMES = 200;
 const mk = (tag, cls, text) => { const n = document.createElement(tag); if (cls) n.className = cls; if (text != null) n.textContent = text; return n; };
 const pct = (v) => v == null ? "–" : `${Number(v).toFixed(1)}%`;
 function csNum(v, digits, good) {
@@ -2467,11 +2487,11 @@ function csRank(row) {
   const line = mk("div", "cs-rk");
   if (row.loading && !r) { line.textContent = "yükleniyor…"; return line; }
   if (!row.puuid) { line.textContent = row.gameName ? "" : "Gizli"; return line; }
-  if (!r) line.append(mk("span", "t", "Unranked"));
+  if (!r) line.append(mk("span", "t", "Derecesiz"));
   else {
     line.append(mk("span", "t", `${r.tier}${r.division ? " " + r.division : ""}`), ` · ${r.lp} LP`);
     const games = r.wins + r.losses;
-    if (games) line.append(` · ${r.wins}W ${r.losses}L · ${Math.round(r.wins * 100 / games)}%`);
+    if (games) line.append(` · ${r.wins}G ${r.losses}M · %${Math.round(r.wins * 100 / games)}`);
   }
   return line;
 }
@@ -2515,7 +2535,7 @@ function drawReveal() {
   const multiUrl = (lobby.links || {})[site] || "";
   $("cs-multi").disabled = !multiUrl;
   $("cs-multi").textContent = `Takımı ${(CS_SITES.find(([k]) => k === site) || [0, "op.gg"])[1]}'de aç ↗`;
-  if (!inSelect || !rows.length) { $("cs-counters").hidden = true; csPick = null; return; }
+  if (!inSelect || !rows.length) { $("cs-counters").hidden = true; csPick = null; csCounter = null; return; }
 
   $("cs-queue").textContent = lobby.queueName || "";
   $("cs-queue").hidden = !lobby.queueName;
@@ -2561,7 +2581,7 @@ function drawReveal() {
         el.append(mk("span", "cs-wait", !e ? "" : !row.championId ? (row.me ? "Senin seçimin bekleniyor" : "Seçim bekleniyor") : a ? "Yeterli maç yok" : "Yükleniyor…"));
       }
       el.addEventListener("click", (ev) => {
-        if (e) { csPick = row.position; drawReveal(); return; }
+        if (e) { if (csPick !== row.position) csCounter = null; csPick = row.position; drawReveal(); return; }
         if (row.opggUrl) act("open_link", { url: row.opggUrl });
       });
       if (row.opggUrl) pl.addEventListener("click", (ev) => { ev.stopPropagation(); act("open_link", { url: row.opggUrl }); });
@@ -2576,8 +2596,11 @@ function drawReveal() {
   const wait = c.status === "loading" ? "Counter'lar yükleniyor…"
     : c.status === "error" ? "Counter verisi şu an alınamadı; sitelerin kendi sayfaları yukarıda." : "";
   $("rv-wait").hidden = !wait; $("rv-wait").textContent = wait;
-  if (!e) { $("cs-crows").replaceChildren(); $("cs-ctitle").textContent = "Counter'lar"; $("cs-clinks").replaceChildren(); return; }
-  const ckey = JSON.stringify(e);
+  if (!e) { $("cs-crows").replaceChildren(); $("cs-ctitle").textContent = "Counter'lar"; $("cs-clinks").replaceChildren(); $("cs-cdetail").hidden = true; return; }
+  const counters = e.counters || [];
+  if (!counters.some((k) => k.id === csCounter)) csCounter = null;
+  csDetail(e, counters.find((k) => k.id === csCounter));
+  const ckey = JSON.stringify([e, csCounter]);
   if ($("cs-crows").dataset.key === ckey) return;
   $("cs-crows").dataset.key = ckey;
   $("cs-ctitle").replaceChildren("En iyi counter'lar: ", mk("em", "", e.name), ` · ${e.roleLabel || ""}`);
@@ -2587,18 +2610,62 @@ function drawReveal() {
     b.addEventListener("click", () => act("open_link", { url: e.links[k] }));
     return b;
   }));
-  const counters = e.counters || [];
   $("cs-crows").replaceChildren(...(counters.length ? counters.map((k) => {
-    const row = mk("div", "cs-crow");
+    const row = mk("div", `cs-crow${k.id === csCounter ? " sel" : ""}`);
     const pk = mk("span", "pk");
     pk.append(Object.assign(mk("img"), { src: CHAMP_ICON(k.id), alt: "" }), mk("span", "", k.name));
     const wr = (v) => mk("span", `cs-num ${v == null ? "na" : v >= 50 ? "up" : "mid"}`, pct(v));
     row.append(pk, wr(k.lolaWin), wr(k.uggWin), csNum(k.kills15, 1, true), csNum(k.cs15, 0, true), csNum(k.gold15, 0, true),
       mk("span", "gm", k.games != null ? String(k.games) : "–"), mk("span", k.sites > 1 ? "ok" : "na", k.sites > 1 ? "✓" : "·"));
     row.title = `${k.name}: %${k.winRate} (${k.games} maç)${k.delta != null ? `, beklenenden ${signed(k.delta, 1)}` : ""}`;
-    if (k.link) row.addEventListener("click", () => act("open_link", { url: k.link }));
+    row.addEventListener("click", () => { csCounter = csCounter === k.id ? null : k.id; drawReveal(); });
     return row;
   }) : [mk("div", "rv-wait", c.status === "loading" ? "" : "Bu eşleşme için yeterli maç yok.")]));
+}
+// The clicked counter: its numbers against the enemy, hovering it in League (never locks in), its matchup page
+function csDetail(e, k) {
+  const box = $("cs-cdetail");
+  const h = (auto && auto.hover) || {};
+  const sig = JSON.stringify([e.id, e.role, k, h, csHovering]);
+  if (box.dataset.key === sig) return;
+  box.dataset.key = sig;
+  box.hidden = !k;
+  if (!k) { box.replaceChildren(); return; }
+  const head = mk("div", "cs-cd-h"), who = mk("div");
+  who.append(mk("b", "", k.name), mk("small", "", [`${e.name} karşısında`, e.roleLabel].filter(Boolean).join(" · ")));
+  const close = mk("button", "x", "✕");
+  close.title = "Kapat";
+  close.addEventListener("click", () => { csCounter = null; drawReveal(); });
+  head.append(Object.assign(mk("img"), { src: CHAMP_ICON(k.id), alt: "" }), who, close);
+  const tile = (label, text, cls) => { const t = mk("div"); t.append(mk("small", "", label), mk("span", cls, text)); return t; };
+  const tone = (v) => v == null ? "" : v >= 0 ? "up" : "dn";
+  const tiles = mk("div", "cs-cd-t");
+  tiles.append(tile("Kazanma", pct(k.winRate), tone(k.delta != null ? k.delta : k.winRate - 50)),
+    tile("Altın @15", k.gold15 != null ? signed(k.gold15, 0) : "–", tone(k.gold15)),
+    tile("CS @15", k.cs15 != null ? signed(k.cs15, 0) : "–", tone(k.cs15)),
+    tile("Maç", k.games != null ? Number(k.games).toLocaleString("tr-TR") : "–", ""));
+  box.replaceChildren(head, tiles);
+  if (k.games != null && k.games < CS_MIN_GAMES) box.append(mk("div", "note", "Az maç var; bu sayılara temkinli bak."));
+  if (h.id === k.id && !h.ok && h.message && csHovering !== k.id && Date.now() / 1000 - (h.at || 0) < 60) box.append(mk("div", "cs-cd-err", h.message));
+  const buttons = mk("div", "cs-cd-b");
+  if (k.link) {
+    const page = mk("button", "btn", "U.GG ↗");
+    page.title = `${k.name} – ${e.name} eşleşmesi U.GG'de`;
+    page.addEventListener("click", () => act("open_link", { url: k.link }));
+    buttons.append(page);
+  }
+  const pick = mk("button", "btn primary", csHovering === k.id ? "Gösteriliyor…" : "Seçimim olarak göster");
+  pick.disabled = csHovering === k.id;
+  pick.title = `${k.name} League'de seçimin olarak görünür; kilitlenmez.`;
+  pick.addEventListener("click", () => {
+    if (csHovering) return;
+    csHovering = k.id;
+    drawReveal();
+    const done = () => { csHovering = null; if (auto) drawReveal(); };
+    api("/api/action/lobby_hover", { championId: k.id, name: k.name }).then(() => setTimeout(() => loadAuto().finally(done), 700), done);
+  });
+  buttons.append(pick);
+  box.append(buttons);
 }
 function csAgo(at) {
   const s = Math.max(0, Date.now() / 1000 - at);
@@ -2630,7 +2697,7 @@ function drawHistory() {
       const t = mk("div");
       const r = p.rank;
       t.append(mk("b", "", p.gameName + (p.gameTag ? ` #${p.gameTag}` : "")),
-        mk("small", "", [CS_LANES[p.position], r ? `${r.tier}${r.division ? " " + r.division : ""} ${r.lp} LP` : "Unranked"].filter(Boolean).join(" · ")));
+        mk("small", "", [CS_LANES[p.position], r ? `${r.tier}${r.division ? " " + r.division : ""} ${r.lp} LP` : "Derecesiz"].filter(Boolean).join(" · ")));
       el.append(t);
       if (p.opggUrl) el.addEventListener("click", () => act("open_link", { url: p.opggUrl }));
       grid.append(el);
@@ -2790,7 +2857,7 @@ async function loadMaps() {
   $("cat-h").hidden = !data.catalog.length;
   data.catalog.forEach((m) => cat.appendChild(mapCard(m, true)));
 }
-setInterval(() => { if ($("page-maps").classList.contains("active")) loadMaps(); }, 3000);
+setInterval(() => { if (!document.hidden && $("page-maps").classList.contains("active")) loadMaps(); }, 3000);
 // A file dropped anywhere else must not replace the page with it
 ["dragover", "drop"].forEach((t) => document.addEventListener(t, (e) => e.preventDefault()));
 const drop = $("drop");
@@ -2853,7 +2920,7 @@ async function loadWalls() {
   list.appendChild(wallCard(null, data));
   data.files.forEach((w) => list.appendChild(wallCard(w, data)));
 }
-setInterval(() => { if ($("page-wallpaper").classList.contains("active")) loadWalls(); }, 4000);
+setInterval(() => { if (!document.hidden && $("page-wallpaper").classList.contains("active")) loadWalls(); }, 4000);
 const wallDrop = $("wall-drop");
 ["dragenter", "dragover"].forEach((t) => wallDrop.addEventListener(t, (e) => { e.preventDefault(); wallDrop.classList.add("over"); }));
 ["dragleave", "drop"].forEach((t) => wallDrop.addEventListener(t, (e) => { e.preventDefault(); wallDrop.classList.remove("over"); }));
@@ -2905,7 +2972,7 @@ async function loadFonts() {
   list.appendChild(fontCard({ id: "", name: "League", selected: !data.selected }));
   data.installed.filter((f) => !f.parasite).forEach((f) => list.appendChild(fontCard(f)));
 }
-setInterval(() => { if ($("page-fonts").classList.contains("active")) loadFonts(); }, 3000);
+setInterval(() => { if (!document.hidden && $("page-fonts").classList.contains("active")) loadFonts(); }, 3000);
 const fontDrop = $("font-drop");
 ["dragenter", "dragover"].forEach((t) => fontDrop.addEventListener(t, (e) => { e.preventDefault(); fontDrop.classList.add("over"); }));
 ["dragleave", "drop"].forEach((t) => fontDrop.addEventListener(t, (e) => { e.preventDefault(); fontDrop.classList.remove("over"); }));
@@ -3023,7 +3090,7 @@ async function loadSkins() {
 }
 $("sk-find").addEventListener("input", drawSkins);
 // Files copied into the folder show up while the page is open
-setInterval(() => { if ($("page-skins").classList.contains("active")) loadSkins(); }, 3000);
+setInterval(() => { if (!document.hidden && $("page-skins").classList.contains("active")) loadSkins(); }, 3000);
 const skinDrop = $("skin-drop");
 ["dragenter", "dragover"].forEach((t) => skinDrop.addEventListener(t, (e) => { e.preventDefault(); skinDrop.classList.add("over"); }));
 ["dragleave", "drop"].forEach((t) => skinDrop.addEventListener(t, (e) => { e.preventDefault(); skinDrop.classList.remove("over"); }));
@@ -3275,10 +3342,16 @@ document.querySelectorAll("[data-goto]").forEach((b) => b.addEventListener("clic
 document.addEventListener("contextmenu", (e) => e.preventDefault());
 buildThemes();
 showPage("home");
+// Hidden (minimized) or during a match the hub's state is read every 5 s instead of 0.8 s;
+// coming back reads it at once
+let pollTimer = 0;
 async function pollLoop() {
+  clearTimeout(pollTimer);
   await poll();
-  setTimeout(pollLoop, state && state.resting ? 5000 : 800);
+  clearTimeout(pollTimer);
+  pollTimer = setTimeout(pollLoop, document.hidden || (state && state.resting) ? 5000 : 800);
 }
+document.addEventListener("visibilitychange", () => { if (!document.hidden) pollLoop(); });
 pollLoop();
 </script>
 </body>

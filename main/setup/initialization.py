@@ -38,6 +38,10 @@ def setup_logging_and_cleanup(args: argparse.Namespace) -> None:
     setup_logging(log_mode, write_logs=write_logs)
     install_uncaught_exception_logging()
 
+    # Troubleshooting tells this session's reports from earlier ones
+    from utils.core.issue_reporter import start_session
+    start_session()
+
     # Log user detection info (helps diagnose "Run as Administrator" issues)
     current_user, target_user, is_mismatch = get_detected_user_info()
     data_dir = get_user_data_dir()
@@ -62,15 +66,34 @@ def setup_logging_and_cleanup(args: argparse.Namespace) -> None:
         })
 
 
+def convert_stored_mods(tray_manager: Optional[TrayManager]) -> None:
+    """Pack the mods an earlier Parasite stored as folders into the archives LTK
+    Manager installs (injection.mods.conversion), before anything else runs:
+    no injection may read a folder while it is converted. Parasite starts anyway
+    when it fails: a folder left as it is still works."""
+    from injection.mods.conversion import convert_folder_mods
+
+    def progress(index: int, total: int, name: str) -> None:
+        if tray_manager:
+            tray_manager.set_title(f"Parasite - modlar hazırlanıyor ({index}/{total}): {name}"[:127])
+
+    try:
+        converted = convert_folder_mods(progress=progress)
+        if converted:
+            log_success(log, f"Packed {converted} stored mod(s) into archives", "")
+    except Exception as e:  # noqa: BLE001 - Parasite must start
+        log.warning(f"[MODS] Could not convert the mods stored as folders: {e}")
+    finally:
+        if tray_manager:
+            tray_manager.set_title("Parasite")
+
+
 def initialize_tray_manager(args: argparse.Namespace) -> Optional[TrayManager]:
     """Initialize the system tray manager"""
     try:
-        def tray_quit_callback():
-            """Callback for tray quit - will be updated with state reference later"""
-            log.info("Setting stop flag from tray quit")
-            # Callback will be updated later when state is initialized
-        
-        tray_manager = TrayManager(quit_callback=tray_quit_callback)
+        # No callbacks yet: run_league_unlock sets them once the state exists
+        # and replays a Quit or Restart clicked before
+        tray_manager = TrayManager()
         tray_manager.start()
         log_success(log, "System tray icon initialized - console hidden", "")
         

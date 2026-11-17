@@ -60,6 +60,73 @@ PATCHES = [
      "    <Copyright>Copyright (c) molenzwiebel and Parasite contributors, GPL-3.0</Copyright>\n"),
 ]
 
+ISSUES_URL = REPO_URL + "/issues"
+# Parasite is Turkish only: what players see (chat replies from the "Parasite Active!" friend,
+# message boxes) in Turkish. Applied after the patches above. The tray menu stays as it is: it is
+# hidden. The chat commands (online, offline, mobile...) are commands and keep their names.
+PATCHES += [
+    ("Deceive/MainController.cs", '"You are now appearing online."', '"Artık çevrimiçi görünüyorsun."'),
+    ("Deceive/MainController.cs", '"You are now appearing " + newStatus + "."',
+     '"Artık " + (newStatus == "mobile" ? "mobilde" : "çevrimdışı") + " görünüyorsun."'),
+    ("Deceive/MainController.cs", '"You are appearing online."', '"Çevrimiçi görünüyorsun."'),
+    ("Deceive/MainController.cs", '"You are appearing " + Status + "."',
+     '(Status == "mobile" ? "Mobilde" : "Çevrimdışı") + " görünüyorsun."'),
+    ("Deceive/MainController.cs", '"Deceive is now enabled."', '"Parasite Offline açıldı."'),
+    ("Deceive/MainController.cs", '"Deceive is now disabled."', '"Parasite Offline kapatıldı."'),
+    ("Deceive/MainController.cs", '"Deceive is already enabled."', '"Parasite Offline zaten açık."'),
+    ("Deceive/MainController.cs", '"Deceive is already disabled."', '"Parasite Offline zaten kapalı."'),
+    ("Deceive/MainController.cs",
+     '"You can send the following messages to quickly change Deceive settings: online/offline/mobile/enable/disable/status"',
+     '"Parasite Offline\'ı hızlıca ayarlamak için şu mesajları gönderebilirsin: online/offline/mobile/enable/disable/status"'),
+    ("Deceive/MainController.cs",
+     '                            "Unable to connect to the chat server. Please check your internet connection. " +\n'
+     '                            "If this issue persists and you can connect to chat normally without Deceive, " +\n'
+     '                            "please file a bug report through GitHub (https://github.com/molenzwiebel/Deceive) or Discord.",\n',
+     '                            "Sohbet sunucusuna bağlanılamadı. İnternet bağlantını kontrol et. " +\n'
+     '                            "Sorun sürerse ve Parasite Offline olmadan sohbete normal bağlanabiliyorsan, " +\n'
+     f'                            "lütfen GitHub\'da bildir ({ISSUES_URL}).",\n'),
+    ("Deceive/ConfigProxy.cs",
+     '                "Deceive was unable to rewrite a League of Legends configuration file. This normally happens because Riot changed something on their end. " +\n'
+     '                "Please check if there\'s a new version of Deceive available, or contact the creator through GitHub (https://github.com/molenzwiebel/Deceive) or Discord if there\'s not.\\n\\n" +\n',
+     '                "Parasite Offline bir League of Legends yapılandırma dosyasını yeniden yazamadı. Bu genellikle Riot kendi tarafında bir şeyi değiştirdiğinde olur. " +\n'
+     f'                "Parasite\'ın yeni bir sürümü var mı bak; yoksa GitHub\'da bildir ({ISSUES_URL}).\\n\\n" +\n'),
+    ("Deceive/StartupHandler.cs",
+     '                "Deceive encountered an error and couldn\'t properly initialize itself. " +\n'
+     '                "Please contact the creator through GitHub (https://github.com/molenzwiebel/Deceive) or Discord.\\n\\n" + ex,\n',
+     '                "Parasite Offline bir hatayla karşılaştı ve düzgün başlatılamadı. " +\n'
+     f'                "Lütfen GitHub\'da bildir ({ISSUES_URL}).\\n\\n" + ex,\n'),
+    ("Deceive/StartupHandler.cs",
+     '                "The Riot Client is currently running. In order to mask your online status, the Riot Client needs to be started by Deceive. " +\n'
+     '                "Do you want Deceive to stop the Riot Client and games launched by it, so that it can restart with the proper configuration?",\n',
+     '                "Riot Client şu anda açık. Çevrimiçi durumunu gizleyebilmek için Riot Client\'ın Parasite Offline tarafından başlatılması gerekiyor. " +\n'
+     '                "Parasite Offline, Riot Client\'ı ve onun açtığı oyunları kapatıp doğru ayarlarla yeniden başlatsın mı?",\n'),
+    ("Deceive/StartupHandler.cs",
+     '                "Deceive was unable to find the path to the Riot Client. Usually this can be resolved by launching any Riot Games game once, then launching Deceive again. " +\n'
+     '                "If this does not resolve the issue, please file a bug report through GitHub (https://github.com/molenzwiebel/Deceive) or Discord.",\n',
+     '                "Parasite Offline, Riot Client\'ın yolunu bulamadı. Genellikle herhangi bir Riot Games oyununu bir kez açıp Parasite Offline\'ı yeniden başlatmak bunu çözer. " +\n'
+     f'                "Çözmezse lütfen GitHub\'da bildir ({ISSUES_URL}).",\n'),
+    ("Deceive/StartupHandler.cs",
+     '                "Deceive was unable to obtain a necessary security certificate for intercepting and modifying the chat connection. This normally happens when there\'s " +\n'
+     '                "a problem with the server that provides the certificate, but it can also be caused by network issues on your end. Please check if there\'s a new version" +\n'
+     '                " of Deceive available, check your network connection, or contact the creator through GitHub (https://github.com/molenzwiebel/Deceive) or Discord.",\n',
+     '                "Parasite Offline, sohbet bağlantısı için gereken güvenlik sertifikasını alamadı. Bu genellikle sertifikayı veren sunucudaki bir sorundan olur, " +\n'
+     '                "ama senin ağındaki bir sorundan da olabilir. Parasite\'ın yeni bir sürümü var mı bak, internet bağlantını kontrol et" +\n'
+     f'                " ya da GitHub\'da bildir ({ISSUES_URL}).",\n'),
+    ("Deceive/Utils.cs",
+     '"Deceive could not stop existing Riot processes because it does not have the right permissions. Please relaunch this application as an administrator and try again."',
+     '"Parasite Offline, açık Riot işlemlerini kapatamadı çünkü yetkisi yok. Parasite\'ı yönetici olarak yeniden başlatıp tekrar dene."'),
+    ("Deceive/Utils.cs",
+     '"Your machine is failing to resolve some required domains. You will need to switch DNS servers or add an entry to your hosts file. '
+     'Please see the FAQ for more information. Deceive will not work until this issue is resolved. Would you like to open the FAQ now?"',
+     '"Bilgisayarın gerekli bazı alan adlarını çözümleyemiyor. DNS sunucunu değiştirmen ya da hosts dosyana bir kayıt eklemen gerekiyor. '
+     'Ayrıntılar SSS sayfasında (İngilizce). Bu sorun çözülene kadar Parasite Offline çalışmaz. SSS sayfası şimdi açılsın mı?"'),
+    ("Deceive/ProxiedConnection.cs", '"rosterName": "Deceive is active. Ignore any version mismatch warnings."',
+     '"rosterName": "Parasite Offline açık. Sürüm uyuşmazlığı uyarılarını yok say."'),
+    ("Deceive/GamePromptForm.Designer.cs", '"Which game would you like to launch?"', '"Hangi oyunu açmak istersin?"'),
+    ("Deceive/GamePromptForm.Designer.cs", '"Remember my decision and skip this screen on future launches."',
+     '"Seçimimi hatırla ve bu ekranı bir daha gösterme."'),
+]
+
 STRING_LITERAL = re.compile(r'\$?"(?:[^"\\\n]|\\.)*"')
 # The word alone, so names inside interpolations ({DeceiveTitle}) keep working.
 WORD = re.compile(r"\bDeceive\b")

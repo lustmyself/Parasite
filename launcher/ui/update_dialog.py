@@ -37,6 +37,15 @@ from utils.system.win32_base import (
 updater_log = get_named_logger("updater", prefix="log_updater")
 
 
+def _turkish(text: str) -> str:
+    """Parasite is Turkish only: the launcher's steps as the desktop hub words them."""
+    try:
+        from launcher.parasite_hub import _translate
+        return _translate(text)
+    except Exception:  # noqa: BLE001 - the English text is better than no text
+        return text
+
+
 class UpdateDialog(Win32Window):
     """Win32 dialog window for showing update progress"""
     
@@ -78,7 +87,7 @@ class UpdateDialog(Win32Window):
 
         detail_hwnd = self.create_control(
             "STATIC",
-            "Preparing Parasite…",
+            "Parasite hazırlanıyor…",
             WS_CHILD | WS_VISIBLE,
             0,
             x_pos,
@@ -139,6 +148,7 @@ class UpdateDialog(Win32Window):
 
     def set_detail(self, text: str) -> None:
         updater_log.info(f"Detail: {text}")
+        text = _turkish(text)
         def _apply() -> None:
             self._current_status = text
             self._status_text = ""
@@ -150,6 +160,7 @@ class UpdateDialog(Win32Window):
 
     def set_status(self, text: str) -> None:
         updater_log.info(f"Status: {text}")
+        text = _turkish(text)
         def _apply() -> None:
             clean_text = re.sub(r"\s*/\s*\?\s*$", "", text).strip()
             title_text = re.sub(
@@ -313,7 +324,7 @@ class UpdateDialog(Win32Window):
     def _render_status_text(self) -> None:
         if not self.detail_hwnd or not self.status_hwnd:
             return
-        header = self._status_text or self._current_status or "Preparing Parasite…"
+        header = self._status_text or self._current_status or "Parasite hazırlanıyor…"
         user32.SetWindowTextW(self.detail_hwnd, header)
         user32.InvalidateRect(self.detail_hwnd, None, True)
         user32.SetWindowTextW(self.status_hwnd, self._transfer_text or "")

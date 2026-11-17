@@ -96,6 +96,36 @@ Add tests to the `tests/` folder of the package they cover (with an
 lints the workflows in `.github/` (actionlint, zizmor) and reviews dependency
 changes on pull requests.
 
+### Party relay
+
+Run `npm ci`, `npm run typecheck`, and `npm test` from `relay-worker/`. The
+tests build the Worker and exercise WebSocket upgrades against a local Durable
+Object with SQLite storage. For manual development, start `npm run dev` and
+set `PARASITE_RELAY_URL=ws://127.0.0.1:8787` in the environment that launches Parasite.
+
+Coordinate the protocol v2 Worker deployment with distribution of a matching
+Parasite client. The new Worker returns HTTP 426 to older clients, and the new
+client requires a v2 acknowledgement before exchanging party state. Existing
+invite tokens keep their room keys. Deployments outside loopback use WSS.
+
+Some networks block the relay at only some of its addresses (Spanish ISPs drop
+Cloudflare IP ranges during LaLiga matches). For a `wss://` relay with a
+hostname, Parasite tries each address in turn, keeping the hostname for TLS and
+the Host header: the address that worked last, then the system resolver's,
+then the addresses DNS-over-HTTPS resolvers give, if none of those connects
+(`party/network/relay_addresses.py`). An HTTP answer from the relay stops the
+search. When every address fails, the error says whether the name did not
+resolve, no address accepted a connection, or connections were cut during the
+handshake.
+
+Each Parasite installation joins with a credential derived from its private
+`party_identity_keys.json`. The room key still grants access to join. While a
+member is connected, only the same installation can take over that summoner
+ID, and Parasite keeps a known member's identity consistent across rooms during
+the current Party Mode session. The relay stores no bindings: once a member
+has left, any installation can join with their ID again, so a reinstall or
+another PC is never locked out.
+
 ## Pull requests
 
 - Branch off `main`, with a name like the ones in the setup above
@@ -164,7 +194,8 @@ Parasite/
 │   │   ├── storage.py      # Custom mods storage
 │   │   └── zip_resolver.py
 │   ├── overlay/            # Overlay session management
-│   │   ├── overlay_manager.py  # LTF session: install mods, run the LTK patcher
+│   │   ├── ltf_session.py      # LTF session: LTK Manager through the bridge, Parasite's imports
+│   │   ├── overlay_manager.py  # Injection: install mods, run the LTK patcher
 │   │   └── process_manager.py
 │   ├── loadingname/        # Skin name on the loading screen
 │   │   └── loading_name.py

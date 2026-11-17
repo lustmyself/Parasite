@@ -48,8 +48,8 @@ class LtkManagerDialogTests(unittest.TestCase):
     def test_the_text_explains_the_setup_and_offers_to_set_the_path(self):
         _, status_title, body, steps, action = parasite_main._dll_dialog_text("no_manager")
 
-        self.assertEqual(action, "Set up path")
-        self.assertIn("never have to open it yourself", body)
+        self.assertEqual(action, "Yolu ayarla")
+        self.assertIn("senin hiç açman gerekmez", body)
         self.assertIn(parasite_main.LTK_MANAGER_DOWNLOAD_URL, steps)
         self.assertNotIn("cf.ini", steps)
 
@@ -81,14 +81,14 @@ class LtkManagerDialogTests(unittest.TestCase):
         self.assertFalse(result)
         self.assertEqual(shown, 2)
         self.set_config_option.assert_not_called()
-        self.assertIn("is not LTK Manager", self.message_box.call_args[0][1])
+        self.assertIn("LTK Manager değil", self.message_box.call_args[0][1])
 
     def test_a_path_parasite_cannot_save_is_reported(self):
         result, shown = self.show(["fix", "close"], picked=self.manager, found=None)
 
         self.assertFalse(result)
         self.assertEqual(shown, 2)
-        self.assertIn("could not save the path", self.message_box.call_args[0][1])
+        self.assertIn("yolu cf.ini dosyasına kaydedemedi", self.message_box.call_args[0][1])
 
     def test_closing_the_dialog_closes_parasite(self):
         result, shown = self.show(["close"])
