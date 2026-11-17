@@ -39,6 +39,9 @@ class TrayManager:
         self.icon = None
         self.tray_thread = None
         self._stop_event = threading.Event()
+        # A Quit or Restart clicked before its callback is set (Parasite starting)
+        self._pending_request = None
+        self._pending_lock = threading.Lock()
         self._diagnostics_lock = threading.Lock()
         self._diagnostics_thread = None
         self._diagnostics_dialog = None
@@ -154,6 +157,12 @@ class TrayManager:
     def _on_quit(self, icon, item):
         """Handle quit menu item click"""
         log.info("Quit requested from system tray")
+        with self._pending_lock:
+            if not self.quit_callback:
+                # Parasite is still starting: keep the icon, run_pending_request quits
+                log.info("Parasite is still starting - it quits once started")
+                self._pending_request = lambda: self._on_quit(icon, item)
+                return
         try:
             # Set stop event immediately to signal shutdown
             self._stop_event.set()
@@ -192,8 +201,8 @@ class TrayManager:
                 from utils.system.admin_utils import show_message_box_threaded
 
                 show_message_box_threaded(
-                    f"Failed to open settings dialog:\n\n{e}",
-                    "Parasite Settings",
+                    f"Ayarlar penceresi açılamadı:\n\n{e}",
+                    "Parasite ayarları",
                     0x10,  # MB_ICONERROR
                 )
             except Exception:
@@ -219,6 +228,12 @@ class TrayManager:
     def _on_restart(self, icon, item):
         """Handle restart menu item click"""
         log.info("Restart requested from system tray")
+        with self._pending_lock:
+            if not self.restart_callback:
+                # Parasite is still starting: keep the icon, run_pending_request restarts
+                log.info("Parasite is still starting - it restarts once started")
+                self._pending_request = lambda: self._on_restart(icon, item)
+                return
         try:
             # Set stop event immediately to signal shutdown
             self._stop_event.set()
@@ -239,6 +254,14 @@ class TrayManager:
             except Exception as e:
                 log.debug(f"Error stopping tray icon: {e}")
 
+    def run_pending_request(self):
+        """Run the Quit or Restart clicked before its callback was set. Call it
+        once both callbacks are set: a click after that runs them itself."""
+        with self._pending_lock:
+            request, self._pending_request = self._pending_request, None
+        if request:
+            request()
+
     def _refresh_diagnostics_menu(self):
         try:
             if self.icon and not self._stop_event.is_set():
@@ -249,7 +272,7 @@ class TrayManager:
     def _notify_diagnostics(self, message):
         try:
             if self.icon and not self._stop_event.is_set():
-                self.icon.notify(message, "Parasite startup diagnostics")
+                self.icon.notify(message, "Parasite başlangıç tanılaması")
         except Exception as e:
             log.debug(f"Could not show diagnostics notification: {e}")
 
@@ -267,7 +290,7 @@ class TrayManager:
             self._diagnostics_lock.release()
             self._refresh_diagnostics_menu()
             log.exception("Could not start startup diagnostics")
-            self._notify_diagnostics("Could not start diagnostics. Please retry.")
+            self._notify_diagnostics("Tanılama başlatılamadı. Tekrar dene.")
 
     def _collect_startup_diagnostics(self):
         try:
@@ -280,7 +303,7 @@ class TrayManager:
                 self._diagnostics_dialog.start()
             except Exception:
                 log.exception("Could not open diagnostics progress window")
-                self._notify_diagnostics("Diagnostics started. Checking Windows and Parasite; this can take up to 3 minutes.")
+                self._notify_diagnostics("Tanılama başladı. Windows ve Parasite kontrol ediliyor; bu 3 dakika kadar sürebilir.")
             result = run_startup_diagnostics(self._stop_event)
             log.info("Startup diagnostics: %s Reports: %s", result.message, result.directory)
             if result.cancelled or self._stop_event.is_set():
@@ -292,12 +315,12 @@ class TrayManager:
                 open_folder_in_explorer(result.directory)
             except Exception as e:
                 log.warning(f"Could not open diagnostics folder: {e}")
-                self._notify_diagnostics("Reports saved. Use Open Logs folder in the tray menu.")
+                self._notify_diagnostics("Raporlar kaydedildi. Tepsi menüsünden Kayıt klasörünü aç'ı kullan.")
         except Exception:
             log.exception("Startup diagnostics failed")
             if self._diagnostics_dialog:
-                self._diagnostics_dialog.finish("Could not save diagnostics. Check the Parasite logs and folder permissions.")
-            self._notify_diagnostics("Could not save diagnostics. Check the Parasite logs and folder permissions.")
+                self._diagnostics_dialog.finish("Tanılama kaydedilemedi. Parasite kayıtlarını ve klasör izinlerini kontrol et.")
+            self._notify_diagnostics("Tanılama kaydedilemedi. Parasite kayıtlarını ve klasör izinlerini kontrol et.")
         finally:
             if self._stop_event.is_set() and self._diagnostics_dialog:
                 self._diagnostics_dialog.close()
@@ -309,7 +332,7 @@ class TrayManager:
             open_folder_in_explorer(get_user_data_dir() / "logs")
         except Exception as e:
             log.error(f"Failed to open logs folder: {e}")
-            self._notify_diagnostics("Could not open the logs folder. Check folder permissions.")
+            self._notify_diagnostics("Kayıt klasörü açılamadı. Klasör izinlerini kontrol et.")
 
     def _create_menu(self) -> pystray.Menu:
         from launcher.parasite_offline import tray_status_menu as _parasite_offline_status_menu
@@ -317,18 +340,18 @@ class TrayManager:
         return pystray.Menu(
             pystray.MenuItem(f"Parasite v{APP_VERSION}", None, enabled=False),
             pystray.Menu.SEPARATOR,
-            pystray.MenuItem("Parasite Hub", self._on_open_hub, default=True),
-            pystray.MenuItem("Open Mods Folder", self._on_open_mods),
-            pystray.MenuItem("Status", _parasite_offline_status_menu()),
+            pystray.MenuItem("Parasite'ı aç", self._on_open_hub, default=True),
+            pystray.MenuItem("Mod klasörünü aç", self._on_open_mods),
+            pystray.MenuItem("Durum", _parasite_offline_status_menu()),
             pystray.MenuItem(
-                lambda item: "Diagnosing Parasite startup..." if self._diagnostics_lock.locked() else "Diagnose Parasite startup",
+                lambda item: "Başlangıç tanılanıyor..." if self._diagnostics_lock.locked() else "Başlangıç sorununu tanıla",
                 self._on_diagnose_startup,
                 enabled=lambda item: not self._diagnostics_lock.locked(),
             ),
-            pystray.MenuItem("Open Logs folder", self._on_open_logs),
+            pystray.MenuItem("Kayıt klasörünü aç", self._on_open_logs),
             pystray.Menu.SEPARATOR,
-            pystray.MenuItem("Restart", self._on_restart),
-            pystray.MenuItem("Quit", self._on_quit),
+            pystray.MenuItem("Yeniden başlat", self._on_restart),
+            pystray.MenuItem("Kapat", self._on_quit),
         )
     
     def _run_tray(self):
@@ -441,6 +464,14 @@ class TrayManager:
         except Exception as e:
             log.error(f"Failed to update tray icon: {e}")
     
+    def set_title(self, title: str):
+        """Set the text shown when hovering the tray icon"""
+        try:
+            if self.icon:
+                self.icon.title = title
+        except Exception as e:
+            log.debug(f"Failed to update tray title: {e}")
+
     def set_downloading(self, is_downloading: bool):
         """
         Update the tray icon to show downloading status (legacy method for compatibility)

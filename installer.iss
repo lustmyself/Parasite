@@ -7,7 +7,7 @@
 #define MyAppPublisher "Parasite Team"
 #define MyAppURL "https://github.com/lustmyself/Parasite"
 #define MyAppExeName "Parasite.exe"
-#define MyAppDescription "Effortless skin changer for League of Legends"
+#define MyAppDescription "League of Legends için zahmetsiz skin değiştirici"
 ; Must match config.SINGLE_INSTANCE_MUTEX_NAME (used by the app to enforce single-instance)
 #define MyAppMutex "Local\ParasiteSingleInstance"
 
@@ -37,6 +37,8 @@ ArchitecturesAllowed=x64
 ArchitecturesInstallIn64BitMode=x64
 UninstallDisplayName={#MyAppName}
 UninstallDisplayIcon={app}\{#MyAppExeName}
+; Replace the old log so upgrades drop its recursive deletes and task removal.
+UninstallLogMode=overwrite
 VersionInfoVersion={#MyAppVersionInfo}
 VersionInfoCompany={#MyAppPublisher}
 VersionInfoDescription={#MyAppDescription}
@@ -45,7 +47,7 @@ VersionInfoProductName={#MyAppName}
 AppMutex={#MyAppMutex}
 
 [Languages]
-Name: "english"; MessagesFile: "compiler:Default.isl"
+Name: "turkish"; MessagesFile: "compiler:Languages\Turkish.isl"
 
 [Tasks]
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
@@ -64,18 +66,22 @@ Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Tasks: de
 Name: "{userappdata}\Microsoft\Internet Explorer\Quick Launch\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Tasks: quicklaunchicon; IconFilename: "{app}\icon.ico"
 
 [Run]
-Filename: "{app}\{#MyAppExeName}"; Description: "{cm:LaunchProgram,{#StringChange(MyAppName, '&', '&&')}} (as Administrator)"; Flags: nowait postinstall skipifsilent shellexec; Verb: runas
+Filename: "{app}\{#MyAppExeName}"; Description: "{cm:LaunchProgram,{#StringChange(MyAppName, '&', '&&')}} (yönetici olarak)"; Flags: nowait postinstall skipifsilent shellexec; Verb: runas
 
 [UninstallRun]
 ; Uninstall Pengu Loader (removes its IFEO activation and disables the native hook)
-Filename: "{app}\_internal\Pengu Loader\Pengu Loader.exe"; Parameters: "--uninstall --silent"; Flags: runhidden waituntilterminated skipifdoesntexist
-; Always remove the Parasite auto-start scheduled task (created via schtasks /TN "Parasite")
-Filename: "{sys}\schtasks.exe"; Parameters: "/Delete /TN Parasite /F"; Flags: runhidden
+Filename: "{app}\_internal\Pengu Loader\Pengu Loader.exe"; Parameters: "--uninstall --silent"; Flags: runhidden waituntilterminated skipifdoesntexist; RunOnceId: "ParasitePenguDeactivate"
 
 [UninstallDelete]
+; _internal is Parasite's runtime alone. An update swaps in a whole new tree, whose
+; files the uninstall log never recorded, so remove it with everything in it.
 Type: filesandordirs; Name: "{app}\_internal"
-Type: filesandordirs; Name: "{app}\injection\overlay"
-Type: filesandordirs; Name: "{app}\injection\mods"
+; Parasite's own Spicetify (Spotify themes), downloaded at run time
+Type: filesandordirs; Name: "{app}\spicetify"
+; Inno tracks installed files. A shared install root can leave untracked files
+; in these folders, so remove the directories only when empty.
+Type: dirifempty; Name: "{app}\injection\overlay"
+Type: dirifempty; Name: "{app}\injection\mods"
 ; %LOCALAPPDATA%\Parasite is not listed here: whether it survives is a checkbox on
 ; the uninstaller page, see _KeepUserData() in [Code] ([UninstallDelete] checks
 ; run at install time, not when the user answers)
@@ -137,14 +143,14 @@ begin
   IntroText.Height := ScaleY(36);
   IntroText.AutoSize := False;
   IntroText.ShowAccelChar := False;
-  IntroText.Caption := 'Your settings, skin history and downloaded skins are kept unless you untick this.';
+  IntroText.Caption := 'Bu kutunun işaretini kaldırmazsan ayarların, skin geçmişin ve indirilen skinler saklanır.';
 
   KeepUserDataBox := TNewCheckBox.Create(UninstallProgressForm);
   KeepUserDataBox.Parent := Page;
   KeepUserDataBox.Left := Left0;
   KeepUserDataBox.Top := Top0 + ScaleY(48);
   KeepUserDataBox.Width := Width0;
-  KeepUserDataBox.Caption := 'Keep my data in ' + _UserDataFolder();
+  KeepUserDataBox.Caption := 'Verilerim kalsın: ' + _UserDataFolder();
   KeepUserDataBox.Checked := True;
 
   { The uninstaller form only has a Cancel button, on the right. Take its spot
@@ -155,7 +161,7 @@ begin
   UninstallButton.Height := UninstallProgressForm.CancelButton.Height;
   UninstallButton.Left := UninstallProgressForm.CancelButton.Left;
   UninstallButton.Top := UninstallProgressForm.CancelButton.Top;
-  UninstallButton.Caption := 'Uninstall';
+  UninstallButton.Caption := 'Kaldır';
   UninstallButton.ModalResult := mrOK;
   UninstallButton.TabOrder := UninstallProgressForm.CancelButton.TabOrder;
 
@@ -164,9 +170,9 @@ begin
     SavedCancelLeft - UninstallButton.Width - ScaleX(10);
   UninstallProgressForm.CancelButton.TabOrder := UninstallButton.TabOrder + 1;
 
-  UninstallProgressForm.PageNameLabel.Caption := 'Uninstall {#MyAppName}';
+  UninstallProgressForm.PageNameLabel.Caption := '{#MyAppName} kaldır';
   UninstallProgressForm.PageDescriptionLabel.Caption :=
-    'Tick the data you want to keep, then continue.';
+    'Saklamak istediğin verileri işaretle, sonra devam et.';
   UninstallProgressForm.CancelButton.Enabled := True;
   UninstallProgressForm.CancelButton.ModalResult := mrCancel;
 
@@ -215,8 +221,8 @@ begin
   if ParasiteRunning and LeagueRunning then
   begin
     MsgBox(
-      '{#MyAppName} and League of Legends are both currently running.'#13#10 +
-      'Please close both applications and try uninstalling again.',
+      '{#MyAppName} ve League of Legends şu anda açık.'#13#10 +
+      'İkisini de kapat ve kaldırmayı tekrar dene.',
       mbCriticalError,
       MB_OK
     );
@@ -227,8 +233,8 @@ begin
   if ParasiteRunning then
   begin
     MsgBox(
-      '{#MyAppName} is currently running.'#13#10 +
-      'Please close it completely (including the tray) and try uninstalling again.',
+      '{#MyAppName} şu anda açık.'#13#10 +
+      'Onu tamamen kapat (sistem tepsisinden de) ve kaldırmayı tekrar dene.',
       mbCriticalError,
       MB_OK
     );
@@ -239,8 +245,8 @@ begin
   if LeagueRunning then
   begin
     MsgBox(
-      'League of Legends is currently running.'#13#10 +
-      'Please close League of Legends and try uninstalling again.',
+      'League of Legends şu anda açık.'#13#10 +
+      'League of Legends\'i kapat ve kaldırmayı tekrar dene.',
       mbCriticalError,
       MB_OK
     );
@@ -251,17 +257,77 @@ begin
   Result := True;
 end;
 
-function _ContainsTextLower(const Haystack: string; const NeedleLower: string): Boolean;
+const
+  ProfileListKey = 'SOFTWARE\Microsoft\Windows NT\CurrentVersion\ProfileList';
+  SystemDrivePrefix = '%SystemDrive%';
+
+{ The loader registers rundll32 "<absolute path to core.dll>", #6000.
+  Use its DLL argument as the ownership check for Run entries and IFEO. }
+function _PenguCoreFromCommand(const Command: string): string;
+var
+  Rest: string;
+  Launcher: string;
+  EntryPoint: string;
+  QuotePos: Integer;
 begin
-  Result := Pos(NeedleLower, LowerCase(Haystack)) > 0;
+  Result := '';
+  QuotePos := Pos('"', Command);
+  if QuotePos = 0 then
+    exit;
+  Launcher := Trim(Copy(Command, 1, QuotePos - 1));
+  if (CompareText(Launcher, 'rundll32') <> 0) and
+     (CompareText(Launcher, 'rundll32.exe') <> 0) then
+    exit;
+  Rest := Copy(Command, QuotePos + 1, Length(Command));
+  QuotePos := Pos('"', Rest);
+  if QuotePos = 0 then
+    exit;
+  EntryPoint := Trim(Copy(Rest, QuotePos + 1, Length(Rest)));
+  if Copy(EntryPoint, 1, 1) <> ',' then
+    exit;
+  if Trim(Copy(EntryPoint, 2, Length(EntryPoint))) = '#6000' then
+    Result := Copy(Rest, 1, QuotePos - 1);
 end;
 
-procedure _DeleteStartupValuesIfMatch(const RootKey: Integer; const SubKey: string);
+function _IsParasitePenguCore(const DllPath: string): Boolean;
+var
+  Profiles: TArrayOfString;
+  ProfileDir: string;
+  I: Integer;
+begin
+  Result :=
+    (CompareText(DllPath, ExpandConstant('{app}\_internal\Pengu Loader\core.dll')) = 0) or
+    (CompareText(DllPath, ExpandConstant('{autopf}\{#MyAppName}\_internal\Pengu Loader\core.dll')) = 0) or
+    (CompareText(DllPath, _UserDataFolder() + '\Pengu Loader\core.dll') = 0);
+  if Result then
+    exit;
+
+  { When the uninstaller runs under another account, Parasite can have used the
+    desktop user's registered profile with the default AppData layout. }
+  if not RegGetSubkeyNames(HKLM64, ProfileListKey, Profiles) then
+    exit;
+  for I := 0 to GetArrayLength(Profiles) - 1 do
+  begin
+    if RegQueryStringValue(HKLM64, ProfileListKey + '\' + Profiles[I], 'ProfileImagePath', ProfileDir) then
+    begin
+      if CompareText(Copy(ProfileDir, 1, Length(SystemDrivePrefix)), SystemDrivePrefix) = 0 then
+        ProfileDir := GetEnv('SystemDrive') + Copy(ProfileDir, Length(SystemDrivePrefix) + 1, Length(ProfileDir));
+      if (ProfileDir <> '') and
+         (CompareText(DllPath, AddBackslash(ProfileDir) + 'AppData\Local\{#MyAppName}\Pengu Loader\core.dll') = 0) then
+      begin
+        Result := True;
+        exit;
+      end;
+    end;
+  end;
+end;
+
+procedure _RemoveParasitePenguStartupValues(const RootKey: Integer; const SubKey: string);
 var
   Names: TArrayOfString;
   I: Integer;
   Val: string;
-  ValLower: string;
+  DllPath: string;
 begin
   if not RegGetValueNames(RootKey, SubKey, Names) then
     exit;
@@ -270,15 +336,9 @@ begin
   begin
     if RegQueryStringValue(RootKey, SubKey, Names[I], Val) then
     begin
-      ValLower := LowerCase(Val);
-
-      { Remove legacy/broken startup entries that invoke rundll32 on Pengu Loader core.dll.
-        This is what produces the RunDLL "module not found" dialog after uninstall. }
-      if (_ContainsTextLower(ValLower, 'rundll32') and _ContainsTextLower(ValLower, 'pengu loader\core.dll')) or
-         _ContainsTextLower(ValLower, '\parasite\_internal\pengu loader\core.dll') then
-      begin
+      DllPath := _PenguCoreFromCommand(Val);
+      if (DllPath <> '') and _IsParasitePenguCore(DllPath) then
         RegDeleteValue(RootKey, SubKey, Names[I]);
-      end;
     end;
   end;
 end;
@@ -292,50 +352,68 @@ const
 procedure _CleanupStartupRegistry();
 begin
   { 64-bit and user/machine startup keys }
-  _DeleteStartupValuesIfMatch(HKCU, RunKey);
-  _DeleteStartupValuesIfMatch(HKLM, RunKey);
-  _DeleteStartupValuesIfMatch(HKCU, RunOnceKey);
-  _DeleteStartupValuesIfMatch(HKLM, RunOnceKey);
+  _RemoveParasitePenguStartupValues(HKCU, RunKey);
+  _RemoveParasitePenguStartupValues(HKLM, RunKey);
+  _RemoveParasitePenguStartupValues(HKCU, RunOnceKey);
+  _RemoveParasitePenguStartupValues(HKLM, RunOnceKey);
 
   { 32-bit view keys (defensive) }
-  _DeleteStartupValuesIfMatch(HKCU, RunKey6432);
-  _DeleteStartupValuesIfMatch(HKLM, RunKey6432);
-  _DeleteStartupValuesIfMatch(HKCU, RunOnce6432);
-  _DeleteStartupValuesIfMatch(HKLM, RunOnce6432);
+  _RemoveParasitePenguStartupValues(HKCU, RunKey6432);
+  _RemoveParasitePenguStartupValues(HKLM, RunKey6432);
+  _RemoveParasitePenguStartupValues(HKCU, RunOnce6432);
+  _RemoveParasitePenguStartupValues(HKLM, RunOnce6432);
 end;
 
 const
   IfeoKey = 'SOFTWARE\Microsoft\Windows NT\CurrentVersion\Image File Execution Options\LeagueClientUx.exe';
 
-{ Pengu hooks the client with an IFEO debugger: rundll32 "<dir>\core.dll", #6000.
-  If that core.dll is gone (Parasite uninstalled or moved), Windows shows a RunDLL
-  "module not found" error on every League start, so remove the dead entry.
-  A working Pengu install elsewhere keeps its key. }
-procedure _RemoveDeadPenguIfeo();
+procedure _RemoveParasitePenguIfeo(const OnlyIfMissing: Boolean);
 var
   Debugger: string;
-  StartPos: Integer;
-  Rest: string;
-  EndPos: Integer;
   DllPath: string;
 begin
-  if not RegQueryStringValue(HKLM, IfeoKey, 'Debugger', Debugger) then
+  if not RegQueryStringValue(HKLM64, IfeoKey, 'Debugger', Debugger) then
     exit;
-  if not _ContainsTextLower(Debugger, 'core.dll') then
-    exit;
+  { A hook whose DLL is gone only breaks the client's start: remove it
+    whoever set it }
+  DllPath := _PenguCoreFromCommand(Debugger);
+  if (DllPath <> '') and
+     ((not FileExists(DllPath)) or ((not OnlyIfMissing) and _IsParasitePenguCore(DllPath))) then
+    RegDeleteValue(HKLM64, IfeoKey, 'Debugger');
+end;
 
-  DllPath := '';
-  StartPos := Pos('"', Debugger);
-  if StartPos > 0 then
-  begin
-    Rest := Copy(Debugger, StartPos + 1, Length(Debugger));
-    EndPos := Pos('"', Rest);
-    if EndPos > 0 then
-      DllPath := Copy(Rest, 1, EndPos - 1);
+procedure _RemoveParasiteAutostartTask();
+var
+  Scheduler: Variant;
+  Folder: Variant;
+  Task: Variant;
+  Actions: Variant;
+  Action: Variant;
+  Arguments: Variant;
+  ActionPath: string;
+  ActionArguments: string;
+begin
+  try
+    Scheduler := CreateOleObject('Schedule.Service');
+    Scheduler.Connect();
+    Folder := Scheduler.GetFolder('\');
+    Task := Folder.GetTask('{#MyAppName}');
+    Actions := Task.Definition.Actions;
+    if Actions.Count <> 1 then
+      exit;
+    Action := Actions.Item(1);
+    { Path and Arguments belong to the executable action Parasite registers.
+      Reading them from any other action fails and leaves the task intact. }
+    ActionPath := Action.Path;
+    Arguments := Action.Arguments;
+    if not (VarIsNull(Arguments) or VarIsEmpty(Arguments)) then
+      ActionArguments := Arguments;
+    if (CompareText(RemoveQuotes(Trim(ActionPath)), ExpandConstant('{app}\{#MyAppExeName}')) = 0) and
+       (Trim(ActionArguments) = '') then
+      Folder.DeleteTask('{#MyAppName}', 0);
+  except
+    Log('Could not read or remove the Parasite startup task: ' + GetExceptionMessage);
   end;
-
-  if (DllPath = '') or not FileExists(DllPath) then
-    RegDeleteKeyIncludingSubkeys(HKLM, IfeoKey);
 end;
 
 const
@@ -365,12 +443,130 @@ begin
   DelTree(_UserDataFolder(), True, True, True);
 end;
 
+const
+  DirectoryAttribute = $10;
+  ReparsePointAttribute = $400;
+  UpdateMarkerName = '.parasite-update-workspace';
+  UpdateMarkerVersion = 'parasite-update-v1';
+
+function _GetFileAttributes(const FileName: string): Cardinal;
+  external 'GetFileAttributesW@kernel32.dll stdcall';
+
+function _IsPlainDirectoryPath(Directory: string): Boolean;
+var
+  Attributes: Cardinal;
+  Parent: string;
+begin
+  Result := False;
+  while Directory <> '' do
+  begin
+    Attributes := _GetFileAttributes(Directory);
+    if (Attributes and (DirectoryAttribute or ReparsePointAttribute)) <> DirectoryAttribute then
+      exit;
+    Parent := ExtractFileDir(Directory);
+    if Parent = Directory then
+      break;
+    Directory := Parent;
+  end;
+  Result := True;
+end;
+
+procedure _RemoveParasiteUpdateWorkspace();
+var
+  Workspace, Marker, Name, EntryPath: string;
+  Contents: AnsiString;
+  MarkerSize: Integer;
+  Entry: TFindRec;
+  Files, Folders: TStringList;
+  I: Integer;
+begin
+  Workspace := ExpandConstant('{app}') + '.update';
+  { Custom locations may be writable by another process during uninstall. }
+  if CompareText(Workspace, ExpandConstant('{autopf}\{#MyAppName}.update')) <> 0 then
+    exit;
+  if not _IsPlainDirectoryPath(Workspace) then
+    exit;
+  Marker := AddBackslash(Workspace) + UpdateMarkerName;
+  if (_GetFileAttributes(Marker) and (DirectoryAttribute or ReparsePointAttribute)) <> 0 then
+    exit;
+  if not FileSize(Marker, MarkerSize) or (MarkerSize <> Length(UpdateMarkerVersion)) then
+    exit;
+  if not LoadStringFromFile(Marker, Contents) or (Contents <> UpdateMarkerVersion) then
+    exit;
+
+  Files := TStringList.Create;
+  Folders := TStringList.Create;
+  try
+    if not FindFirst(AddBackslash(Workspace) + '*', Entry) then
+      exit;
+    try
+      repeat
+        Name := LowerCase(Entry.Name);
+        if (Name <> '.') and (Name <> '..') then
+        begin
+          if (Entry.Attributes and ReparsePointAttribute) <> 0 then
+            exit;
+          EntryPath := AddBackslash(Workspace) + Entry.Name;
+          if (Entry.Attributes and DirectoryAttribute) <> 0 then
+          begin
+            if (Name <> 'staging') and (Name <> 'previous') and (Name <> 'failed') then
+              exit;
+            Folders.Add(EntryPath);
+          end
+          else if Name <> UpdateMarkerName then
+          begin
+            if Pos('|' + Name + '|', '|apply.ps1|recover-parasite.cmd|plan.json|update.log|ready|package.zip|package.zip.part|') = 0 then
+              exit;
+            Files.Add(EntryPath);
+          end;
+        end;
+      until not FindNext(Entry);
+    finally
+      FindClose(Entry);
+    end;
+
+    { A snapshot can include files from a shared install directory. Keep the
+      workspace and recovery tool whenever a snapshot still has content. }
+    for I := 0 to Folders.Count - 1 do
+      if not RemoveDir(Folders[I]) then
+      begin
+        Log('Kept the Parasite update workspace with its recovery snapshot: ' + Workspace);
+        exit;
+      end;
+    for I := 0 to Files.Count - 1 do
+      if not DeleteFile(Files[I]) then
+        exit;
+    if DeleteFile(Marker) then
+      RemoveDir(Workspace);
+  finally
+    Folders.Free;
+    Files.Free;
+  end;
+end;
+
 procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
+var
+  ResultCode: Integer;
 begin
   if CurUninstallStep = usUninstall then
   begin
     _CleanupStartupRegistry();
+    _RemoveParasiteAutostartTask();
     _CleanupLegacyUninstallEntry();
+    { Only Parasite's data names the mods Parasite added to LTK Manager's library:
+      remove them while Parasite is still here to do it. Kept data keeps them.
+      Not in [UninstallRun], whose Check: is evaluated at install time. }
+    if not _KeepUserData then
+    begin
+      Exec(ExpandConstant('{app}\{#MyAppExeName}'), '--remove-ltk-mods', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+      if (ResultCode <> 0) and not UninstallSilent then
+        MsgBox(
+          '{#MyAppName}, LTK Manager\'ı temizlemeyi bitiremedi.'#13#10 +
+          'LTK Manager\'daki bazı modların hâlâ kapalı olabilir: onları LTK Manager\'da yeniden aç.',
+          mbInformation,
+          MB_OK
+        );
+    end;
   end;
 
   if CurUninstallStep = usPostUninstall then
@@ -380,8 +576,9 @@ begin
     { Inno removes installed files; a shared/custom install root may also
       contain unrelated files. Remove the root only when it is empty. }
     RemoveDir(ExpandConstant('{app}'));
-    { Safety net if Pengu's own --uninstall could not run }
-    _RemoveDeadPenguIfeo();
+    { The bundled loader cannot deactivate the copy in the user's data. }
+    _RemoveParasitePenguIfeo(False);
+    _RemoveParasiteUpdateWorkspace();
   end;
 end;
 
@@ -390,7 +587,7 @@ begin
   if CurStep = ssPostInstall then
   begin
     { Clean up a dead hook left by an older Parasite uninstall }
-    _RemoveDeadPenguIfeo();
+    _RemoveParasitePenguIfeo(True);
 
     _CleanupLegacyUninstallEntry();
   end;

@@ -114,11 +114,14 @@ def _save(state: dict) -> None:
 
 def inspect(path: Path) -> dict:
     """The WAD names in a mod (champion candidates) and the title its info.json gives."""
-    from utils.core.safe_extract import list_mod_archive
+    from injection.mods.mod_files import ModFiles
     wads: list[str] = []
     title = ""
     try:
-        for member in list_mod_archive(path):
+        # Rose reads a mod's files from its archive (.zip, .fantome, or a .modpkg's table of contents)
+        with ModFiles(path) as mod:
+            members = mod.files_under()
+        for member in members:
             match = WAD_RE.search(member.replace("\\", "/"))
             if match and match.group(1).lower() not in wads:
                 wads.append(match.group(1).lower())
@@ -285,6 +288,7 @@ def custom_mod_for(champion_id, skin_id) -> Optional[dict]:
         global _playing_build
         _playing = name
         _playing_build = game_build()
+        from injection.mods.mod_source import ParasiteFile
         return {
             "skin_id": skin_id,
             "storage_skin_id": skin_id,
@@ -294,6 +298,8 @@ def custom_mod_for(champion_id, skin_id) -> Optional[dict]:
             "display_name": entry.get("title") or path.stem,
             "mod_path": str(path),
             "mod_folder_name": f"parasite-custom-{safe}",
+            # What the injection links into its mods folder (Rose 1.5.6+ reads only this)
+            "source": ParasiteFile(path, f"parasite-custom-{safe}"),
             "relative_path": None,  # not one of the mod wheel's: nothing saved as its history
         }
     return None

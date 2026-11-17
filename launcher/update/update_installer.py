@@ -1,84 +1,356 @@
-"""
-Update Installer
-Handles extracting and installing updates
-"""
-
+"""Stage a complete Windows update beside the installation before switching it."""
 from __future__ import annotations
 
+import json
 import os
+import re
 import shutil
+import stat
 import subprocess
 import sys
+import time
 import zipfile
 from pathlib import Path
 from typing import Callable, Optional
 
+from config import SINGLE_INSTANCE_MUTEX_NAME
+from utils.core.atomic_file import write_text_atomic
 from utils.core.logging import get_named_logger
-from utils.core.safe_extract import safe_extract, is_safe_path
+from utils.core.safe_extract import UnsafePathError, safe_extractall
 
 updater_log = get_named_logger("updater", prefix="log_updater")
 
-PERSISTENT_ROOT_FILES = ("icon.ico", "unins000.exe", "unins000.dat")
-
-# User-provided files that should survive updates (relative to install dir)
-# In frozen builds, files are under _internal/
-PERSISTENT_USER_FILES = ()
-
-# Copies the update over the install once Parasite has exited, then starts it
-# again. Its paths come in as environment variables (see install). robocopy
-# retries a locked file 1,000,000 times 30s apart by default, which left the
-# update hanging unseen: /R:5 /W:2 makes it fail and say so instead. /XD only
-# matches names or full paths: "Pengu Loader\plugins" alone matched nothing,
-# and /MIR deleted the plugins users installed themselves
-APPLY_UPDATE_SCRIPT = r"""@echo off
-setlocal enableextensions
-echo [%date% %time%] Update start > "%LOG%"
-if defined PID (
-    echo [%date% %time%] Waiting for Parasite to exit >> "%LOG%"
-    powershell -NoProfile -NonInteractive -Command "Wait-Process -Id %PID% -Timeout 30 -ErrorAction SilentlyContinue" >nul 2>&1
-)
-echo [%date% %time%] Closing Parasite windows left open >> "%LOG%"
-powershell -NoProfile -NonInteractive -Command "Get-Process -Name Parasite -ErrorAction SilentlyContinue | Where-Object { $_.Path -and $_.Path.StartsWith($env:DEST, [StringComparison]::OrdinalIgnoreCase) } | Stop-Process -Force -ErrorAction SilentlyContinue; Start-Sleep -Milliseconds 800" >nul 2>&1
-echo [%date% %time%] Mirroring files >> "%LOG%"
-set "KEEP_OFFLINE="
-powershell -NoProfile -NonInteractive -Command "if (Get-Process -Name ParasiteOffline -ErrorAction SilentlyContinue | Where-Object { $_.Path -and $_.Path.StartsWith($env:DEST, [StringComparison]::OrdinalIgnoreCase) }) { exit 1 }" >nul 2>&1
+PENGU_PLUGIN_DIRS = (Path("Pengu Loader/plugins"), Path("_internal/Pengu Loader/plugins"))
+PERSISTENT_FILENAMES = {"cf.ini", "hashes.game.txt", "parasite.cfg"}
+WORKSPACE_MARKER = ".parasite-update-workspace"
+WORKSPACE_VERSION = b"parasite-update-v1"
+RECOVERY_COMMAND = r"""@echo off
+"%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -ExecutionPolicy Bypass -File "%~dp0apply.ps1" -Recover
 if errorlevel 1 (
-    set "KEEP_OFFLINE=ParasiteOffline.exe"
-    echo [%date% %time%] Parasite Offline is running ^(League chat goes through it^): its file stays as it is >> "%LOG%"
+    echo Recovery failed. See "%~dp0update.log".
+    pause
 )
-robocopy "%SOURCE%" "%DEST%" /MIR /R:5 /W:2 /NFL /NDL /NJH /NJS /XD __pycache__ "%SOURCE%\Pengu Loader\plugins" /XF cf.ini hashes.game.txt %KEEP_OFFLINE% >> "%LOG%" 2>&1
-set "RC=%ERRORLEVEL%"
-echo [%date% %time%] robocopy exit code %RC% >> "%LOG%"
-if %RC% GEQ 8 goto :robofail
-echo [%date% %time%] Updating PARASITE plugins (preserving user-installed) >> "%LOG%"
-if exist "%SOURCE%\Pengu Loader\plugins" (
-    if not exist "%DEST%\Pengu Loader\plugins" mkdir "%DEST%\Pengu Loader\plugins"
-    for /d %%D in ("%SOURCE%\Pengu Loader\plugins\PARASITE-*") do (
-        echo [%date% %time%]   Sync plugin %%~nxD >> "%LOG%"
-        robocopy "%%D" "%DEST%\Pengu Loader\plugins\%%~nxD" /MIR /R:5 /W:2 /NFL /NDL /NJH /NJS /XD __pycache__ >> "%LOG%" 2>&1
-        if errorlevel 8 goto :robofail
-    )
-)
-echo [%date% %time%] Starting Parasite >> "%LOG%"
-start "" /D "%DEST%" "%DEST%\%EXE%"
-echo [%date% %time%] Cleaning staging >> "%LOG%"
-if exist "%STAGING%" rd /s /q "%STAGING%" >> "%LOG%" 2>&1
-if exist "%ZIPFILE%" del "%ZIPFILE%" >> "%LOG%" 2>&1
-echo [%date% %time%] Update done >> "%LOG%"
-exit
+"""
 
-:robofail
-echo [%date% %time%] Update failed; starting Parasite again >> "%LOG%"
-start "" /D "%DEST%" "%DEST%\%EXE%"
-exit 1
+# Keep this outside either application tree so Windows can rename both trees.
+# A named mutex stays alive while any process has an open handle to it.
+APPLY_UPDATE_SCRIPT = r"""
+param([switch]$Recover, [switch]$Notify)
+$ErrorActionPreference = 'Stop'
+$log = Join-Path $PSScriptRoot 'update.log'
+$previous = Join-Path $PSScriptRoot 'previous'
+$failed = Join-Path $PSScriptRoot 'failed'
+$plan = Get-Content -Raw -LiteralPath (Join-Path $PSScriptRoot 'plan.json') | ConvertFrom-Json
+$destination = $plan.destination
+$executable = Join-Path $destination $plan.executable
+$mutex = $null
+$result = 0
+$swapStarted = $false
+$parentExited = $false
+$restarted = $false
+
+function Get-InstalledProcess([string]$name) {
+    $prefix = $destination.TrimEnd([char]92) + [char]92
+    Get-Process -Name $name -ErrorAction SilentlyContinue |
+        Where-Object { $_.Path -and $_.Path.StartsWith($prefix, [StringComparison]::OrdinalIgnoreCase) }
+}
+
+function Write-UpdateLog([string]$message) {
+    Add-Content -LiteralPath $log -Value ("[{0:u}] {1}" -f (Get-Date), $message) -Encoding UTF8 -ErrorAction SilentlyContinue
+}
+
+function Move-Directory([string]$source, [string]$target) {
+    for ($attempt = 1; $attempt -le 20; $attempt++) {
+        try {
+            [System.IO.Directory]::Move($source, $target)
+            return
+        }
+        catch [System.IO.IOException] {
+            if ($attempt -eq 20) { throw }
+            Start-Sleep -Milliseconds 500
+        }
+    }
+}
+
+function Start-Parasite {
+    # Start-Process expands wildcards: an install path holding [ ] was not found
+    $info = [System.Diagnostics.ProcessStartInfo]::new($executable)
+    $info.WorkingDirectory = $destination
+    $info.UseShellExecute = $true
+    return [System.Diagnostics.Process]::Start($info)
+}
+
+function New-RecoveryMutex {
+    $created = $false
+    $handle = [System.Threading.Mutex]::new($false, $plan.mutex, [ref]$created)
+    if (!$created) {
+        $handle.Dispose()
+        throw 'Close Parasite and let any running update finish before recovering.'
+    }
+    return $handle
+}
+
+function Restore-PreviousInstallation {
+    if (![System.IO.File]::Exists((Join-Path $previous $plan.executable))) {
+        if ([System.IO.File]::Exists($executable)) {
+            Write-UpdateLog 'No previous installation to restore. Parasite is present.'
+            return
+        }
+        throw 'There is no previous Parasite installation to restore.'
+    }
+    if ([System.IO.Directory]::Exists($destination)) {
+        Move-Directory $destination $failed
+    }
+    try {
+        Move-Directory $previous $destination
+    }
+    catch {
+        if (![System.IO.Directory]::Exists($destination) -and [System.IO.Directory]::Exists($failed)) {
+            Move-Directory $failed $destination
+        }
+        throw
+    }
+    Write-UpdateLog 'Previous installation restored.'
+}
+
+try {
+    if ($Recover) {
+        $mutex = New-RecoveryMutex
+        Restore-PreviousInstallation
+    }
+    else {
+        $mutex = [System.Threading.Mutex]::OpenExisting($plan.mutex)
+        $parasite = Get-Process -Id $plan.parent_pid
+        # Force the Process handle open before signalling readiness so the PID
+        # cannot be reused between handoff and the wait.
+        $null = $parasite.Handle
+        [System.IO.File]::WriteAllText((Join-Path $PSScriptRoot 'ready'), '')
+        if (!$parasite.WaitForExit(30000)) { throw 'Timed out waiting for Parasite to exit.' }
+        $parentExited = $true
+        # Parasite: Parasite Offline runs from this folder while the Riot Client is open
+        if (Get-InstalledProcess 'ParasiteOffline') {
+            throw 'Parasite Offline is running (League chat goes through it): the update waits for the next start.'
+        }
+        # Parasite: windows left open from this folder (an old hub window) lock its files
+        $leftOpen = @(Get-InstalledProcess ([System.IO.Path]::GetFileNameWithoutExtension($plan.executable)))
+        if ($leftOpen.Count) {
+            Write-UpdateLog ('Closing Parasite windows left open: ' + (($leftOpen | ForEach-Object { $_.Id }) -join ', '))
+            $leftOpen | Stop-Process -Force -ErrorAction SilentlyContinue
+            Start-Sleep -Milliseconds 800
+        }
+
+        if (![System.IO.File]::Exists((Join-Path $plan.candidate $plan.executable))) {
+            throw 'The staged Parasite executable is missing.'
+        }
+        $swapStarted = $true
+        Move-Directory $destination $previous
+        try {
+            Move-Directory $plan.candidate $destination
+        }
+        catch {
+            Move-Directory $previous $destination
+            throw
+        }
+        Write-UpdateLog 'Switched installation directories. Previous installation kept for recovery.'
+    }
+}
+catch {
+    Write-UpdateLog ("Operation failed: " + $_.Exception.Message)
+    $result = 1
+}
+finally {
+    if ($null -ne $mutex) { $mutex.Dispose() }
+}
+
+if ($result -eq 0 -and !$Recover) {
+    try {
+        $started = Start-Parasite
+        Write-UpdateLog ("Update applied. Parasite relaunched (PID " + $started.Id + ").")
+    }
+    catch {
+        Write-UpdateLog ("Could not launch the installed Parasite: " + $_.Exception.Message)
+        $result = 1
+        try {
+            $rollbackMutex = New-RecoveryMutex
+            try { Restore-PreviousInstallation }
+            finally { $rollbackMutex.Dispose() }
+        }
+        catch {
+            Write-UpdateLog ("Automatic rollback could not run: " + $_.Exception.Message)
+        }
+    }
+}
+elseif ($result -ne 0 -and !$Recover -and $parentExited -and [System.IO.File]::Exists($executable)) {
+    # The update failed before or during the swap (undone): Parasite has exited
+    # for it, so start the installed one again (Parasite: also when Parasite
+    # Offline kept the folder from moving)
+    try { $null = Start-Parasite; $restarted = $true; Write-UpdateLog 'Restarted the installed Parasite.' }
+    catch { Write-UpdateLog ("Could not restart the installed Parasite: " + $_.Exception.Message) }
+}
+if ($result -ne 0 -and $Notify -and !$restarted) {
+    Add-Type -AssemblyName System.Windows.Forms
+    [void][System.Windows.Forms.MessageBox]::Show(
+        ([regex]::Unescape('Parasite g\u00fcncellemeyi tamamlayamad\u0131. Kay\u0131t dosyas\u0131: ') + $log +
+        [regex]::Unescape('. Parasite a\u00e7\u0131lmazsa ') + $PSScriptRoot +
+        [regex]::Unescape(' klas\u00f6r\u00fcndeki Recover-Parasite.cmd dosyas\u0131n\u0131 y\u00f6netici olarak \u00e7al\u0131\u015ft\u0131r.')),
+        [regex]::Unescape('Parasite g\u00fcncellemesi ba\u015far\u0131s\u0131z'), 'OK', 'Error')
+}
+exit $result
 """
 
 
-class UpdateInstaller:
-    """Handles update extraction and installation"""
+def _is_reparse_point(path: Path) -> bool:
+    return bool(path.lstat().st_file_attributes & stat.FILE_ATTRIBUTE_REPARSE_POINT) if os.name == "nt" else path.is_symlink()
 
-    def __init__(self):
-        pass
+
+def _copy_preserved_file(source: Path, target: Path) -> None:
+    if _is_reparse_point(source) or not source.is_file():
+        raise OSError(f"Cannot preserve {source}: expected an ordinary file")
+    if target.exists() and not target.is_file():
+        raise OSError(f"Cannot preserve {source}: the update puts a directory at {target}")
+    target.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(source, target)
+
+
+def _copy_preserved_entry(source: Path, target: Path) -> None:
+    if _is_reparse_point(source):
+        raise OSError(f"Cannot preserve linked entry: {source}")
+    if source.is_dir():
+        target.mkdir(parents=True, exist_ok=True)
+        for entry in source.iterdir():
+            _copy_preserved_entry(entry, target / entry.name)
+    else:
+        _copy_preserved_file(source, target)
+
+
+def _preserve_bundled_plugin_state(source: Path, target: Path) -> None:
+    """Keep the entrypoint enabled or disabled, using the new plugin's code."""
+    if _is_reparse_point(source):
+        raise OSError(f"Cannot preserve linked plugin: {source}")
+    enabled = "index.js"
+    disabled = "index.js_"
+    if (source / disabled).is_file():
+        keep, drop = disabled, enabled
+    elif (source / enabled).is_file():
+        keep, drop = enabled, disabled
+    else:
+        return
+    if (target / keep).is_file():
+        (target / drop).unlink(missing_ok=True)
+    elif (target / drop).is_file():
+        (target / drop).rename(target / keep)
+
+
+def _preserve_install_files(install_dir: Path, candidate: Path) -> None:
+    runtime = install_dir / "_internal"
+    managed_root = {"_internal", Path(sys.executable).name.casefold()}
+    # An installer may share this directory with unrelated files. Only Parasite's
+    # executable and runtime can disappear or be replaced with the release.
+    for entry in install_dir.iterdir():
+        if _is_reparse_point(entry):
+            raise OSError(f"Cannot update an installation with a linked root entry: {entry}")
+        name = entry.name.casefold()
+        if name in managed_root:
+            continue
+        target = candidate / entry.name
+        if name in PERSISTENT_FILENAMES or name == "icon.ico" or re.fullmatch(r"unins\d+\.(exe|dat|msg)", name):
+            _copy_preserved_file(entry, target)
+        elif target.exists():
+            # A name the release ships is Parasite's: the installed copy stays in previous
+            continue
+        else:
+            _copy_preserved_entry(entry, target)
+
+    if not runtime.is_dir():
+        raise OSError(f"The installed Parasite runtime is missing: {runtime}")
+    for folder, directories, files in os.walk(runtime, onerror=_raise):
+        directory = Path(folder)
+        directories[:] = [name for name in directories if not _is_reparse_point(directory / name)]
+        relative = directory.relative_to(install_dir)
+        for name in files:
+            if name.casefold() in PERSISTENT_FILENAMES:
+                _copy_preserved_file(directory / name, candidate / relative / name)
+
+    for relative in PENGU_PLUGIN_DIRS:
+        current_plugins = install_dir / relative
+        datastore = current_plugins.parent / "datastore"
+        if current_plugins.parent.exists() and _is_reparse_point(current_plugins.parent):
+            raise OSError(f"Cannot preserve linked Pengu Loader directory: {current_plugins.parent}")
+        if datastore.is_file():
+            _copy_preserved_file(datastore, candidate / relative.parent / "datastore")
+        if not current_plugins.is_dir():
+            continue
+        if _is_reparse_point(current_plugins):
+            raise OSError(f"Cannot preserve linked plugin directory: {current_plugins}")
+        for entry in current_plugins.iterdir():
+            target = candidate / relative / entry.name
+            # A bundled Parasite plugin is replaced as a unit, removing its stale files.
+            if entry.name.upper().startswith("PARASITE-") and target.exists():
+                _preserve_bundled_plugin_state(entry, target)
+                continue
+            _copy_preserved_entry(entry, target)
+
+
+def _raise(error: OSError) -> None:
+    raise error
+
+
+def _has_executable_header(path: Path) -> bool:
+    if not path.is_file():
+        return False
+    with path.open("rb") as handle:
+        return handle.read(2) == b"MZ"
+
+
+def _has_runtime(root: Path) -> bool:
+    internal = root / "_internal"
+    if not zipfile.is_zipfile(internal / "base_library.zip"):
+        return False
+    return any(
+        re.fullmatch(r"python3\d{2}t?\.dll", path.name, re.IGNORECASE) and _has_executable_header(path)
+        for path in internal.glob("python*.dll")
+    )
+
+
+class UpdateInstaller:
+    def workspace(self, install_dir: Path) -> Path:
+        """Use a sibling directory on the same volume, normally in Program Files."""
+        if not install_dir.name:
+            raise OSError("Parasite cannot update an installation in the root of a volume")
+        root = install_dir.with_name(f"{install_dir.name}.update")
+        root.mkdir(exist_ok=True)
+        if _is_reparse_point(root):
+            raise OSError(f"Update workspace is a link: {root}")
+        # Parasite: only administrators may change what the elevated update installs and runs
+        from launcher.parasite_integrity import secure_workspace
+        secure_workspace(root)
+        marker = root / WORKSPACE_MARKER
+        if not any(root.iterdir()):
+            marker.write_bytes(WORKSPACE_VERSION)
+        if not marker.is_file() or _is_reparse_point(marker) or marker.read_bytes() != WORKSPACE_VERSION:
+            raise OSError(f"Update workspace was not created by Parasite: {root}")
+        return root
+
+    def discard_snapshots(self, install_dir: Path) -> None:
+        """Parasite started from the swapped-in tree: drop the recovery trees.
+
+        Recover-Parasite.cmd is for a Parasite that cannot start; one that got this far
+        can update itself. An uninstall left them behind otherwise (a full old
+        Parasite, beside the install).
+        """
+        root = install_dir.with_name(f"{install_dir.name}.update")
+        try:
+            if _is_reparse_point(root) or (root / WORKSPACE_MARKER).read_bytes() != WORKSPACE_VERSION:
+                return
+        except OSError:
+            return
+        for name in ("previous", "failed", "staging"):
+            tree = root / name
+            try:
+                if tree.exists() and not _is_reparse_point(tree):
+                    shutil.rmtree(tree)
+            except OSError as exc:
+                updater_log.debug("Could not remove %s: %s", tree, exc)
 
     def extract_update(
         self,
@@ -87,145 +359,74 @@ class UpdateInstaller:
         progress_callback: Callable[[int], None],
         status_callback: Callable[[str], None],
     ) -> Optional[Path]:
-        """Extract update ZIP to staging directory
-
-        Args:
-            zip_path: Path to the update ZIP file
-            staging_dir: Directory to extract to
-            progress_callback: Callback for progress updates
-            status_callback: Callback for status updates
-
-        Returns:
-            Path to extracted root directory, or None if failed
-        """
-        if staging_dir.exists():
-            shutil.rmtree(staging_dir, ignore_errors=True)
-        staging_dir.mkdir(parents=True, exist_ok=True)
-
+        """Extract and validate the release payload without touching the installation."""
         try:
-            with zipfile.ZipFile(zip_path, "r") as zip_file:
-                members = zip_file.infolist()
-                total_members = max(len(members), 1)
-                for index, member in enumerate(members, start=1):
-                    # Security: Use safe extraction to prevent path traversal attacks
-                    safe_extract(zip_path, member.filename, staging_dir)
-                    progress = 40 + int(20 * index / total_members)
-                    progress_callback(min(progress, 60))
-
-            extracted_root = self._resolve_extracted_root(staging_dir)
-            if extracted_root is None:
-                status_callback("Invalid update package")
-                return None
-            return extracted_root
-        except Exception as exc:  # noqa: BLE001
+            if staging_dir.exists():
+                shutil.rmtree(staging_dir)
+            safe_extractall(zip_path, staging_dir)
+            candidates = [p for p in staging_dir.iterdir() if p.name != "__MACOSX"]
+            root = candidates[0] if len(candidates) == 1 and candidates[0].is_dir() else staging_dir
+            if not _has_executable_header(root / Path(sys.executable).name) or not _has_runtime(root):
+                raise ValueError("The update is missing Parasite.exe or its Python runtime")
+            progress_callback(60)
+            return root
+        except (OSError, ValueError, RuntimeError, UnsafePathError, zipfile.BadZipFile) as exc:
             status_callback(f"Extraction failed: {exc}")
-            updater_log.error(f"Update extraction failed: {exc}")
+            updater_log.error("Update extraction failed: %s", exc)
             return None
 
     def install(
         self,
-        extracted_root: Path,
+        candidate: Path,
         install_dir: Path,
         updates_root: Path,
-        zip_path: Path,
-        staging_dir: Path,
         status_callback: Callable[[str], None],
     ) -> bool:
-        """Start the script that copies the update over the install once Parasite exits
-
-        Args:
-            extracted_root: Root directory of extracted update
-            install_dir: Directory where application is installed
-            updates_root: Root directory for updates
-            zip_path: Path to the update ZIP file
-            staging_dir: Staging directory
-            status_callback: Callback for status updates
-
-        Returns:
-            True if the script started
-        """
-        exe_name = Path(sys.executable).name
-
-        if not (extracted_root / exe_name).exists():
-            status_callback("Update aborted: executable missing in package")
-            updater_log.error(f"Executable {exe_name} not found in {extracted_root}")
-            return False
-
-        # Preserve persistent root files
-        for relative_name in PERSISTENT_ROOT_FILES:
-            source_path = install_dir / relative_name
-            if not source_path.exists():
-                continue
-            target_path = extracted_root / relative_name
-            try:
-                target_path.parent.mkdir(parents=True, exist_ok=True)
-                shutil.copy2(source_path, target_path)
-            except Exception as exc:  # noqa: BLE001
-                status_callback(f"Warning: failed to preserve {relative_name}: {exc}")
-                updater_log.warning(f"Failed to preserve {relative_name}: {exc}")
-
-        # Preserve user-provided files (e.g., DLL that users must provide themselves)
-        for relative_name in PERSISTENT_USER_FILES:
-            source_path = install_dir / relative_name
-            if not source_path.exists():
-                continue
-            target_path = extracted_root / relative_name
-            try:
-                target_path.parent.mkdir(parents=True, exist_ok=True)
-                shutil.copy2(source_path, target_path)
-                updater_log.info(f"Preserved user file: {relative_name}")
-            except Exception as exc:  # noqa: BLE001
-                status_callback(f"Warning: failed to preserve {relative_name}: {exc}")
-                updater_log.warning(f"Failed to preserve user file {relative_name}: {exc}")
-
-        batch_path = updates_root / "apply_update.bat"
-        log_path = updates_root / "update.log"
+        """Hand off the prepared update to a helper before the current Parasite exits."""
+        ready = updates_root / "ready"
+        script = updates_root / "apply.ps1"
         try:
-            batch_path.write_text(APPLY_UPDATE_SCRIPT, encoding="ascii")
-        except Exception as exc:  # noqa: BLE001
-            status_callback(f"Failed to prepare updater: {exc}")
-            updater_log.error(f"Failed to create batch script: {exc}")
+            _preserve_install_files(install_dir, candidate)
+            # A prior completed or rolled-back update may leave recovery trees.
+            # Keep the previous build until the next version is ready to install.
+            for name in ("previous", "failed"):
+                old_tree = updates_root / name
+                if old_tree.exists():
+                    shutil.rmtree(old_tree)
+            ready.unlink(missing_ok=True)
+            write_text_atomic(script, APPLY_UPDATE_SCRIPT)
+            write_text_atomic(updates_root / "Recover-Parasite.cmd", RECOVERY_COMMAND)
+            write_text_atomic(updates_root / "plan.json", json.dumps({
+                "destination": str(install_dir),
+                "executable": Path(sys.executable).name,
+                "candidate": str(candidate),
+                "parent_pid": os.getpid(),
+                "mutex": SINGLE_INSTANCE_MUTEX_NAME,
+            }))
+            powershell = Path(os.environ.get("SystemRoot", r"C:\Windows")) / "System32/WindowsPowerShell/v1.0/powershell.exe"
+            process = subprocess.Popen(
+                [str(powershell), "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass",
+                 "-File", str(script), "-Notify"],
+                cwd=updates_root,
+                creationflags=subprocess.CREATE_NO_WINDOW,
+            )
+        except OSError as exc:
+            status_callback(f"Could not prepare update: {exc}")
+            updater_log.error("Could not prepare update: %s", exc)
             return False
 
-        # cmd reads a script in the console code page: written into it, a
-        # non-ASCII path (C:\Users\José) pointed nowhere and the update failed
-        env = dict(
-            os.environ,
-            SOURCE=str(extracted_root),
-            DEST=str(install_dir),
-            EXE=exe_name,
-            ZIPFILE=str(zip_path),
-            STAGING=str(staging_dir),
-            LOG=str(log_path),
-            PID=str(os.getpid()),
-        )
-        # With System32 missing from the user's PATH, cmd found no robocopy and
-        # the update copied nothing (#363)
-        system32 = Path(os.environ.get("SystemRoot", r"C:\Windows")) / "System32"
-        env["PATH"] = os.pathsep.join(
-            [str(system32), str(system32 / "WindowsPowerShell" / "v1.0"), os.environ.get("PATH", "")]
-        )
-        # /s keeps the quotes around the path: without it, cmd drops them when
-        # the path holds & or parentheses, and runs a cut off path
-        try:
-            subprocess.Popen(f'cmd /s /c ""{batch_path}""', env=env, close_fds=True)
-        except Exception as exc:  # noqa: BLE001
-            status_callback(f"Failed to launch updater: {exc}")
-            updater_log.error(f"Failed to launch installer: {exc}")
-            return False
+        # A cold PowerShell start behind a busy antivirus can take a while
+        deadline = time.monotonic() + 30
+        while time.monotonic() < deadline and process.poll() is None:
+            if ready.is_file():
+                updater_log.info("Update helper is ready. Update log and recovery tool: %s", updates_root)
+                return True
+            time.sleep(0.05)
 
-        # The files are only copied once Parasite has exited: whether that worked
-        # is in the script's own log
-        updater_log.info(f"Update script started, its log is {log_path}")
-        return True
-
-    @staticmethod
-    def _resolve_extracted_root(staging_dir: Path) -> Optional[Path]:
-        """Return the directory that contains the update payload."""
-        candidates = [p for p in staging_dir.iterdir() if not p.name.startswith("__MACOSX")]
-        if not candidates:
-            return None
-        if len(candidates) == 1 and candidates[0].is_dir():
-            return candidates[0]
-        return staging_dir
+        if process.poll() is None:
+            process.terminate()
+            process.wait()
+        status_callback("The update helper could not start")
+        updater_log.error("Update helper did not acknowledge handoff. See %s", updates_root)
+        return False
 

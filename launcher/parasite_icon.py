@@ -27,10 +27,13 @@ log = get_logger()
 CDRAGON = "https://raw.communitydragon.org/latest/plugins/rcp-be-lol-game-data/global/default/"
 ICONS_URL = CDRAGON + "v1/summoner-icons.json"
 ICONS_TTL_S = 6 * 60 * 60
+# After a failed download (offline), the next try waits this long: the hub's tiles ask every few seconds
+RETRY_S = 60
 CHOICE_FILE = "profile-icon.json"
 
 _lock = threading.Lock()
 _icons: tuple = (0.0, [])  # (fetched at, [icons])
+_failed_at: Optional[float] = None
 
 
 def image_url(icon_id: int) -> str:
@@ -55,10 +58,12 @@ def clean_icons(data) -> list:
 
 
 def icons() -> list:
-    global _icons
+    global _icons, _failed_at
     with _lock:
         fetched, cached = _icons
         if cached and time.monotonic() - fetched < ICONS_TTL_S:
+            return cached
+        if _failed_at is not None and time.monotonic() - _failed_at < RETRY_S:
             return cached
     items = []
     try:
@@ -69,9 +74,11 @@ def icons() -> list:
         items = clean_icons(response.json())
     except Exception as e:  # noqa: BLE001
         log.info(f"[Icon] Could not read the icon list: {e}")
-    if items:
-        with _lock:
-            _icons = (time.monotonic(), items)
+    with _lock:
+        if items:
+            _icons, _failed_at = (time.monotonic(), items), None
+        else:
+            _failed_at = time.monotonic()
     return items or cached
 
 

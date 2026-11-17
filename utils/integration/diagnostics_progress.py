@@ -27,7 +27,7 @@ class _ProgressWindow(Win32Window):
 
     def __init__(self):
         super().__init__(
-            class_name="ParasiteDiagnosticsProgress", window_title="Diagnose Parasite startup",
+            class_name="ParasiteDiagnosticsProgress", window_title="Başlangıç sorununu tanıla",
             width=520, height=285, style=WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX,
         )
         init_common_controls()
@@ -40,11 +40,11 @@ class _ProgressWindow(Win32Window):
         width, _ = self.get_client_size()
         content = width - 40
         self.title_label = self.create_control(
-            "STATIC", "Diagnostics started", WS_CHILD | WS_VISIBLE,
+            "STATIC", "Tanılama başladı", WS_CHILD | WS_VISIBLE,
             0, 20, 18, content, 24, 4210,
         )
         self.detail_label = self.create_control(
-            "STATIC", "Checking Windows and Parasite. Keep the League client open.\nThis can take up to 3 minutes.",
+            "STATIC", "Windows ve Parasite kontrol ediliyor. League istemcisi açık kalsın.\nBu 3 dakika kadar sürebilir.",
             WS_CHILD | WS_VISIBLE, 0, 20, 48, content, 80, 4211,
         )
         self.progress = self.create_control(
@@ -53,16 +53,16 @@ class _ProgressWindow(Win32Window):
         )
         self.send_message(self.progress, PBM_SETMARQUEE, 1, 35)
         self.elapsed_label = self.create_control(
-            "STATIC", "Collecting... 0 seconds", WS_CHILD | WS_VISIBLE,
+            "STATIC", "Toplanıyor... 0 saniye", WS_CHILD | WS_VISIBLE,
             0, 20, 162, content, 22, 4213,
         )
         self.open_button = self.create_control(
-            "BUTTON", "Open reports", WS_CHILD | WS_VISIBLE | WS_TABSTOP,
+            "BUTTON", "Raporları aç", WS_CHILD | WS_VISIBLE | WS_TABSTOP,
             0, width - 258, 196, 116, 28, self.OPEN_ID,
         )
         user32.EnableWindow(self.open_button, False)
         self.close_button = self.create_control(
-            "BUTTON", "Run in background", WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_DEFPUSHBUTTON,
+            "BUTTON", "Arka planda çalıştır", WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_DEFPUSHBUTTON,
             0, width - 132, 196, 112, 28, self.CLOSE_ID,
         )
         icon = get_asset_path("icon.ico")
@@ -72,7 +72,7 @@ class _ProgressWindow(Win32Window):
 
     def tick(self):
         if not self.finished and not self.closed.is_set():
-            self.set_label_text(self.elapsed_label, f"Collecting... {int(time.monotonic() - self.started)} seconds")
+            self.set_label_text(self.elapsed_label, f"Toplanıyor... {int(time.monotonic() - self.started)} saniye")
 
     def complete(self, message, directory, succeeded):
         if self.closed.is_set():
@@ -82,10 +82,10 @@ class _ProgressWindow(Win32Window):
         self.send_message(self.progress, PBM_SETMARQUEE, 0, 0)
         self.set_window_styles(self.progress, remove=PBS_MARQUEE)
         self.send_message(self.progress, PBM_SETPOS, 100 if succeeded else 0, 0)
-        self.set_label_text(self.title_label, "Diagnostics complete" if succeeded else "Diagnostics could not finish")
+        self.set_label_text(self.title_label, "Tanılama tamamlandı" if succeeded else "Tanılama bitirilemedi")
         self.set_label_text(self.detail_label, message)
-        self.set_label_text(self.elapsed_label, "Reports saved." if directory else "Check the Parasite logs for details.")
-        self.set_label_text(self.close_button, "Close")
+        self.set_label_text(self.elapsed_label, "Raporlar kaydedildi." if directory else "Ayrıntılar için Parasite kayıtlarına bak.")
+        self.set_label_text(self.close_button, "Kapat")
         user32.EnableWindow(self.open_button, directory is not None)
 
     def on_command(self, command_id, notification_code, control_hwnd):
@@ -96,7 +96,7 @@ class _ProgressWindow(Win32Window):
                 open_folder_in_explorer(self.directory)
             except OSError:
                 log.exception("Could not open diagnostic reports")
-                self.set_label_text(self.elapsed_label, "Could not open reports. Use Open Logs folder in the tray.")
+                self.set_label_text(self.elapsed_label, "Raporlar açılamadı. Tepsideki Kayıt klasörünü aç'ı kullan.")
             return 0
         return None
 

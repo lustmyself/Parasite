@@ -12,8 +12,6 @@
   const CHROMA_CONTAINER_CLASS = "lpp-chroma-container";
   const VISIBLE_OFFSETS = new Set([0, 1, 2, 3, 4]);
 
-  const DISCORD_INVITE_URL = "https://discord.com/invite/roseskins";
-  const PARASITE_DISCORD_GUILD_ID = "1490473857075642621";
   const PARASITE_GITHUB_REPO_API_URL =
     "https://api.github.com/repos/lustmyself/Parasite";
   const PARASITE_GITHUB_BADGE_FALLBACK_URL =
@@ -60,13 +58,7 @@
       const source = badge.getAttribute("src") || "";
 
       if (source.includes("/discord/")) {
-        const fixedSource = source.replace(
-          /\/discord\/\d+/,
-          "/discord/" + PARASITE_DISCORD_GUILD_ID
-        );
-        if (fixedSource !== source) {
-          badge.setAttribute("src", fixedSource);
-        }
+        (badge.closest("a") || badge).remove();  // Parasite has no Discord
         return;
       }
 
@@ -708,21 +700,19 @@
     };
     window.addEventListener("resize", handleResize, { passive: true });
 
-    document.addEventListener(
-      "visibilitychange",
-      () => {
-        if (document.visibilityState === "visible") {
-          scanSkinSelection();
-        }
-      },
-      false
-    );
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        scanSkinSelection();
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisibilityChange, false);
 
     // Return cleanup in case we ever need it
     return () => {
       observer.disconnect();
       clearInterval(intervalId);
       window.removeEventListener("resize", handleResize);
+      document.removeEventListener("visibilitychange", handleVisibilityChange, false);
     };
   }
 
