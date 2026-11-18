@@ -16,7 +16,10 @@ the player's own game, so it always matches the patch:
 
 - <seasonal>.mapgeo: Base_SRX's mapgeo, as the game stores it;
 - <seasonal>.materials.bin: Base_SRX's materials with its MapContainer entry renamed to the
-  seasonal container, plus the seasonal materials Base_SRX has none of (its particles use them).
+  seasonal container, plus the seasonal materials Base_SRX has none of (its particles use them);
+- map11.bin: the seasonal map skin made the Default one (its grass tint, minimap, nav grid,
+  objects, particles...) but for its name and container: the default geometry with the seasonal
+  map skin's objects crashes the game as the champions spawn.
 """
 
 from __future__ import annotations
@@ -44,6 +47,7 @@ MAP_BIN = "data/maps/shipping/map11/map11.bin"
 GEOMETRY = "data/maps/mapgeometry/map11/{}.mapgeo"
 MATERIALS = "data/maps/mapgeometry/map11/{}.materials.bin"
 DEFAULT_CONTAINER = "Maps/MapGeometry/Map11/Base_SRX"
+DEFAULT_SKIN = "Default"
 MAP_SKIN = "Maps/Shipping/Map11/MapSkins/{}"
 MAP_CONTAINER_TYPE = "MapContainer"
 MAPSKIN_LINE = re.compile(r"mapskin\s*=\s*([A-Za-z0-9_]+)")
@@ -133,6 +137,38 @@ def map_container(map_bin: bytes, skin: str) -> str:
     return fallback
 
 
+def _rebuilt(head: bytes, types: List[int], blobs: List[bytes], tail: bytes) -> bytes:
+    out = bytearray(head)
+    out += struct.pack("<I", len(types))
+    out += struct.pack(f"<{len(types)}I", *types)
+    for blob in blobs:
+        out += blob
+    out += tail
+    return bytes(out)
+
+
+def default_map_skin(map_bin: bytes, skin: str) -> bytes:
+    """map11.bin with map skin *skin* given the Default map skin's fields, but for its own
+    name and container link."""
+    from injection.baseskin.propbin import _entry_bytes, fnv1a_lower
+    keep = {fnv1a_lower("name"), fnv1a_lower("mMapContainerLink")}
+    head, types, entries, tail = _entries(map_bin)
+    wanted, default = fnv1a_lower(MAP_SKIN.format(skin)), fnv1a_lower(MAP_SKIN.format(DEFAULT_SKIN))
+    found = {path_hash: (type_hash, start, end) for type_hash, (start, end, path_hash) in zip(types, entries)
+             if path_hash in (wanted, default)}
+    if wanted not in found or default not in found:
+        raise DefaultRiftError(f"Haritanın görünüm ayarları bulunamadı ({skin})")
+    seasonal = _parse_entry(map_bin, *found[wanted])
+    own = {field.name_hash: field for field in seasonal.fields if field.name_hash in keep}
+    fields = [own.get(field.name_hash, field) for field in _parse_entry(map_bin, *found[default]).fields]
+    present = {field.name_hash for field in fields}
+    fields += [field for name_hash, field in own.items() if name_hash not in present]
+    seasonal.fields = fields
+    blobs = [_entry_bytes(seasonal) if path_hash == wanted else map_bin[start:end]
+             for start, end, path_hash in entries]
+    return _rebuilt(head, types, blobs, tail)
+
+
 def merged_materials(base: bytes, seasonal: bytes, container: str) -> bytes:
     """Base_SRX's materials with its container renamed to *container*, plus the seasonal
     entries Base_SRX has none of (not the seasonal container itself)."""
@@ -165,13 +201,7 @@ def merged_materials(base: bytes, seasonal: bytes, container: str) -> bytes:
         types.append(type_hash)
         blobs.append(seasonal[start:end])
         seen.add(path_hash)
-    out = bytearray(base_head)
-    out += struct.pack("<I", len(types))
-    out += struct.pack(f"<{len(types)}I", *types)
-    for blob in blobs:
-        out += blob
-    out += base_tail
-    return bytes(out)
+    return _rebuilt(base_head, types, blobs, base_tail)
 
 
 # ---- the mod ----
@@ -198,16 +228,18 @@ def build(game: Path, skin: str, target: Path) -> Path:
     if seasonal_materials is None or not wad.has_path(GEOMETRY.format(name)):
         raise DefaultRiftError(f"{skin} haritasının dosyaları oyunda yok")
     materials = merged_materials(base_materials, seasonal_materials, container)
+    skins = default_map_skin(map_bin, skin)
 
     source = FileSource(wad_path)
     try:
         mod = ModWad(EMPTY_WAD)
         mod.add(wad.stored_file(GEOMETRY.format(base_name), source, name_hash=path_hash(GEOMETRY.format(name))))
         mod.put_path(MATERIALS.format(name), materials)
+        mod.put_path(MAP_BIN, skins)
         info = {
             "Name": NAME,
             "Author": "Parasite (TheKillerey'in Default Rift yöntemiyle)",
-            "Version": "1.0.0",
+            "Version": "1.1.0",
             "Description": f"{skin} yerine varsayılan Sihirdar Vadisi, oyunun kendi dosyalarından",
         }
         target.parent.mkdir(parents=True, exist_ok=True)

@@ -47,6 +47,43 @@ class MaterialsTest(unittest.TestCase):
             rift.merged_materials(WINTER, WINTER, SEASONAL)
 
 
+def _skin(name: str, container: str, grass: str, extra=()) -> Entry:
+    return Entry(fnv1a_lower("MapSkin"), fnv1a_lower(rift.MAP_SKIN.format(name)),
+                 [Field(NAME_FIELD, Value.string(name)), Field(GRASS_FIELD, Value.string(grass)),
+                  Field(LINK_FIELD, Value.string(container)), *extra])
+
+
+GRASS_FIELD = fnv1a_lower("mGrassTintTexture")
+LINK_FIELD = fnv1a_lower("mMapContainerLink")
+SNOW_FIELD = fnv1a_lower("mSnow")
+MAP_BIN = build([
+    _skin("Default", rift.DEFAULT_CONTAINER, "GrassTint_SRX.tex"),
+    _skin("Milkshake_SRS", SEASONAL, "GrassTint_Winter.tex", [Field(SNOW_FIELD, Value.string("on"))]),
+])
+
+
+class MapSkinTest(unittest.TestCase):
+    def test_the_seasonal_map_skin_takes_the_default_look_but_keeps_its_container(self):
+        out = rift.default_map_skin(MAP_BIN, "Milkshake_SRS")
+        parsed = Bin(out)
+        skins = {}
+        for type_hash, (start, end) in zip(parsed.types, parsed._locate()):
+            entry = rift._parse_entry(out, type_hash, start, end)
+            skins[entry.path_hash] = {f.name_hash: f.value.as_string() for f in entry.fields}
+        winter = skins[fnv1a_lower(rift.MAP_SKIN.format("Milkshake_SRS"))]
+        self.assertEqual(winter, {NAME_FIELD: "Milkshake_SRS", GRASS_FIELD: "GrassTint_SRX.tex", LINK_FIELD: SEASONAL})
+        default = skins[fnv1a_lower(rift.MAP_SKIN.format("Default"))]
+        self.assertEqual(default[LINK_FIELD], rift.DEFAULT_CONTAINER)
+
+    def test_a_default_map_skin_already_matching_is_left_as_it_is(self):
+        once = rift.default_map_skin(MAP_BIN, "Milkshake_SRS")
+        self.assertEqual(rift.default_map_skin(once, "Milkshake_SRS"), once)
+
+    def test_an_unknown_map_skin_is_refused(self):
+        with self.assertRaises(rift.DefaultRiftError):
+            rift.default_map_skin(MAP_BIN, "Nope")
+
+
 class GameTest(unittest.TestCase):
     def setUp(self):
         self.root = Path(tempfile.mkdtemp())
@@ -69,10 +106,8 @@ class GameTest(unittest.TestCase):
         self.assertIsNone(rift.last_map_skin(self.game))
 
     def _wad(self):
-        skin = Entry(fnv1a_lower("MapSkin"), fnv1a_lower(rift.MAP_SKIN.format("Milkshake_SRS")),
-                     [Field(fnv1a_lower("mMapContainerLink"), Value.string(SEASONAL))])
         wad = ModWad(rift.EMPTY_WAD)
-        wad.put_path(rift.MAP_BIN, build([skin]))
+        wad.put_path(rift.MAP_BIN, MAP_BIN)
         wad.put_path(rift.GEOMETRY.format("base_srx"), b"default geometry")
         wad.put_path(rift.GEOMETRY.format("milkshake_srs"), b"winter geometry")
         wad.put_path(rift.MATERIALS.format("base_srx"), BASE)
@@ -93,6 +128,7 @@ class GameTest(unittest.TestCase):
         materials = _entries(mod.read_path(rift.MATERIALS.format("milkshake_srs")))
         self.assertEqual(materials[fnv1a_lower(SEASONAL)], SEASONAL)
         self.assertFalse(mod.has_path(rift.GEOMETRY.format("base_srx")))
+        self.assertEqual(mod.read_path(rift.MAP_BIN), rift.default_map_skin(MAP_BIN, "Milkshake_SRS"))
 
     def test_the_default_map_skin_is_not_rebuilt(self):
         self._wad()
