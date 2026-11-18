@@ -1,19 +1,15 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""Keep the stored custom skins matching the base skin of the game installed.
+"""A stored custom skin, matched to the base skin once, as it is added.
 
-A skin is fixed as it is added (MessageHandler._check_imported_mods). That
-leaves out the skins stored before Parasite fixed them, those added during a game
-(the fix waits: it rewrites the mod while the game runs) or before the game's
-folder was known, and those fixed against a patch that changed the base skin
-since. So while the client is idle (home screen, lobby: on_phase), Parasite checks
-every stored skin it has not checked against the game's current champion WADs,
-and fixes those that need it. A check is cheap: a WAD is read file by file.
-
-What was checked is kept in <mods>/.parasite_baseskin.json, per mod: the size and
-time of the mod checked, those of the champion WADs it was checked against, and
-whether every step could run (a mod a step failed on is tried again at the
-next start of Parasite).
+A skin is fixed as it is added (MessageHandler._check_imported_mods), and only
+then: Parasite does not go back over the skins it stores. What was checked is kept
+in <mods>/.parasite_baseskin.json, per mod: the size and time of the mod checked,
+those of the champion WADs it was checked against, the steps' version, and
+whether every step could run. A skin picked for a game that this Parasite's steps
+did not fix (one an older Parasite fixed, one added during a game, whose fix
+waits, or one a step failed on) is the player's to add again: Troubleshooting
+tells them (needs_reinstall, report_outdated).
 
 Rewriting a stored mod changes its file: party mode shares the hash of the
 file as it was picked (its sourceHash; for a skin an older Parasite added, the
@@ -29,10 +25,9 @@ import json
 import threading
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Callable, Dict, Iterator, List, Optional, Set
+from typing import Dict, Iterator, List
 
 from utils.core.atomic_file import atomic_write
-from utils.core.junction import is_junction
 from utils.core.logging import get_logger
 
 from .package import FixResult, fix_mod
@@ -40,20 +35,13 @@ from .package import FixResult, fix_mod
 log = get_logger()
 
 STATE_FILE = ".parasite_baseskin.json"
-# Raise it when the steps write something else: every stored skin is checked again
-STEPS_VERSION = 2  # 2: unpacked WAD folders are fixed too
-# Where the pass may run: the client shows its home screen or a lobby. Not from
-# matchmaking on (Swiftplay injects then), nor while a game ends. The phase
-# thread keeps the home screen as None in the shared state
-IDLE_PHASES = frozenset({None, "None", "Lobby"})
-_STORED_SUFFIXES = (".fantome", ".zip")
+# Raise it when the steps write something else: a skin fixed by older steps is
+# then one to add again (needs_reinstall)
+STEPS_VERSION = 3  # 2: unpacked WAD folders are fixed too; 3: meshes rebuilt, bank paths moved, event names unlisted
 
-# One fix of one mod at a time: an import and the pass never rewrite a mod together
+# One fix of one mod at a time: never two rewrites of one mod together
 _FIX_LOCK = threading.Lock()
 _STATE_LOCK = threading.Lock()
-_pass_thread: Optional[threading.Thread] = None
-# Mods a step failed on, tried again once per start of Parasite
-_retried: Set[str] = set()
 
 
 # --------------------------------------------------------------------------------------
@@ -72,25 +60,6 @@ def _mod_stamp(mod: Path) -> List[int]:
         return [size, latest]
     stat = mod.stat()
     return [stat.st_size, stat.st_mtime_ns]
-
-
-def _champions_dir(game_dir: Path) -> Path:
-    return Path(game_dir) / "DATA" / "FINAL" / "Champions"
-
-
-def _up_to_date(known: Optional[dict], stamp: List[int], champions_dir: Path, key: str) -> bool:
-    if not isinstance(known, dict) or known.get("version") != STEPS_VERSION or known.get("mod") != stamp:
-        return False
-    if not known.get("complete") and key not in _retried:
-        return False
-    for name, game_stamp in (known.get("game") or {}).items():
-        try:
-            stat = (champions_dir / name).stat()
-        except OSError:
-            return False
-        if [stat.st_size, stat.st_mtime_ns] != game_stamp:
-            return False
-    return True
 
 
 @contextmanager
@@ -145,115 +114,43 @@ def _save(mods_root: Path, state: Dict[str, dict]) -> None:
         log.debug(f"[BASESKIN] Could not save {STATE_FILE}: {e}")
 
 
-# --------------------------------------------------------------------------------------
-# the stored skins
-# --------------------------------------------------------------------------------------
-
-def stored_skins(storage) -> Iterator[Path]:
-    """The custom skins in the mods storage (skins/<id>/): archives and folders."""
-    try:
-        parents = sorted(child for child in storage.skins_dir.iterdir() if child.is_dir() and child.name.isdigit())
-    except OSError:
-        return
-    for parent in parents:
-        try:
-            entries = sorted(parent.iterdir(), key=lambda entry: entry.name.lower())
-        except OSError:
-            continue
-        for entry in entries:
-            if entry.name.startswith("."):
-                continue
-            if entry.is_dir() and not is_junction(entry):
-                yield entry
-            elif entry.is_file() and entry.suffix.lower() in _STORED_SUFFIXES:
-                yield entry
-
-
-def fix_stored_skins(storage, game_dir: Path, stop: Callable[[], bool]) -> int:
-    """Check every stored custom skin not yet checked against the game's
-    current champion WADs, and fix those that need it; return how many were
-    fixed. *stop()* is asked between two mods."""
-    champions_dir = _champions_dir(game_dir)
-    if not champions_dir.is_dir():
-        return 0
-    with _STATE_LOCK:
-        state = _load(storage.mods_root)
-    fixed = 0
-    present: Set[str] = set()
-    finished = True
-    for mod in stored_skins(storage):
-        if stop():
-            finished = False
-            break
-        try:
-            key = mod.relative_to(storage.mods_root).as_posix()
-            stamp = _mod_stamp(mod)
-        except (OSError, ValueError):
-            continue
-        present.add(key)
-        if _up_to_date(state.get(key), stamp, champions_dir, key):
-            continue
-        _retried.add(key)
-        try:
-            result = fix_stored_mod(storage, mod, game_dir)
-        except Exception as e:  # noqa: BLE001 - one mod must not stop the others
-            log.warning(f"[BASESKIN] Could not check {mod.name} against the base skin: {e}")
-            failed = FixResult()
-            failed.complete = False  # tried again at the next start, not at every lobby
-            _remember(storage.mods_root, mod, failed)
-            continue
-        if result.changed:
-            fixed += 1
-            log.info(f"[BASESKIN] Fixed the stored skin {mod.name} against the game's base skin: "
-                     f"{describe(result)}")
-    if finished:
-        with _STATE_LOCK:
-            state = _load(storage.mods_root)
-            gone = [key for key in state if key not in present]
-            if gone:
-                for key in gone:
-                    del state[key]
-                _save(storage.mods_root, state)
-    return fixed
-
-
 def describe(result: FixResult) -> str:
     found = result.findings
     return (f"{len(found.names)} skin name(s), {len(found.meshes)} model file(s), "
-            f"{found.audio_merges} sound tag merge(s), {found.unit_renames} bank unit rename(s)")
+            f"{found.audio_merges} sound tag merge(s), {found.unit_renames} bank unit rename(s), "
+            f"{found.bank_moves} bank path move(s), {found.event_names_unlisted} skin event name(s) unlisted")
 
 
 # --------------------------------------------------------------------------------------
-# when
+# a stored skin this Parasite did not fix
 # --------------------------------------------------------------------------------------
 
-def on_phase(phase: Optional[str], injection_manager, state) -> None:
-    """Start the pass in the background when the client becomes idle. It
-    stops between two mods once the client leaves the idle phases or an
-    injection starts."""
-    global _pass_thread
-    if phase not in IDLE_PHASES:
-        return
-    injector = getattr(injection_manager, "injector", None)
-    game_dir = getattr(injector, "game_dir", None) or getattr(injection_manager, "game_dir", None)
-    if game_dir is None:
-        return  # once the injection system knows the game's folder
-
-    def stop() -> bool:
-        return (getattr(state, "phase", None) not in IDLE_PHASES
-                or bool(getattr(injection_manager, "_injection_in_progress", False)))
-
-    def run() -> None:
-        from injection.mods.storage import ModStorageService
-        try:
-            fixed = fix_stored_skins(ModStorageService(), Path(game_dir), stop)
-            if fixed:
-                log.info(f"[BASESKIN] Fixed {fixed} stored skin(s) so LTK Manager does not take them for skinhacks")
-        except Exception as e:  # noqa: BLE001 - a background pass must not take Parasite down
-            log.warning(f"[BASESKIN] Could not check the stored skins: {e}")
-
+def needs_reinstall(mods_root: Path, mod: Path) -> bool:
+    """Whether the stored custom skin *mod* is not as this Parasite's steps fix
+    a skin: never checked (added during a game, or before Parasite knew the
+    game's folder), fixed by an older Parasite (an older STEPS_VERSION), or this
+    Parasite's fix of it could not complete. As it is, it may fail in game, and
+    Parasite does not fix it again: the player adds it again."""
+    try:
+        key = Path(mod).relative_to(mods_root).as_posix()
+    except ValueError:
+        return False
     with _STATE_LOCK:
-        if _pass_thread is not None and _pass_thread.is_alive():
-            return
-        _pass_thread = threading.Thread(target=run, name="BaseSkinPass", daemon=True)
-        _pass_thread.start()
+        known = _load(Path(mods_root)).get(key)
+    if not isinstance(known, dict):
+        return True
+    return known.get("version") != STEPS_VERSION or not known.get("complete")
+
+
+def report_outdated(name: str) -> None:
+    """Tell the player, in Troubleshooting, to add the custom skin *name* again."""
+    from utils.core.issue_reporter import report_issue
+
+    log.warning(f"[BASESKIN] The custom skin {name} is not prepared for this Parasite: it must be added again")
+    report_issue(
+        "CUSTOM_SKIN_OUTDATED",
+        "error",
+        f"Custom skin {name} was added with an older Parasite",
+        details={"skin": name},
+        hint="Please update your custom skin by reinstalling it into Parasite.",
+    )

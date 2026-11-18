@@ -5552,6 +5552,19 @@
           };
         }
 
+        if (code === 'CUSTOM_SKIN_OUTDATED') {
+          const skin = String(e?.detail || '').trim();
+          return {
+            title: t('A custom skin needs to be added again'),
+            details: [
+              skin
+                ? t('What it means: {skin} was not prepared by this version of Parasite (it was added with an older Parasite, or while a game was running), so it may fail to show, or play without its sounds.', { skin })
+                : t('What it means: a custom skin was not prepared by this version of Parasite (it was added with an older Parasite, or while a game was running), so it may fail to show, or play without its sounds.'),
+              t('Fix: please update your custom skin by reinstalling it into Parasite (remove it, then add it again).'),
+            ],
+          };
+        }
+
         if (code === 'LTF_IMPORT_FAILED') {
           const detail = String(e?.detail || '').trim();
           return {

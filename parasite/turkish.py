@@ -533,6 +533,9 @@ LOCALE_TR = {
         "Çözüm: Parasite'ın başlatıcısı LTK Manager'ı açtı ama ona bağlanamadı. Yukarıda err=5 (erişim reddedildi) varsa Windows ya da bir antivirüs engelledi: Parasite'ın klasörünü antivirüsünün istisnalarına ekle, Parasite'ı güncelle, sonra tekrar dene. Parasite, oturum açtığın hesaptan başka bir Windows hesabıyla yönetici olarak çalışıyorsa bunun yerine kendi hesabını yönetici yap.",
     "Fix: Windows refused to start Parasite's ltk_launcher.exe because it is set to run as administrator, so LTK Manager did not start under explorer.exe. Parasite takes that setting off before it starts LTK Manager: retry the next game. If it happens again, untick \"Run this program as an administrator\" in the Compatibility tab of the Properties of ltk_launcher.exe, in Parasite's _internal\\injection\\tools folder (also under \"Change settings for all users\"), then restart Parasite.":
         "Çözüm: Windows, Parasite'ın ltk_launcher.exe dosyasını yönetici olarak çalışacak şekilde ayarlı olduğu için başlatmadı; bu yüzden LTK Manager explorer.exe altında açılmadı. Parasite bu ayarı LTK Manager'ı başlatmadan önce kaldırır: bir sonraki maçta tekrar dene. Yine olursa Parasite'ın _internal\\injection\\tools klasöründeki ltk_launcher.exe'nin Özellikler > Uyumluluk sekmesinde \"Bu programı yönetici olarak çalıştır\" işaretini kaldır (\"Tüm kullanıcılar için ayarları değiştir\" altında da), sonra Parasite'ı yeniden başlat.",
+    "A custom skin needs to be added again": "Bir özel skinin yeniden eklenmesi gerekiyor",
+    "Fix: please update your custom skin by reinstalling it into Parasite (remove it, then add it again).":
+        "Çözüm: özel skinini Parasite'a yeniden kurarak güncelle (kaldır, sonra tekrar ekle).",
     "Fix: another program closed LTK Manager, most often an antivirus. Add Parasite's folder to its exclusions, then retry.":
         "Çözüm: LTK Manager'ı başka bir program kapattı, çoğunlukla bir antivirüs. Parasite'ın klasörünü onun istisnalarına ekle, sonra tekrar dene.",
     "Fix: close LTK Manager (also from the system tray), then retry. Parasite starts it with its bridge and closes it again after the game.":
@@ -558,6 +561,8 @@ LOCALE_TR = {
     "Parasite's launcher is set to run as administrator": "Parasite'ın başlatıcısı yönetici olarak çalışacak şekilde ayarlı",
     "The mod could not be installed into LTK Manager": "Mod LTK Manager'a kurulamadı",
     "What happened: LTK Manager refused the mod import.": "Ne oldu: LTK Manager modu içe aktarmayı reddetti.",
+    "What it means: a custom skin was not prepared by this version of Parasite (it was added with an older Parasite, or while a game was running), so it may fail to show, or play without its sounds.":
+        "Anlamı: bir özel skin Parasite'ın bu sürümüyle hazırlanmadı (eski bir Parasite ile ya da bir maç sürerken eklendi); bu yüzden görünmeyebilir ya da sesleri olmadan oynayabilir.",
     "What it means: Parasite applies skins through LTK Manager, which was not found on this PC.":
         "Anlamı: Parasite skinleri LTK Manager üzerinden uygular, ama LTK Manager bu bilgisayarda bulunamadı.",
     "What it means: Parasite could not install the mod for the selected skin.":
@@ -566,6 +571,8 @@ LOCALE_TR = {
         "Anlamı: Parasite'ın LTK Manager'ı yönetebilmesi için araçlar klasöründe ltk_launcher.exe ve LeagueToolFlop.dll gerekiyor.",
     "What it means: Windows' compatibility settings run Parasite's ltk_launcher.exe as administrator, so Windows refuses to start it for your Windows account, LTK Manager does not start under explorer.exe and its patcher refuses the skins. Parasite could not take that setting off by itself: {detail}":
         "Anlamı: Windows'un uyumluluk ayarları Parasite'ın ltk_launcher.exe dosyasını yönetici olarak çalıştırıyor; bu yüzden Windows onu senin hesabın için başlatmıyor, LTK Manager explorer.exe altında açılmıyor ve patcher'ı skinleri reddediyor. Parasite bu ayarı kendisi kaldıramadı: {detail}",
+    "What it means: {skin} was not prepared by this version of Parasite (it was added with an older Parasite, or while a game was running), so it may fail to show, or play without its sounds.":
+        "Anlamı: {skin} Parasite'ın bu sürümüyle hazırlanmadı (eski bir Parasite ile ya da bir maç sürerken eklendi); bu yüzden görünmeyebilir ya da sesleri olmadan oynayabilir.",
 }
 
 # Rose's tr.json: "Rose'u" became "Parasite'u" (Parasite takes back vowels: Parasite'ı, as the hub
