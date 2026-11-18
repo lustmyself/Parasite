@@ -997,10 +997,16 @@ class HubDialog:
     def confirm_update(self, remote_version: str, local_version: str) -> Optional[bool]:
         """Ask in the hub. None when the window can't be shown, so the caller asks its own way."""
         global _prompt_answer
+        from launcher import parasite_autoupdate
+        if parasite_autoupdate.offline_running():
+            # The update would fail on Parasite Offline's open folder and restart Parasite,
+            # which would try again at once: a restart loop. Start as it is; the background
+            # check installs the update once the Riot Client (and Parasite Offline) is closed.
+            log.info(f"[Hub] Parasite Offline is running: {remote_version} waits until League is closed")
+            return False
         if take_update_acceptance():
             log.info(f"[Hub] Update to {remote_version} accepted in the hub before restarting")
             return True
-        from launcher import parasite_autoupdate
         if parasite_autoupdate.enabled():
             log.info(f"[Hub] Auto update is on: installing {remote_version} without asking")
             return True

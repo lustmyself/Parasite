@@ -135,6 +135,18 @@ def _league_running() -> bool:
     return any((p.info.get("name") or "").lower() in LEAGUE for p in psutil.process_iter(["name"]))
 
 
+def offline_running() -> bool:
+    """Parasite Offline runs from Parasite's folder while the Riot Client is open: an update
+    started now can't move that folder, so the update script gives up and restarts Parasite."""
+    try:
+        import psutil
+        return any((p.info.get("name") or "").lower() == "parasiteoffline.exe"
+                   for p in psutil.process_iter(["name"]))
+    except Exception as exc:  # noqa: BLE001
+        log.debug(f"[AutoUpdate] Could not list the processes: {exc}")
+        return False
+
+
 def _install_when_idle() -> None:
     """Restart Parasite into its installer once League has been closed for a minute.
 
