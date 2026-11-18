@@ -9,7 +9,7 @@
   const EVENT_CHANGED = "parasite-i18n-changed";
 
   // Texts are keyed by their English version, which is also the fallback
-  let state = { language: "tr", setting: "tr", direction: "ltr", languages: { tr: "Türkçe" }, strings: {} };
+  let state = { language: "en", setting: "auto", direction: "ltr", languages: { en: "English" }, strings: {} };
 
   function format(text, vars) {
     if (!vars) return text;
@@ -67,7 +67,7 @@
       (next.setting || "auto") !== state.setting ||
       JSON.stringify(next.strings) !== JSON.stringify(state.strings);
     state = {
-      language: next.language || "tr",
+      language: next.language || "en",
       setting: next.setting || "auto",
       direction: next.direction === "rtl" ? "rtl" : "ltr",
       languages: next.languages || state.languages,

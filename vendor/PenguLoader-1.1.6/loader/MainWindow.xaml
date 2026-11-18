@@ -58,7 +58,7 @@
         <ui:TitleBarButton
             Click="ThemeButtonClick"
             Margin="0,0,138,0"
-            ToolTip="Temayı değiştir"
+            ToolTip="Change theme"
             VerticalAlignment="Top"
             HorizontalAlignment="Right"
         >

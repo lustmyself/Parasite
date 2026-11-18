@@ -27,8 +27,8 @@ Put new files in `overlay/`, and changes to Rose files in `EDITS` in `sync.py`.
 To check locally against a Rose tag:
 
 ```
-git fetch --no-tags https://github.com/Alban1911/Rose.git refs/tags/1.5.7:refs/rose/1.5.7
-python parasite/sync.py refs/rose/1.5.7
+git fetch --no-tags https://github.com/Alban1911/Rose.git refs/tags/1.5.3:refs/rose/1.5.3
+python parasite/sync.py refs/rose/1.5.3
 git status   # should show only the changes you meant to make
 ```
 

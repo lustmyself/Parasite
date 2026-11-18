@@ -555,13 +555,12 @@
     }
   `;
 
-  function emitBridgeLog(event, data = {}, level) {
+  function emitBridgeLog(event, data = {}) {
     try {
       const payload = {
         type: "chroma-log",
         source: "FormsWheel",
         event,
-        level,
         data,
         timestamp: Date.now(),
       };
@@ -1533,19 +1532,15 @@
   const log = {
     info: (msg, extra) => {
       console.log(`${LOG_PREFIX} ${msg}`, extra ?? "");
-      emitBridgeLog("info", { message: msg, data: extra }, "info");
+      emitBridgeLog("info", { message: msg, data: extra });
     },
     warn: (msg, extra) => {
       console.warn(`${LOG_PREFIX} ${msg}`, extra ?? "");
-      emitBridgeLog("warn", { message: msg, data: extra }, "warn");
+      emitBridgeLog("warn", { message: msg, data: extra });
     },
     debug: (msg, extra) => {
       console.debug(`${LOG_PREFIX} ${msg}`, extra ?? "");
-      emitBridgeLog("debug", { message: msg, data: extra }, "debug");
-    },
-    error: (msg, extra) => {
-      console.error(`${LOG_PREFIX} ${msg}`, extra ?? "");
-      emitBridgeLog("error", { message: msg, data: extra }, "error");
+      emitBridgeLog("debug", { message: msg, data: extra });
     },
   };
 
@@ -4590,12 +4585,6 @@
 
     // Add click outside handler to close
     const closeHandler = function closePanelOnOutsideClick(e) {
-      // Panel was already removed by another path (chroma selected, button
-      // toggle...): drop this listener so it doesn't leak with the old panel
-      if (!panel.isConnected) {
-        document.removeEventListener("click", closeHandler);
-        return;
-      }
       if (
         panel &&
         panel.parentNode &&

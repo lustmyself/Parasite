@@ -1,13 +1,7 @@
 """Spotify themes for the desktop hub's Spotify tab, through Spicetify.
 
 Parasite doesn't patch Spotify itself: it downloads the official Spicetify CLI from its
-GitHub releases (github.com/spicetify/cli, LGPL) and runs it. Parasite runs as administrator,
-so the CLI is checked against the SHA-256 GitHub's API gives for the release asset (its
-`digest`; without one the download is refused) and kept in Parasite's install folder,
-which only administrators can change (the same folder as Parasite.exe, so no new way in):
-never in the user-writable data folder, where any program of the user could swap it for
-its own and get it run elevated. Updates mirror the install folder, so the CLI is
-downloaded again after one.
+GitHub releases (github.com/spicetify/cli, LGPL) into Parasite's data folder and runs it.
 Themes: Luminous (streetraceing/luminous, MIT), Parasite's purple and pink (written
 here), Sleek's schemes from spicetify-themes (MIT), or Spotify's original look. Spotify updates wipe the patch,
 so with "auto" on Parasite applies the theme again when Spotify.exe changes.
@@ -17,12 +11,10 @@ Parasite runs elevated and Spicetify refuses that unless told --bypass-admin.
 from __future__ import annotations
 
 import ctypes
-import hashlib
 import io
 import json
 import os
 import re
-import shutil
 import subprocess
 import threading
 import zipfile
@@ -32,12 +24,11 @@ from typing import Optional
 import requests
 
 from utils.core.logging import get_logger
-from utils.core.paths import get_app_dir, get_user_data_dir
+from utils.core.paths import get_user_data_dir
 
 log = get_logger()
 
 RELEASES = "https://api.github.com/repos/spicetify/cli/releases/latest"
-MAX_CLI_BYTES = 100 * 1024 * 1024
 SLEEK = "https://raw.githubusercontent.com/spicetify/spicetify-themes/master/Sleek/"
 LUMINOUS = "https://raw.githubusercontent.com/streetraceing/luminous/main/release/"  # MIT
 # key: (theme folder, color scheme, label, preview background, preview accent), in the tab's order
@@ -203,52 +194,16 @@ def status() -> dict:
     }
 
 
-def _cli_dir() -> Path:
-    """Where the CLI lives: in Parasite's install folder, writable by administrators only."""
-    return get_app_dir() / "spicetify"
-
-
-def _cli_source() -> tuple[str, str, str]:
-    """(tag, download URL, expected SHA-256) of the latest CLI."""
-    response = requests.get(RELEASES, timeout=20)
-    response.raise_for_status()
-    release = response.json()
-    asset = next(a for a in release["assets"] if a["name"].endswith("-windows-x64.zip"))
-    digest = str(asset.get("digest") or "").lower()
-    if not (digest.startswith("sha256:") and re.fullmatch(r"[0-9a-f]{64}", digest[7:])):
-        log.warning(f"[Spotify] GitHub gave no SHA-256 for Spicetify {release.get('tag_name')}: not downloading it")
-        raise RuntimeError("Spicetify indirmesi doğrulanamadı")
-    return release.get("tag_name") or "", asset["browser_download_url"], digest[7:]
-
-
 def _cli() -> Path:
-    exe = _cli_dir() / "spicetify.exe"
+    exe = _dir() / "cli" / "spicetify.exe"
     if exe.is_file():
         return exe
-    tag, url, expected = _cli_source()
-    response = requests.get(url, timeout=120)
-    response.raise_for_status()
-    data = response.content
-    if len(data) > MAX_CLI_BYTES:
-        raise RuntimeError("Spicetify indirmesi beklenenden büyük")
-    actual = hashlib.sha256(data).hexdigest()
-    if actual != expected:
-        log.warning(f"[Spotify] Spicetify {tag} SHA-256 mismatch: {actual}, expected {expected}")
-        raise RuntimeError("Spicetify indirmesi doğrulanamadı")
-    # Extract next to the final folder and move it in whole, so a half-extracted CLI never runs
-    staging = exe.parent.with_name(exe.parent.name + ".new")
-    shutil.rmtree(staging, ignore_errors=True)
-    staging.mkdir(parents=True)
-    try:
-        with zipfile.ZipFile(io.BytesIO(data)) as archive:
-            archive.extractall(staging)
-        if not (staging / "spicetify.exe").is_file():
-            raise RuntimeError("spicetify.exe is missing from the download")
-        shutil.rmtree(exe.parent, ignore_errors=True)
-        staging.replace(exe.parent)
-    finally:
-        shutil.rmtree(staging, ignore_errors=True)
-    log.info(f"[Spotify] Spicetify {tag} downloaded and verified (sha256 {actual})")
+    release = requests.get(RELEASES, timeout=20).json()
+    asset = next(a for a in release["assets"] if a["name"].endswith("-windows-x64.zip"))
+    data = requests.get(asset["browser_download_url"], timeout=120).content
+    with zipfile.ZipFile(io.BytesIO(data)) as archive:
+        archive.extractall(exe.parent)
+    log.info(f"[Spotify] Spicetify {release.get('tag_name')} downloaded")
     return exe
 
 

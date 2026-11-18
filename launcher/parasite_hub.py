@@ -60,27 +60,7 @@ TR_MESSAGES = [
     ("Checking for updates", "Güncellemeler kontrol ediliyor"),
     ("Contacting update server", "Güncelleme sunucusuna bağlanılıyor"),
     ("Update available", "Güncelleme var"),
-    ("Update skipped by user", "Güncelleme atlandı"),
-    ("Update skipped (development build)", "Güncelleme atlandı (geliştirme sürümü)"),
     ("Update skipped", "Güncelleme atlandı"),
-    ("Update downloaded in the background", "Güncelleme arka planda indirildi"),
-    ("Update ready to apply after Parasite exits", "Güncelleme, Parasite kapanınca uygulanacak"),
-    ("Preparing to install update", "Güncelleme kurulmaya hazırlanıyor"),
-    ("Could not prepare update", "Güncelleme hazırlanamadı"),
-    ("Could not create update workspace", "Güncelleme klasörü oluşturulamadı"),
-    ("Could not compare update versions", "Sürümler karşılaştırılamadı"),
-    ("Close the running Parasite before installing an update", "Güncellemeyi kurmadan önce çalışan Parasite'ı kapat"),
-    ("No release asset found", "Güncelleme paketi bulunamadı"),
-    ("The update helper could not start", "Güncelleme yardımcısı başlatılamadı"),
-    ("Download failed", "İndirme başarısız"),
-    ("Extraction failed", "Açma başarısız"),
-    ("Warning: failed to download hash file", "Uyarı: hash dosyası indirilemedi"),
-    ("Failed to download ", "İndirilemedi: "),
-    ("Failed to write ", "Yazılamadı: "),
-    ("Successfully created ", "Oluşturuldu: "),
-    ("Downloaded ", "İndirildi: "),
-    ("Writing ", "Yazılıyor: "),
-    ("Hash check skipped", "Hash kontrolü atlandı"),
     ("Updating Parasite", "Parasite güncelleniyor"),
     ("Downloading update", "Güncelleme indiriliyor"),
     ("Extracting update", "Güncelleme açılıyor"),
@@ -638,7 +618,6 @@ ACTIONS: dict[str, Callable[[dict], str]] = {
     "dodge_now": lambda body: _auto().dodge_now(),
     "dodge_last": lambda body: _auto().arm_dodge(bool(body.get("on"))),
     "lobby_history_clear": lambda body: _lobby().clear_history(),
-    "lobby_hover": lambda body: _lobby().hover(body.get("championId"), str(body.get("name") or "")),
     "wallpaper_set": lambda body: _wallpaper().choose(body.get("name") if isinstance(body.get("name"), str) else None),
     "wallpaper_delete": lambda body: _wallpaper().delete(str(body.get("name") or "")),
     "wallpaper_folder": lambda body: _wallpaper().open_folder(),
@@ -1022,9 +1001,8 @@ class HubDialog:
         return bool(_prompt_answer)
 
 
-def make_launcher_dialog(fallback=None):
-    """The hub when its window can be shown, else Rose's Win32 progress dialog (*fallback*:
-    the launcher's UpdateDialog, so what replaces it there replaces it here too)."""
+def make_launcher_dialog():
+    """The hub when its window can be shown, else Rose's Win32 progress dialog."""
     if sys.platform == "win32":
         try:
             from launcher import parasite_hub_window
@@ -1035,6 +1013,5 @@ def make_launcher_dialog(fallback=None):
                 return HubDialog(show=not quiet and not _started_quietly() and not parasite_hub_window._in_game())
         except Exception as exc:  # noqa: BLE001
             log.warning(f"[Hub] Window unavailable: {exc}")
-    if fallback is None:
-        from launcher.ui.update_dialog import UpdateDialog as fallback
-    return fallback()
+    from launcher.ui.update_dialog import UpdateDialog
+    return UpdateDialog()

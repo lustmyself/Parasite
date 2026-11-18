@@ -4,7 +4,6 @@
 LCU Skin Scraper - Scrape skins for a specific champion from LCU
 """
 
-from threading import Lock
 from typing import Optional, Dict, List, Tuple
 
 from config import LCU_SKIN_SCRAPER_TIMEOUT_S, SKIN_NAME_MIN_SIMILARITY
@@ -26,9 +25,6 @@ class LCUSkinScraper:
         """
         self.lcu = lcu_client
         self.cache = ChampionSkinCache()
-        self._cache_lock = Lock()
-        self._request_generation = 0
-        self._requested_champion_id = None
     
     def scrape_champion_skins(self, champion_id: int, force_refresh: bool = False) -> bool:
         """Scrape all skins for a specific champion from LCU
@@ -40,15 +36,13 @@ class LCUSkinScraper:
         Returns:
             True if scraping succeeded, False otherwise
         """
-        with self._cache_lock:
-            if champion_id != self._requested_champion_id or force_refresh:
-                self._request_generation += 1
-                self._requested_champion_id = champion_id
-            generation = self._request_generation
-            if not force_refresh and self.cache.is_loaded_for_champion(champion_id):
-                log.debug(f"[LCU-SCRAPER] Champion {champion_id} skins already cached ({len(self.cache.skins)} skins)")
-                return True
-            self.cache = ChampionSkinCache()
+        # Check if already cached
+        if not force_refresh and self.cache.is_loaded_for_champion(champion_id):
+            log.debug(f"[LCU-SCRAPER] Champion {champion_id} skins already cached ({len(self.cache.skins)} skins)")
+            return True
+        
+        # Clear old cache
+        self.cache.clear()
         
         log.info(f"[LCU-SCRAPER] Scraping skins for champion ID {champion_id}...")
         
@@ -75,9 +69,8 @@ class LCUSkinScraper:
             return False
         
         # Extract champion info
-        cache = ChampionSkinCache()
-        cache.champion_id = champion_id
-        cache.champion_name = champ_data.get('name', f'Champion{champion_id}')
+        self.cache.champion_id = champion_id
+        self.cache.champion_name = champ_data.get('name', f'Champion{champion_id}')
         
         # Extract skins
         raw_skins = champ_data.get('skins', [])
@@ -119,7 +112,7 @@ class LCUSkinScraper:
                 }
                 
                 chroma_details.append(chroma_info)
-                cache.chroma_id_map[chroma_id] = chroma_info
+                self.cache.chroma_id_map[chroma_id] = chroma_info
             
             skin_data = {
                 'skinId': skin_id,
@@ -131,21 +124,16 @@ class LCUSkinScraper:
                 'num': skin.get('num', 0)
             }
             
-            cache.skins.append(skin_data)
-            cache.skin_id_map[skin_id] = skin_data
-            cache.skin_name_map[english_skin_name] = skin_data
+            self.cache.skins.append(skin_data)
+            self.cache.skin_id_map[skin_id] = skin_data
+            self.cache.skin_name_map[english_skin_name] = skin_data
         
-        with self._cache_lock:
-            if generation != self._request_generation:
-                return self.cache.is_loaded_for_champion(champion_id)
-            self.cache = cache
-
-        log.info(f"[LCU-SCRAPER] Scraped {len(cache.skins)} skins for {cache.champion_name} (ID: {champion_id})")
+        log.info(f"[LCU-SCRAPER] Scraped {len(self.cache.skins)} skins for {self.cache.champion_name} (ID: {champion_id})")
         
         # Log first few skins for debugging
-        if cache.skins:
+        if self.cache.skins:
             log.debug(f"[LCU-SCRAPER] Sample skins:")
-            for skin in cache.skins[:3]:
+            for skin in self.cache.skins[:3]:
                 log.debug(f"  - {skin['skinName']} (ID: {skin['skinId']})")
         
         return True
@@ -160,8 +148,7 @@ class LCUSkinScraper:
         Returns:
             Tuple of (skinId, skinName, similarity_score) if found, None otherwise
         """
-        cache = self.cache
-        if not text or not cache.skins:
+        if not text or not self.cache.skins:
             return None
 
         from utils.core.normalization import levenshtein_distance
@@ -182,7 +169,7 @@ class LCUSkinScraper:
 
         # Try exact match first (both candidates)
         for candidate in candidates:
-            exact_match = cache.get_skin_by_name(candidate)
+            exact_match = self.cache.get_skin_by_name(candidate)
             if exact_match:
                 return (exact_match['skinId'], exact_match['skinName'], 1.0)
 
@@ -194,7 +181,7 @@ class LCUSkinScraper:
         best_distance = float('inf')
         best_similarity = 0.0
 
-        for skin in cache.skins:
+        for skin in self.cache.skins:
             skin_name = skin['skinName']
 
             for candidate in candidates:

@@ -358,8 +358,14 @@ function getClientLocale() {
 }
 function getThemeLocale() {
   const selectedLang = ParasiteData$1.get("Theme-language", "client");
-  void selectedLang;  // Parasite is Turkish only, whatever is saved or the client speaks
-  return "tr-TR";
+  if (selectedLang && selectedLang !== "client")
+    return selectedLang;
+  const parasiteLanguage = window.ParasiteI18n && window.ParasiteI18n.language;
+  if (parasiteLanguage) {
+    const locales = { tr: "tr-TR", ru: "ru-RU", vi: "vi-VN", zh: "zh-CN" };
+    return locales[parasiteLanguage.slice(0, 2)] || "default";
+  }
+  return getClientLocale();
 }
 async function haveLocaleFile(langCode) {
   try {
@@ -2779,7 +2785,12 @@ const setWindowEffectsSettingsVisibility = windowEffects.setSettingsVisibility;
 
 async function infoSection() {
   const themeLanguageOptions = [
-    { label: "Türkçe", value: "tr-TR" }  // Parasite is Turkish only
+    { label: await getString("theme-settings.theme-language-client"), value: "client" },
+    { label: "English", value: "default" },
+    { label: "Tiếng Việt", value: "vi-VN" },
+    { label: "Русский", value: "ru-RU" },
+    { label: "中文", value: "zh-CN" },
+    { label: "Türkçe", value: "tr-TR" }
   ];
   return [
     UI.createRow("Info", [
@@ -4851,7 +4862,7 @@ window.addEventListener("load", async () => {
     }
   }, 500);
 });
-// Parasite's own texts in the panel, in Turkish whatever the client's language (Parasite is Turkish only)
+// Turkish for Parasite's own texts in the panel; other languages go through PARASITE-I18n
 const PARASITE_TR = {
   "CUSTOMIZE": "ÖZELLEŞTİR",
   "Status": "Durum",
@@ -4934,7 +4945,7 @@ const PARASITE_TR = {
 };
 function parasiteTr(text, vars) {
   const i18n = window.ParasiteI18n;
-  let out = PARASITE_TR[text] ? PARASITE_TR[text] : i18n ? i18n.t(text) : text;
+  let out = i18n && i18n.language === "tr" && PARASITE_TR[text] ? PARASITE_TR[text] : i18n ? i18n.t(text) : text;
   if (vars) out = out.replace(/\{(\w+)\}/g, (match, key) => (key in vars ? String(vars[key]) : match));
   return out;
 }
@@ -5566,7 +5577,8 @@ async function newsCard(view) {
   } catch {}
   if (!news || !news.version || seen === news.version)
     return;
-  const items = news.tr || news.en || [];  // Parasite is Turkish only
+  const language = window.ParasiteI18n && window.ParasiteI18n.language === "tr" ? "tr" : "en";
+  const items = news[language] || news.en || [];
   const card = document.createElement("div");
   card.className = "parasite-news";
   const title = document.createElement("div");

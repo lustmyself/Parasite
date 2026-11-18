@@ -1,11 +1,12 @@
 # Working on Parasite
 
-> Parasite is Lust (`lustmyself/Lust`) renamed and moved to Rose (now 1.5.7). Rose's own skin injection
-> (LTK Manager, LTF bridge) is kept as is. core.dll reads `%LOCALAPPDATA%\Parasite\cf.ini`
+> Parasite is Lust (`lustmyself/Lust`) renamed and moved to Rose 1.5.3. Rose's own skin injection
+> (LTK Manager, LTF bridge) is kept as is: Lust's LTK patcher edits are listed in
+> `SKIPPED_EDIT_MARKERS` in `parasite/sync.py`. core.dll reads `%LOCALAPPDATA%\Parasite\cf.ini`
 > ("Parasite" is longer than "Rose", see `patch_core_dll`), so Parasite's settings file is `cf.ini`.
 
 Parasite is a rebrand of [Rose](https://github.com/Alban1911/Rose) (League of Legends skin changer) with its own
-features: the desktop hub, Parasite Offline, custom skins, skin sharing, the PARASITE client theme, Spotify, settings.
+features: the desktop hub, Parasite Offline, custom skins, the PARASITE client theme, Spotify, settings.
 Repo: `lustmyself/Parasite`. The owner writes in Turkish: answer in Turkish, keep it short, work
 autonomously, and show a preview (screenshot) before publishing UI changes.
 
@@ -16,20 +17,14 @@ Editing those files directly is lost on the next sync.
 
 - `parasite/overlay/` — Parasite's own files, copied over Rose's tree (including this file).
 - `parasite/sync.py` — `EDITS` (exact text replacements in Rose's files), `REMOVE` (Rose paths Parasite drops),
-  core.dll byte patches (same length only). Sync starts from a fresh Rose extract every time, so every `old`
-  must match exactly once, or sync fails.
-- `parasite/turkish.py` — Parasite is Turkish only (no English to choose): `TURKISH` replaces the English texts
-  players see in Rose's files (dialogs, tray, installer, Pengu Loader's window), `LOCALE_TR` fills Rose's tr.json.
-  Every new text players see is Turkish; logs, code and developer-only text stay English.
+  core.dll byte patches (same length only). Every `old` must match exactly once.
 - `parasite/theme/build_theme.py` — builds the PARASITE client theme from Elaina (MIT); theme changes are `PATCHES` there.
 - `parasite/offline/build_offline.py` — builds Parasite Offline (`ParasiteOffline.exe`) from Deceive (GPL-3.0).
-- `parasite/relay/` — Parasite's party relay (Cloudflare Worker) for skin sharing; it serves Rose 1.5.7's party
-  protocol 2 next to protocol 1 (Lust, Parasite ≤ 2.10). See `parasite/relay/README.md` before deploying.
 
 ## Every change
 
 ```bash
-python parasite/sync.py refs/rose/1.5.7      # rebuild the tree (fetch the tag first, see below)
+python parasite/sync.py refs/rose/1.5.3      # rebuild the tree (fetch the tag first, see below)
 git restore assets/icon.ico               # sync rewrites it; keep Parasite's
 ```
 
@@ -46,16 +41,14 @@ python -m ruff check . --select E9,F63,F7,F82
 2. Add the release's lines at the top of `parasite/overlay/Pengu Loader/plugins/PARASITE-News/whats-new.json`
    (`version`, `en`, `tr`).
 3. Sync, commit, push, then `gh workflow run "Follow Rose releases" -R lustmyself/Parasite`
-   (always pass `-R lustmyself/Parasite`; `upstream` is Rose). CI builds and publishes `v2.N` with `SHA256SUMS`.
+   (always pass `-R lustmyself/Parasite`; `upstream` is Rose). CI builds and publishes `v2.N`.
 4. Installed copies update themselves: silently while League is closed (`launcher/parasite_autoupdate.py`).
-   They install only a package whose SHA-256 GitHub publishes (asset digest, else `SHA256SUMS`;
-   `launcher/parasite_integrity.py`), from an admin-only folder.
    The update script that runs is the *old* version's, so an update-script fix helps from the next release on.
 
 ## A fresh machine
 
 - Python 3.12+ (`pip install -r requirements.txt`), Node (for `node --check` on plugin JS), `gh auth login`.
-- Rose's tag: `git fetch --no-tags https://github.com/Alban1911/Rose.git "refs/tags/1.5.7:refs/rose/1.5.7"`.
+- Rose's tag: `git fetch --no-tags https://github.com/Alban1911/Rose.git "refs/tags/1.5.3:refs/rose/1.5.3"`.
 - `party/network/relay_config.py` (gitignored) must exist: `RELAY_URL = ""`.
 - Theme sources (only to rebuild the theme), as `.github/workflows/builds-check.yml` does:
   `ElainaV4.zip` from the Elaina69/Elaina-theme release in `parasite/elaina_version.txt`, and
@@ -63,8 +56,7 @@ python -m ruff check . --select E9,F63,F7,F82
   `python parasite/theme/build_theme.py ElainaV4.zip data.tgz` and
   `git restore "parasite/overlay/Pengu Loader/plugins/PARASITE-Theme/assets/icon/mouse-cursor.png"`.
 - Parasite Offline: Deceive at the tag in `parasite/deceive_version.txt`, `python parasite/offline/build_offline.py <Deceive>`
-  (needs the .NET SDK). The Windows build is the reference: `builds-check.yml` builds it on Windows and checks
-  that the committed exe is exactly that build (if not, commit the exe from the run's artifact).
+  (needs the .NET SDK).
 
 ## How Parasite is put together (Parasite's own parts)
 
@@ -74,15 +66,15 @@ python -m ruff check . --select E9,F63,F7,F82
 - `parasite_hero.py` (welcome card: Riot ID, rank, last match, LP cutoffs from replays.lol),
   `parasite_media.py` (Spotify now playing: winrt + pycaw; COM must be multithreaded), `parasite_spotify.py`
   (Spicetify themes), `parasite_settings.py` (Settings tab, `hub-settings.json`), `parasite_perf.py`
-  (performance mode during a match), `parasite_share.py` (skin sharing through the relay),
-  `parasite_autoupdate.py`, `parasite_integrity.py`, `parasite_cleanup.py`, `parasite_rose.py`, `parasite_offline.py`.
+  (performance mode during a match), `parasite_autoupdate.py`, `parasite_cleanup.py`, `parasite_rose.py`, `parasite_offline.py`.
 - Client side: `Pengu Loader/plugins/PARASITE-*` (PARASITE-Theme is generated by build_theme.py).
 
 ## Things that bit us
 
 - Write multi-line patches as Python scripts with the Write tool, not shell heredocs (backslashes and
   line continuations get mangled).
-- An `EDITS` entry with an empty replacement works, but prefer a short comment as the replacement.
+- An `EDITS` entry whose replacement is empty used to be skipped; `apply_edits` handles it now, but prefer
+  a short comment as the replacement.
 - `EDITS` run in order: an anchor added by an earlier entry is only there for later ones.
 - pywebview hands the page every public attribute of `js_api`: keep the window private (`_window`), or it
   reads WebView2 controls from the wrong thread and the window locks up.

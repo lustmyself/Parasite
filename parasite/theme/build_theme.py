@@ -211,7 +211,7 @@ html.parasite-profile-page #background-ambient {
 
 '''
 
-PARASITE_PANEL_JS = '''// Parasite's own texts in the panel, in Turkish whatever the client's language (Parasite is Turkish only)
+PARASITE_PANEL_JS = '''// Turkish for Parasite's own texts in the panel; other languages go through PARASITE-I18n
 const PARASITE_TR = {
   "CUSTOMIZE": "ÖZELLEŞTİR",
   "Status": "Durum",
@@ -294,7 +294,7 @@ const PARASITE_TR = {
 };
 function parasiteTr(text, vars) {
   const i18n = window.ParasiteI18n;
-  let out = PARASITE_TR[text] ? PARASITE_TR[text] : i18n ? i18n.t(text) : text;
+  let out = i18n && i18n.language === "tr" && PARASITE_TR[text] ? PARASITE_TR[text] : i18n ? i18n.t(text) : text;
   if (vars) out = out.replace(/\\{(\\w+)\\}/g, (match, key) => (key in vars ? String(vars[key]) : match));
   return out;
 }
@@ -926,7 +926,8 @@ async function newsCard(view) {
   } catch {}
   if (!news || !news.version || seen === news.version)
     return;
-  const items = news.tr || news.en || [];  // Parasite is Turkish only
+  const language = window.ParasiteI18n && window.ParasiteI18n.language === "tr" ? "tr" : "en";
+  const items = news[language] || news.en || [];
   const card = document.createElement("div");
   card.className = "parasite-news";
   const title = document.createElement("div");
@@ -1476,19 +1477,19 @@ PATCHES = [
      '      if (ElainaData.get("Custom-rank")) {\n        window.setTimeout(async () => {\n'
      '          customProfile.customRank();\n          window.customRank = customProfile.customRank;\n'
      '        }, 1e4);\n      }\n', ""),
-    # Turkish only (parasite/theme/locales/tr-TR.js), whatever is saved or the client speaks:
-    # the language list holds Türkçe alone.
-    ("index.js",
-     '    { label: await getString("theme-settings.theme-language-client"), value: "client" },\n'
-     '    { label: "English", value: "default" },\n'
-     '    { label: "Tiếng Việt", value: "vi-VN" },\n'
-     '    { label: "Русский", value: "ru-RU" },\n'
-     '    { label: "中文", value: "zh-CN" }\n  ];',
-     '    { label: "Türkçe", value: "tr-TR" }  // Parasite is Turkish only\n  ];'),
+    # Turkish (parasite/theme/locales/tr-TR.js), and "Follow client language" follows
+    # the language picked in Parasite's panel, which Parasite's own menus use too.
+    ("index.js", '    { label: "中文", value: "zh-CN" }\n  ];',
+     '    { label: "中文", value: "zh-CN" },\n    { label: "Türkçe", value: "tr-TR" }\n  ];'),
     ("index.js",
      '  if (selectedLang && selectedLang !== "client")\n    return selectedLang;\n  return getClientLocale();',
-     '  void selectedLang;  // Parasite is Turkish only, whatever is saved or the client speaks\n'
-     '  return "tr-TR";'),
+     '  if (selectedLang && selectedLang !== "client")\n    return selectedLang;\n'
+     '  const parasiteLanguage = window.ParasiteI18n && window.ParasiteI18n.language;\n'
+     '  if (parasiteLanguage) {\n'
+     '    const locales = { tr: "tr-TR", ru: "ru-RU", vi: "vi-VN", zh: "zh-CN" };\n'
+     '    return locales[parasiteLanguage.slice(0, 2)] || "default";\n'
+     '  }\n'
+     '  return getClientLocale();'),
     # Name colors come from the CUSTOMIZE tab now, League's own until a player picks one.
     ("index.js",
      '    if (ElainaData.get("change-nickname-color"))\n      addCss.customNicknameColor();',

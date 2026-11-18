@@ -45,22 +45,12 @@ def _storage():
 
 
 def _selected() -> Optional[str]:
-    """The saved choice, as the id the listing gives the mod: a choice saved under another of
-    its names (an older Parasite's folder, "<dir>/<name>") is the mod's identity now."""
     try:
         from utils.core.mod_historic import get_historic_mod
         value = get_historic_mod(HISTORIC_KEY)
-        value = value.replace("\\", "/") if isinstance(value, str) and value else None
+        return value.replace("\\", "/") if isinstance(value, str) and value else None
     except Exception:  # noqa: BLE001
         return None
-    if value:
-        try:
-            saved = _storage().saved_mod(value)
-            if saved is not None:
-                return saved.identity
-        except Exception:  # noqa: BLE001
-            pass
-    return value
 
 
 def _bundled() -> Path:
@@ -176,7 +166,7 @@ def delete(font_id: str) -> str:
 def import_file(path: Path, display_name: Optional[str] = None) -> str:
     """Add a font mod archive (.zip, .fantome, .modpkg) to the fonts folder."""
     storage = _storage()
-    mod_name = storage.import_category_mod_file(CATEGORY, path).name
+    _target, mod_name = storage.import_category_mod_file(CATEGORY, path)
     if display_name:
         try:
             storage.set_category_mod_display_name(CATEGORY, mod_name, display_name)

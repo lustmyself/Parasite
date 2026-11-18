@@ -15,7 +15,6 @@ Each file that lands is recorded right away (.skin_sync_state.json), so an
 interrupted sync resumes where it stopped instead of starting over. A file
 already on disk is trusted when it matches what was recorded for it (size and
 modification time); otherwise its blob SHA is computed once.
-Only a complete sync can retire files from the last completed library.
 
 Without a manifest, the repository tree is listed with one API call instead
 (files then come from main), unless GitHub's rate limit refuses it.
@@ -26,7 +25,6 @@ from __future__ import annotations
 import hashlib
 import json
 import os
-import re
 import threading
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -39,7 +37,6 @@ import requests
 
 from config import APP_USER_AGENT, SKIN_DOWNLOAD_STREAM_TIMEOUT_S
 from utils.core.atomic_file import atomic_write, write_text_atomic
-from utils.core.junction import is_junction
 from utils.core.logging import get_logger
 
 from . import github_rate_limit
@@ -163,40 +160,22 @@ class SkinSync:
         if not isinstance(data, dict) or data.get("version") != MANIFEST_VERSION:
             return None
         files: Dict[str, Tuple[str, int]] = {}
-        entries = data.get("files")
-        if not isinstance(entries, list):
-            return None
-        seen = set()
-        for entry in entries:
-            if not isinstance(entry, (list, tuple)) or len(entry) != 3:
+        for entry in data.get("files") or []:
+            try:
+                path, sha, size = entry
+                files[str(path)] = (str(sha), int(size))
+            except (TypeError, ValueError):
                 return None
-            path, sha, size = entry
-            if not isinstance(path, str) or "\\" in path or ":" in path:
-                return None
-            parts = path.split("/")
-            if parts[0] not in SYNCED_FOLDERS:
-                continue  # a folder Parasite does not sync
-            if len(parts) < 2 or any(not part or part.endswith((".", " ")) for part in parts):
-                return None
-            key = os.path.normcase(path)
-            if (key in seen or not isinstance(sha, str) or not re.fullmatch(r"[0-9a-f]{40}", sha)
-                    or type(size) is not int or size < 0):
-                return None
-            seen.add(key)
-            files[path] = (sha, size)
         if not any(path.startswith("skins/") for path in files):
             return None  # an empty or broken listing must never empty the library
         commit = data.get("commit")
         return Manifest(commit=str(commit) if commit else None, files=files, etag=etag)
 
-    def _read_manifest_copy(self, etag: Optional[str]) -> Optional[Manifest]:
+    def _read_manifest_copy(self) -> Optional[Manifest]:
         try:
-            cached = json.loads(self.manifest_copy.read_text(encoding="utf-8"))
-            if isinstance(cached, dict) and etag and cached.get("etag") == etag:
-                return self._parse_manifest(cached.get("manifest"), etag)
+            return self._parse_manifest(json.loads(self.manifest_copy.read_text(encoding="utf-8")))
         except (OSError, ValueError):
-            pass
-        return None
+            return None
 
     def fetch_manifest(self, state: dict) -> Optional[Manifest]:
         """The manifest from raw.githubusercontent.com (an unchanged one is read
@@ -207,18 +186,17 @@ class SkinSync:
         try:
             response = self._session().get(MANIFEST_URL, headers=headers, timeout=30)
             if response.status_code == 304:
-                manifest = self._read_manifest_copy(state.get("manifest_etag"))
+                manifest = self._read_manifest_copy()
                 if manifest is not None:
+                    manifest.etag = state.get("manifest_etag")
                     log.info("[SKINS] The skin manifest is unchanged")
                     return manifest
                 response = self._session().get(MANIFEST_URL, timeout=30)
             if response.status_code == 200:
-                data = response.json()
-                manifest = self._parse_manifest(data, response.headers.get("ETag"))
+                manifest = self._parse_manifest(response.json(), response.headers.get("ETag"))
                 if manifest is not None:
                     try:
-                        cache = {"etag": manifest.etag, "manifest": data}
-                        write_text_atomic(self.manifest_copy, json.dumps(cache, separators=(",", ":")))
+                        write_text_atomic(self.manifest_copy, response.text)
                     except OSError as e:
                         log.debug(f"[SKINS] Could not keep a copy of the manifest: {e}")
                     log.info(
@@ -273,53 +251,20 @@ class SkinSync:
         self._last_progress = now
         self.progress(max(0.0, min(percent, 100.0)), message)
 
-    # -- what is on disk --------------------------------------------------------
-    def scan(self) -> Tuple[Dict[str, os.stat_result], List[str]]:
-        """The files under the synced folders (case-normalized path -> size and
-        times) and the folders that hold nothing.
-
-        One walk: a folder's listing gives the size and times of its files, so
-        no file is opened (looking each one up took 4s of every start, and
-        walking the folders again for the files to remove 4s more)."""
-        files: Dict[str, os.stat_result] = {}
-        empty: List[str] = []
-        folders = [str(root) for root in self.roots if root.is_dir()]
-        while folders:
-            folder = folders.pop()
-            try:
-                with os.scandir(folder) as entries:
-                    listing = list(entries)
-            except OSError:
-                continue
-            if not listing:
-                empty.append(folder)
-            for entry in listing:
-                try:
-                    if entry.is_dir(follow_symlinks=False):
-                        folders.append(entry.path)
-                    elif entry.is_file():
-                        files[os.path.normcase(entry.path)] = entry.stat()
-                except OSError:
-                    continue
-        return files, empty
-
     # -- what to download -------------------------------------------------------
-    def plan(self, manifest: Manifest, state: dict,
-             on_disk: Dict[str, os.stat_result]) -> Tuple[List[Tuple[str, Path, str, int]], List[str]]:
-        """The files to download: missing from *on_disk* (scan), of another
-        size, or whose content differs (hashed once when nothing was recorded
-        for them), plus entries that cannot be placed in the library."""
+    def plan(self, manifest: Manifest, state: dict) -> List[Tuple[str, Path, str, int]]:
+        """The files to download: missing, of another size, or whose content
+        differs (hashed once when nothing was recorded for them)."""
         known: Dict[str, list] = state["files"]
         todo: List[Tuple[str, Path, str, int]] = []
-        unresolved: List[str] = []
         to_hash: List[Tuple[str, Path, str, int, os.stat_result]] = []
         for path, (sha, size) in manifest.files.items():
             local = self.resolve(path)
             if local is None:
-                unresolved.append(path)
                 continue
-            stat = on_disk.get(os.path.normcase(str(local)))
-            if stat is None:
+            try:
+                stat = local.stat()
+            except OSError:
                 todo.append((path, local, sha, size))
                 continue
             record = known.get(path)
@@ -332,7 +277,7 @@ class SkinSync:
 
         total = len(to_hash)
         if not total:
-            return todo, unresolved
+            return todo
 
         def matches(local: Path, sha: str) -> bool:
             try:
@@ -353,7 +298,7 @@ class SkinSync:
                     todo.append((path, local, sha, size))
                 self._emit(5 + 10 * index / total, f"Verifying skin library... {index}/{total}")
         log.info(f"[SKINS] Verified {total} files already on disk in {time.monotonic() - started:.1f}s")
-        return todo, unresolved
+        return todo
 
     # -- downloads --------------------------------------------------------------
     def _urls(self, manifest: Manifest, path: str) -> List[str]:
@@ -452,93 +397,39 @@ class SkinSync:
         return result
 
     # -- files no longer in the library -----------------------------------------
-    def _completed_files(self, state: dict) -> Dict[str, str]:
-        completed = state.get("completed_files")
-        if isinstance(completed, dict):
-            return completed
-        # Older releases only recorded whether the last sync was complete.
-        # Their download cache is a usable baseline only in that case.
-        if state.get("complete") is not True:
-            return {}
-        return {
-            path: record[0] for path, record in state["files"].items()
-            if isinstance(record, list) and record and isinstance(record[0], str)
-        }
-
-    def _finish_sync(self, manifest: Manifest, state: dict, empty: List[str]) -> int:
-        """Retire previously synced, unmodified files after a complete sync,
-        then the folders of *empty* (scan) a killed sync left with nothing in them."""
-        expected = {os.path.normcase(path) for path in manifest.files}
-        completed = {path: sha for path, (sha, _) in manifest.files.items()}
-        removed = 0
-        # Files an incomplete sync downloaded are not in completed_files yet.
-        # Still only an unmodified file (same blob) is removed
-        candidates = {
-            path: record[0] for path, record in state["files"].items()
-            if isinstance(record, list) and record and isinstance(record[0], str)
-        }
-        candidates.update(self._completed_files(state))
-        for path, sha in candidates.items():
-            if os.path.normcase(os.path.normpath(path)) in expected:
-                continue
+    def remove_obsolete(self, manifest: Manifest, state: dict) -> int:
+        """Delete files under the synced folders that the manifest no longer lists."""
+        expected = set()
+        for path in manifest.files:
             local = self.resolve(path)
-            if local is None or is_junction(local) or local.is_symlink():
+            if local is not None:
+                expected.add(os.path.normcase(str(local)))
+        removed = 0
+        for root in self.roots:
+            if not root.is_dir():
                 continue
-            root = next((root for root in self.roots if root in local.parents), None)
-            if root is None:
-                continue
-            if any(is_junction(folder) or folder.is_symlink() for folder in local.parents if root in folder.parents):
-                continue
-            try:
-                if not local.is_file() or blob_sha(local) != sha:
+            for local in list(root.rglob("*")):
+                # Parasite's own state and temporary files start with a dot
+                if not local.is_file() or local.name.startswith("."):
                     continue
-                local.unlink()
-            except FileNotFoundError:
-                continue
-            except OSError as e:
-                # A locked file can be retired on the next complete sync.
-                completed[path] = sha
-                log.debug(f"[SKINS] Could not remove {local}: {e}")
-                continue
-            removed += 1
-            for folder in local.parents:
-                if folder == root:
-                    break
+                if os.path.normcase(str(local)) in expected:
+                    continue
                 try:
-                    folder.rmdir()
-                except OSError:
-                    break
-        roots = {os.path.normcase(str(root)) for root in self.roots}
-        for folder in empty:
-            # Up the tree while a folder goes: only an empty one does
-            while os.path.normcase(folder) not in roots:
+                    local.unlink()
+                    removed += 1
+                except OSError as e:
+                    log.debug(f"[SKINS] Could not remove {local}: {e}")
+            for folder in sorted((p for p in root.rglob("*") if p.is_dir()), key=lambda p: len(p.parts), reverse=True):
                 try:
-                    os.rmdir(folder)
+                    folder.rmdir()  # only empty ones
                 except OSError:
-                    break
-                folder = os.path.dirname(folder)
+                    pass
         known = state["files"]
         for path in [p for p in known if p not in manifest.files]:
             del known[path]
-        state["completed_files"] = completed
         if removed:
             log.info(f"[SKINS] Removed {removed} files no longer in the library")
         return removed
-
-    # -- temp files a killed sync left behind -----------------------------------
-    def _remove_stale_temps(self, on_disk: Dict[str, os.stat_result]) -> None:
-        """Delete atomic_write temp files (.<name>.<random>.tmp) from an interrupted sync.
-
-        A hard kill skips atomic_write's cleanup, and _finish_sync only retires
-        files a sync recorded, so a partial download would stay on disk forever.
-        The scan lists them (before this sync has downloaded anything).
-        """
-        for local in [path for path in on_disk if os.path.basename(path).startswith(".") and path.endswith(".tmp")]:
-            del on_disk[local]
-            try:
-                os.unlink(local)
-            except OSError as e:
-                log.debug(f"[SKINS] Could not remove stale temp file {local}: {e}")
 
     # -- all of it --------------------------------------------------------------
     def run(self) -> Optional[SyncResult]:
@@ -548,19 +439,11 @@ class SkinSync:
         manifest = self.fetch_manifest(state)
         if manifest is None:
             return None
-        state["completed_files"] = self._completed_files(state)
         self._emit(5, "Checking skin library...", force=True)
-        on_disk, empty = self.scan()
-        self._remove_stale_temps(on_disk)
-        todo, unresolved = self.plan(manifest, state, on_disk)
+        todo = self.plan(manifest, state)
         result = self.download(manifest, state, todo)
-        if unresolved:
-            result.pending.extend(unresolved)
-            result.failed += len(unresolved)
-            result.complete = False
-        if result.complete:
-            self._emit(95, "Cleaning up removed skins...", force=True)
-            result.removed = self._finish_sync(manifest, state, empty)
+        self._emit(95, "Cleaning up removed skins...", force=True)
+        result.removed = self.remove_obsolete(manifest, state)
         state["manifest_etag"] = manifest.etag if manifest.source == "manifest" else None
         state["commit"] = manifest.commit
         state["complete"] = result.complete

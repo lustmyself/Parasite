@@ -7,7 +7,6 @@ from unittest.mock import patch
 from injection.game import game_monitor
 from injection.game.game_monitor import make_game_ended_callback
 from injection.overlay import overlay_manager
-from injection.overlay.ltf_session import LtfSession
 from injection.overlay.overlay_manager import OverlayManager
 
 
@@ -24,17 +23,14 @@ class PatcherReconnectTests(unittest.TestCase):
         state = SimpleNamespace(phase='InProgress', stop=False)
         remaining = iter(phases)
         observed = []
-        session = {'ltf': LtfSession(None, parasite_started_manager=False), 'error': None, 'done': False}
-
-        def stop_the_loop_the_game_never_ended():
-            session['ltf'].ended = True
+        session = {'ended': False, 'error': None, 'done': False}
 
         def tick(_):
             observed.append(state.phase)
             try:
                 state.phase = next(remaining)
             except StopIteration:
-                stop_the_loop_the_game_never_ended()
+                session['ended'] = True  # never reached the end: stop the test's loop
 
         callback = make_game_ended_callback(state, clock=clock) if clock else make_game_ended_callback(state)
         with patch.object(overlay_manager.time, 'sleep', side_effect=tick), \
@@ -45,7 +41,7 @@ class PatcherReconnectTests(unittest.TestCase):
                 patch.object(overlay, '_stopped_by_parasite', return_value=False), \
                 patch.object(overlay, '_end_session') as end:
             code = overlay._run_session(session, callback)
-        ended_by_game = not session['ltf'].ended
+        ended_by_game = not session['ended']
         end.assert_called_once()
         return code, observed, ended_by_game
 

@@ -9,7 +9,7 @@ body:
       value: |
         Thanks for helping improve Parasite. Please search existing issues before reporting a new one.
 
-        Installation help and general questions are welcome here too.
+        For installation help or general questions, use the Parasite Discord linked on the issue chooser instead.
 
   - type: input
     id: parasite-version

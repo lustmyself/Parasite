@@ -103,7 +103,7 @@ namespace PenguLoader.Views
                     if (!Config.UseSymlink)
                     {
                         if (MessageBox.Show(Owner,
-                            "Çekirdek modül genel olarak etkinleştirilemedi. Yerel sembolik bağlantı modu kullanılsın mı?",
+                            "Failed to activate the core module globally, want to use symlink mode locally?",
                             Program.Name, MessageBoxButton.YesNo, MessageBoxImage.Warning) == MessageBoxResult.Yes)
                         {
                             Config.UseSymlink = true;
@@ -148,6 +148,11 @@ namespace PenguLoader.Views
             DataContext = this;
         }
 
+        private void DiscordButtonClick(object sender, RoutedEventArgs e)
+        {
+            Utils.OpenLink(Program.DiscordUrl);
+        }
+
         private void GitHubButtonClick(object sender, RoutedEventArgs e)
         {
             Utils.OpenLink(Program.GithubUrl);
@@ -155,13 +160,13 @@ namespace PenguLoader.Views
 
         private void HomePageButtonClick(object sender, RoutedEventArgs e)
         {
-            Utils.OpenLink(Program.GithubIssuesUrl);  // Report a problem
+            Utils.OpenLink(Program.HomepageUrl);
         }
 
         bool DoSelectLeaguePath()
         {
             var fbd = new Ookii.Dialogs.Wpf.VistaFolderBrowserDialog();
-            fbd.Description = "Riot Games, League of Legends ya da LeagueClient klasörünü seç.";
+            fbd.Description = "Select Riot Games, League of Legends or LeagueClient folder.";
             fbd.UseDescriptionForTitle = true;
 
             if (fbd.ShowDialog() == true && !string.IsNullOrWhiteSpace(fbd.SelectedPath))
@@ -175,7 +180,7 @@ namespace PenguLoader.Views
                 else if (LCU.IsValidDir(path = Path.Combine(selected, "Riot Games", "League of Legends"))) { }
                 else
                 {
-                    MessageBox.Show(Owner, "Seçtiğin klasör geçersiz: içinde \"LeagueClient.exe\" olduğundan emin ol.",
+                    MessageBox.Show(Owner, "Your selected folder is not valid, please make sure it contains \"LeagueClient.exe\".",
                         Program.Name, MessageBoxButton.OK, MessageBoxImage.Warning);
                     return false;
                 }

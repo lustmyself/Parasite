@@ -11,12 +11,9 @@ File: %LOCALAPPDATA%\\Parasite\\parasite_diagnostics.txt
 
 from __future__ import annotations
 
-import re
-import secrets
 import threading
 import time
-from datetime import datetime
-from typing import Any, Callable, Dict, NamedTuple, Optional
+from typing import Any, Callable, Dict, Optional
 
 from utils.core.logging import get_logger
 from utils.core.paths import get_user_data_dir
@@ -34,7 +31,6 @@ _ALLOWED_CODES = {
     'BASE_SKIN_FORCE_SLOW',   # Suggest increasing Injection Threshold
     'BASE_SKIN_VERIFY_FAILED',  # Base skin verification mismatch (often causes skin not to show)
     'LEAGUE_ELEVATED',        # The League client runs as administrator: LTK Manager's patcher can't reach it
-    'LAUNCHER_ELEVATED',      # Parasite's ltk_launcher.exe is set to run as administrator and Parasite could not undo it
     'LOW_DISK_SPACE',         # Injection could not install a mod with the available disk space
     'LTF_MISSING',            # Parasite's LTF bridge files (ltk_launcher.exe + LeagueToolFlop.dll) are missing
     'LTK_MANAGER_MISSING',    # LTK Manager, which Parasite drives through the bridge, is not installed
@@ -48,117 +44,6 @@ _ALLOWED_CODES = {
     'WINDOWS_ADMIN_SHELL',    # Windows runs every program as administrator: LTK Manager refuses to patch
 }
 
-# Reports about how the PC is set up, which Parasite checks again as it starts
-# (Pengu Loader's activation, the Windows account) or as League connects: an
-# earlier session's copy would only repeat or contradict this session's
-_SETUP_CODES = {
-    'LEAGUE_ELEVATED',
-    'PENGU_ACTIVATION_FAILED',
-    'PENGU_INJECTION_FAILED',
-    'WINDOWS_ADMIN_SHELL',
-}
-
-# Setup reports Parasite only checks again as LTK Manager starts (a champion
-# select, a mod added): an earlier session's copy is kept, and counts as this
-# session's, until that check removes it (resolve_issue) or reports it again.
-# Dropped at Parasite's start, the problem went unseen until a game's injection failed
-_UNTIL_RECHECKED = {
-    'LAUNCHER_ELEVATED',
-    'LTF_MISSING',
-    'LTK_ELEVATED',
-    'LTK_MANAGER_MISSING',
-}
-
-# An earlier session's other reports stay this long
-EARLIER_REPORTS_KEPT_S = 7 * 24 * 3600
-
-# When this Parasite started (start_session), shown in Troubleshooting
-SESSION_START = time.time()
-
-# Which run of Parasite wrote a report: its stamp carries it, so this session's
-# reports are told from earlier ones whatever the clock did between them
-# (a daylight saving change, a clock set right after a boot)
-SESSION_ID = secrets.token_hex(4)
-
-# "2026-11-08 14:02:31 [LTF_FAILED] #3f9a0c21": time, code and session. Reports
-# from before the session was stamped hold no "#..."; older ones hold
-# "Nov 08 14:02" (no year, no code)
-_STAMP_FORMAT = "%Y-%m-%d %H:%M:%S"
-_STAMP = re.compile(r"^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})(?: \[([A-Za-z0-9_]+)\])?(?: #([0-9a-f]+))?$")
-_OLD_STAMP = re.compile(r"^([A-Za-z]{3}) (\d{1,2}) (\d{1,2}):(\d{2})$")
-_MONTHS = ("jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec")
-
-
-class Stamp(NamedTuple):
-    """A report's stamp (parse_stamp)."""
-
-    when: Optional[float]
-    code: str
-    session: str
-
-
-def parse_stamp(stamp: str, now: Optional[float] = None) -> Stamp:
-    """The time, code and session of a report's stamp, the part before " | ".
-    The time is None when the stamp can't be read; the code is empty for older
-    reports, the session for reports from before stamps held it. An older
-    report has no year: it gets the latest one that is not in the future."""
-    stamp = (stamp or "").strip()
-    try:
-        m = _STAMP.match(stamp)
-        if m:
-            return Stamp(datetime.strptime(m.group(1), _STAMP_FORMAT).timestamp(), m.group(2) or "",
-                         m.group(3) or "")
-        m = _OLD_STAMP.match(stamp)
-        if m:
-            current = datetime.fromtimestamp(time.time() if now is None else now)
-            month = _MONTHS.index(m.group(1).lower()) + 1
-            day, hour, minute = int(m.group(2)), int(m.group(3)), int(m.group(4))
-            for year in (current.year, current.year - 1):
-                try:
-                    when = datetime(year, month, day, hour, minute)
-                except ValueError:  # Feb 29 of a year without it
-                    continue
-                if when <= current:
-                    return Stamp(when.timestamp(), "", "")
-    except Exception:
-        pass
-    return Stamp(None, "", "")
-
-
-def in_this_session(stamp: Stamp) -> bool:
-    """Whether a report (parse_stamp) is this session's: written by this run of
-    Parasite, or a setup problem LTK Manager's next start is still to check again
-    (_UNTIL_RECHECKED), which is the PC's until then."""
-    return stamp.session == SESSION_ID or stamp.code in _UNTIL_RECHECKED
-
-
-def start_session() -> None:
-    """Start a new session (its id stamps the reports from here on), and drop
-    the earlier sessions' setup reports Parasite checks again as it starts, and
-    their reports older than EARLIER_REPORTS_KEPT_S. Never raises."""
-    global SESSION_START, SESSION_ID
-    SESSION_START = time.time()
-    SESSION_ID = secrets.token_hex(4)
-    cutoff = SESSION_START - EARLIER_REPORTS_KEPT_S
-
-    def stale(line: str, fix: str) -> bool:
-        stamp = parse_stamp(line.split(" | ", 1)[0], SESSION_START)
-        if stamp.code in _UNTIL_RECHECKED:
-            return False
-        return stamp.code in _SETUP_CODES or (stamp.when is not None and stamp.when < cutoff)
-
-    remove_issues(stale)
-
-
-def resolve_issue(code: str, message: Optional[str] = None) -> None:
-    """Remove the reports of *code*, of any session: the problem it reports is
-    gone. *message*, part of the report's line, also finds one an older Parasite
-    wrote, whose stamp holds no code. Never raises."""
-    def resolved(line: str, fix: str) -> bool:
-        stamp = parse_stamp(line.split(" | ", 1)[0])
-        return stamp.code == code or (not stamp.code and message is not None and message in line)
-
-    remove_issues(resolved)
 
 
 def _issues_path():
@@ -197,15 +82,11 @@ def report_issue(
             return
         _LAST[key] = now
 
-        # One report of a setup problem kept across sessions: this one replaces it
-        if code in _UNTIL_RECHECKED:
-            resolve_issue(code)
-
         # Novice-friendly formatting:
-        #   2026-12-15 00:39:12 [LTF_FAILED] #3f9a0c21 | Something happened...
+        #   Dec 15 00:39 | Something happened...
         #   Fix: Do this...
-        stamp = f"{time.strftime(_STAMP_FORMAT, time.localtime(now))} [{code}] #{SESSION_ID}"
-        lines = [f"{stamp} | {message}".rstrip()]
+        ts_short = time.strftime("%b %d %H:%M", time.localtime(now))
+        lines = [f"{ts_short} | {message}".rstrip()]
         if hint:
             lines.append(f"Fix: {hint}".rstrip())
         line = "\n".join(lines) + "\n"
@@ -244,8 +125,7 @@ def read_issues_tail(*, max_lines: int = 60) -> list[str]:
 
 
 def remove_issues(should_remove: Callable[[str, str], bool]) -> bool:
-    """Remove the reports for which should_remove(message_line, fix_line) is
-    true, writing the file only when one goes (safe, never raises)."""
+    """Remove the reports for which should_remove(message_line, fix_line) is true (safe, never raises)."""
     try:
         with _LOCK:
             p = _issues_path()
@@ -253,7 +133,6 @@ def remove_issues(should_remove: Callable[[str, str], bool]) -> bool:
                 return True
             lines = p.read_text(encoding="utf-8", errors="ignore").splitlines()
             kept: list[str] = []
-            removed = False
             i = 0
             while i < len(lines):
                 line = lines[i]
@@ -262,15 +141,12 @@ def remove_issues(should_remove: Callable[[str, str], bool]) -> bool:
                 if " | " in line and i + 1 < len(lines) and lines[i + 1].startswith("Fix:"):
                     fix = lines[i + 1]
                     i += 1
-                if " | " in line and should_remove(line, fix):
-                    removed = True
-                else:
+                if not (" | " in line and should_remove(line, fix)):
                     kept.append(line)
                     if fix:
                         kept.append(fix)
                 i += 1
-            if removed:
-                p.write_text("\n".join(kept) + "\n" if kept else "", encoding="utf-8")
+            p.write_text("\n".join(kept) + "\n" if kept else "", encoding="utf-8")
         return True
     except Exception as e:
         log.debug("[ISSUES] Could not remove diagnostics entries: %s", e)

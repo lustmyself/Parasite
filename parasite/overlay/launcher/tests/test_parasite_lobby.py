@@ -1,5 +1,4 @@
 import unittest
-from unittest.mock import patch
 
 from launcher import parasite_lobby as lobby
 
@@ -13,7 +12,7 @@ class RankTests(unittest.TestCase):
     def test_solo_rank(self):
         stats = {"queueMap": {"RANKED_SOLO_5x5": {"tier": "DIAMOND", "division": "I", "leaguePoints": 73,
                                                   "wins": 6, "losses": 1}}}
-        self.assertEqual(lobby.parse_rank(stats), {"tier": "Elmas", "division": "I", "lp": 73, "wins": 6, "losses": 1})
+        self.assertEqual(lobby.parse_rank(stats), {"tier": "Diamond", "division": "I", "lp": 73, "wins": 6, "losses": 1})
 
     def test_apex_has_no_division(self):
         stats = {"queueMap": {"RANKED_SOLO_5x5": {"tier": "MASTER", "division": "NA", "leaguePoints": 536}}}
@@ -80,60 +79,6 @@ class TeamTests(unittest.TestCase):
         self.assertEqual(len(second), 1)
         self.assertEqual(second[0]["at"], 100)
         self.assertEqual(second[0]["players"][0]["championId"], 86)
-
-
-def _action(id_, cell, kind="pick", champion=0, completed=False):
-    return {"id": id_, "actorCellId": cell, "type": kind, "championId": champion, "completed": completed}
-
-
-def _draft(*actions, me=1, bans=None):
-    return {"localPlayerCellId": me, "myTeam": [{"cellId": me}], "actions": [list(actions)], "bans": bans or {}}
-
-
-class HoverTests(unittest.TestCase):
-    def test_hovers_on_your_next_pick_before_or_during_your_turn(self):
-        self.assertEqual(lobby.hover_action(_draft(_action(3, 1, "ban"), _action(7, 1)), 59), (7, ""))
-        # A teammate hovering it doesn't stop you; only locked-in picks and bans do
-        self.assertEqual(lobby.hover_action(_draft(_action(8, 2, champion=59), _action(9, 1)), 59), (9, ""))
-
-    def test_says_why_a_champion_cannot_be_hovered(self):
-        draft = _draft(_action(3, 2, "ban", 59, completed=True), _action(7, 1))
-        self.assertEqual(lobby.hover_action(draft, 59), (None, lobby.HOVER_TAKEN))
-        self.assertEqual(lobby.hover_action(draft, 64, {104}), (None, lobby.HOVER_UNAVAILABLE))
-        self.assertEqual(lobby.hover_action(draft, 104, {104}), (7, ""))
-        self.assertEqual(lobby.hover_action(_draft(_action(7, 1), bans={"theirTeamBans": [64]}), 64),
-                         (None, lobby.HOVER_TAKEN))
-        self.assertEqual(lobby.hover_action(_draft(_action(7, 1, champion=104, completed=True)), 59),
-                         (None, lobby.HOVER_LOCKED_IN))
-        self.assertEqual(lobby.hover_action(_draft(_action(8, 2)), 59), (None, lobby.HOVER_NO_PICK))
-
-    def test_hover_patches_the_pick_without_locking_it_in(self):
-        calls = []
-
-        def lcu(method, path, body=None):
-            calls.append((method, path, body))
-            if path == "/lol-champ-select/v1/session":
-                return _draft(_action(7, 1))
-            if path == "/lol-champ-select/v1/pickable-champion-ids":
-                return []
-            return {}
-        with patch("launcher.parasite_auto._lcu", side_effect=lcu):
-            message = lobby.hover(59, "Jarvan IV")
-        self.assertEqual(calls[-1], ("PATCH", "/lol-champ-select/v1/session/actions/7", {"championId": 59}))
-        self.assertIn("kilitlenmedi", message)
-        self.assertTrue(lobby.hover_state()["ok"])
-
-    def test_hover_outside_champ_select_or_refused(self):
-        with patch("launcher.parasite_auto._lcu", return_value=None):
-            self.assertEqual(lobby.hover(59, "Jarvan IV"), "Şampiyon seçiminde değilsin.")
-        state = lobby.hover_state()
-        self.assertEqual((state["id"], state["ok"]), (59, False))
-
-        def lcu(method, path, body=None):
-            return [104] if path.endswith("pickable-champion-ids") else _draft(_action(7, 1))
-        with patch("launcher.parasite_auto._lcu", side_effect=lcu):
-            self.assertEqual(lobby.hover(59, "Jarvan IV"), "Jarvan IV seçilemez: sende yok ya da banlı.")
-        self.assertEqual(lobby.hover("59"), "")
 
 
 if __name__ == "__main__":

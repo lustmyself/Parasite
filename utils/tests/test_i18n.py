@@ -92,26 +92,26 @@ class LoadStringsTests(unittest.TestCase):
     def test_english_needs_no_file(self):
         self.assertEqual(load_strings("en", self.directory), {})
 
-    def test_payload_is_turkish_whatever_the_client(self):
-        (self.directory / "tr.json").write_text(json.dumps({"Save": "Kaydet"}), encoding="utf-8")
+    def test_payload_follows_the_client(self):
+        (self.directory / "ar.json").write_text(json.dumps({"Save": "حفظ"}), encoding="utf-8")
         state = SimpleNamespace(current_locale="ar_AE")
         with patch("config.get_config_option", return_value=None), \
                 patch.object(i18n, "locales_dir", return_value=self.directory):
             payload = i18n_payload(state)
-        self.assertEqual(payload["language"], "tr")
-        self.assertEqual(payload["setting"], "tr")
-        self.assertEqual(payload["direction"], "ltr")
-        self.assertEqual(payload["strings"], {"Save": "Kaydet"})
-        self.assertEqual(payload["languages"], {"tr": LANGUAGES["tr"]})
+        self.assertEqual(payload["language"], "ar")
+        self.assertEqual(payload["setting"], "auto")
+        self.assertEqual(payload["direction"], "rtl")
+        self.assertEqual(payload["strings"], {"Save": "حفظ"})
+        self.assertEqual(payload["languages"], LANGUAGES)
 
-    def test_payload_is_turkish_whatever_the_settings_choice(self):
-        (self.directory / "tr.json").write_text(json.dumps({"Save": "Kaydet"}), encoding="utf-8")
+    def test_payload_uses_the_settings_choice(self):
+        (self.directory / "fr.json").write_text(json.dumps({"Save": "Enregistrer"}), encoding="utf-8")
         state = SimpleNamespace(current_locale="ko_KR")
         with patch("config.get_config_option", return_value="fr"), \
                 patch.object(i18n, "locales_dir", return_value=self.directory):
             payload = i18n_payload(state)
-        self.assertEqual(payload["language"], "tr")
-        self.assertEqual(payload["setting"], "tr")
+        self.assertEqual(payload["language"], "fr")
+        self.assertEqual(payload["setting"], "fr")
         self.assertEqual(payload["direction"], "ltr")
 
 

@@ -51,65 +51,24 @@ def _storage():
 
 
 def _selected() -> Optional[str]:
-    """The saved choice, as the id the listing gives the mod: a choice saved under another of
-    its names (an older Parasite's folder, "<dir>/<name>") is the mod's identity now."""
     try:
         from utils.core.mod_historic import get_historic_mod
         value = get_historic_mod("map")
-        value = value.replace("\\", "/") if isinstance(value, str) and value else None
+        return value.replace("\\", "/") if isinstance(value, str) and value else None
     except Exception:  # noqa: BLE001
         return None
-    if value:
-        try:
-            saved = _storage().saved_mod(value)
-            if saved is not None:
-                return saved.identity
-        except Exception:  # noqa: BLE001
-            pass
-    return value
 
 
-def _mod_path(storage, entry) -> Path:
-    """Where an installed map's mod is: an archive (Rose 1.5.6+ keeps mods as the archive they
-    came in), a folder (older Parasites), or nothing once LTK Manager holds it."""
-    return storage.mods_root / entry["path"]
-
-
-def _mod_files(path: Path) -> list:
-    """The relative paths of a mod's files, whether it is a folder or an archive."""
-    from injection.mods.mod_files import ModFiles
-    if not path.exists():
-        return []
-    with ModFiles(path) as mod:
-        return mod.files_under()
-
-
-def _preview_ref(storage, map_id: str) -> Optional[tuple]:
-    """(file, member) of an installed map's preview image: the image Rose keeps beside the
-    mod (member None), or one inside the mod (a folder's file, or an archive's member)."""
-    from injection.mods.mod_files import ModFiles
+def preview_path(storage, map_id: str) -> Optional[Path]:
+    """The preview image inside an installed map mod, when it has one."""
     for entry in storage.list_mods_for_category(CATEGORY):
         if entry.get("id") != map_id:
             continue
-        saved = storage.saved_mod(entry["id"])
-        for candidate in (saved.image_paths() if saved is not None else ()):
+        folder = storage.mods_root / entry["path"]
+        for name in PREVIEW_NAMES:
+            candidate = folder / name
             if candidate.is_file() and candidate.suffix.lower() in PREVIEW_TYPES:
-                return candidate, None
-        path = _mod_path(storage, entry)
-        try:
-            if path.is_dir():
-                for name in PREVIEW_NAMES:
-                    candidate = path / name
-                    if candidate.is_file() and candidate.suffix.lower() in PREVIEW_TYPES:
-                        return candidate, None
-            elif path.is_file():
-                with ModFiles(path) as mod:
-                    for name in PREVIEW_NAMES:
-                        if Path(name).suffix.lower() in PREVIEW_TYPES and mod.is_file(name):
-                            return path, name
-        except Exception as e:  # noqa: BLE001 - a broken mod just has no preview
-            log.debug(f"[Maps] No preview for {map_id}: {e}")
-        return None
+                return candidate
     return None
 
 
@@ -131,28 +90,23 @@ def _looks_like_font(paths) -> bool:
     return any(name.startswith(("bootstrap", "ui.")) for name in wads)
 
 
-def is_font_mod(path: Path) -> bool:
-    """A font mod that ended up among the maps (its archive, or an older Parasite's folder)."""
+def is_font_mod(folder: Path) -> bool:
+    """A font mod that ended up among the maps (its extracted folder)."""
     try:
-        return _looks_like_font(_mod_files(path))
-    except Exception:  # noqa: BLE001 - an unreadable mod is not moved
+        return _looks_like_font(p.relative_to(folder) for p in folder.rglob("*"))
+    except OSError:
         return False
 
 
 def _move_to_fonts(storage, entry) -> bool:
     """Hand a font mod found in the maps folder to the Fonts page, then drop it from the maps."""
-    path = _mod_path(storage, entry)
+    folder = storage.mods_root / entry["path"]
     name = entry.get("displayName") or entry["name"]
     work = Path(tempfile.mkdtemp(prefix="parasite-map-font-"))
     try:
-        if path.is_dir():
-            archive = Path(shutil.make_archive(str(work / entry["name"]), "zip", root_dir=str(path)))
-        else:
-            # The fonts folder takes it as a .zip, .fantome or .modpkg file of its own
-            archive = work / f"{entry['name']}{path.suffix or '.fantome'}"
-            shutil.copyfile(path, archive)
+        archive = shutil.make_archive(str(work / entry["name"]), "zip", root_dir=str(folder))
         from launcher import parasite_fonts
-        parasite_fonts.import_file(archive, display_name=name)
+        parasite_fonts.import_file(Path(archive), display_name=name)
     except Exception as e:  # noqa: BLE001
         log.warning(f"[Maps] Could not move font mod {entry['name']} to Fonts: {e}")
         return False
@@ -168,7 +122,7 @@ def _move_to_fonts(storage, entry) -> bool:
 def installed() -> list:
     storage = _storage()
     entries = storage.list_mods_for_category(CATEGORY)
-    misplaced = [e for e in entries if is_font_mod(_mod_path(storage, e))]
+    misplaced = [e for e in entries if is_font_mod(storage.mods_root / e["path"])]
     if misplaced:
         for entry in misplaced:
             _move_to_fonts(storage, entry)
@@ -181,7 +135,7 @@ def installed() -> list:
             "id": entry["id"],
             "name": entry.get("displayName") or entry["name"],
             "description": entry.get("description") or "",
-            "preview": _preview_ref(storage, entry["id"]) is not None,
+            "preview": preview_path(storage, entry["id"]) is not None,
             "selected": entry["id"] == chosen,
         })
     return maps
@@ -286,7 +240,7 @@ def delete(map_id: str) -> str:
 def import_file(path: Path, display_name: Optional[str] = None) -> str:
     """Add a map mod archive (.zip, .fantome, .modpkg) to the maps folder."""
     storage = _storage()
-    mod_name = storage.import_category_mod_file(CATEGORY, path).name
+    _target, mod_name = storage.import_category_mod_file(CATEGORY, path)
     if display_name:
         try:
             storage.set_category_mod_display_name(CATEGORY, mod_name, display_name)
@@ -299,7 +253,8 @@ def import_file(path: Path, display_name: Optional[str] = None) -> str:
 def _archive_is_font(path: Path) -> bool:
     """A dropped archive that is a font mod (it goes to the Fonts page instead)."""
     try:
-        return _looks_like_font(_mod_files(path))
+        from utils.core.safe_extract import list_mod_archive
+        return _looks_like_font(list_mod_archive(path))
     except Exception:  # noqa: BLE001
         return False
 
@@ -376,17 +331,12 @@ def install(catalog_id: str) -> str:
 
 def preview_bytes(map_id: str) -> Optional[tuple]:
     """(bytes, content type) of an installed map's preview."""
-    ref = _preview_ref(_storage(), map_id)
-    if ref is None:
+    path = preview_path(_storage(), map_id)
+    if path is None:
         return None
-    path, member = ref
     try:
-        if member is None:
-            return path.read_bytes(), PREVIEW_TYPES[path.suffix.lower()]
-        from injection.mods.mod_files import ModFiles
-        with ModFiles(path) as mod:
-            return mod.read(member), PREVIEW_TYPES[Path(member).suffix.lower()]
-    except Exception:  # noqa: BLE001
+        return path.read_bytes(), PREVIEW_TYPES[path.suffix.lower()]
+    except OSError:
         return None
 
 

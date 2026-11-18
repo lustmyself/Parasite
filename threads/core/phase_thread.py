@@ -73,34 +73,21 @@ class PhaseThread(threading.Thread):
                 if ph in ("None", "Lobby", "EndOfGame"):
                     from utils.integration import pengu_loader
                     pengu_loader.retry_deferred_restart()
-                if ph == "None":
-                    # The home screen never reaches the phase handler (an
-                    # unknown phase is skipped below): start the base-skin fix
-                    # of the stored skins from here. The shared phase is the
-                    # home screen's already, or the pass stops on the last one
-                    self.state.phase = None
-                    try:
-                        from injection.baseskin.library import on_phase as fix_stored_skins_when_idle
-                        fix_stored_skins_when_idle(ph, self.injection_manager, self.state)
-                    except Exception as e:  # noqa: BLE001 - phase handling goes on
-                        log.warning(f"[phase] Could not start checking the stored skins against the base skin: {e}")
 
             if ph == "None":
                 ph = None
             
             # If phase is unknown (None), skip handling.
-            # Use a grace period to avoid wiping the phase and Swiftplay state on
-            # transient API hiccups (the LCU can briefly return None during
-            # transitions): one missed poll in the countdown would end the
-            # loadout ticker and the match would get no skin
+            # Use a grace period to avoid wiping Swiftplay state on transient
+            # API hiccups (the LCU can briefly return None during transitions).
             if ph is None:
+                from threads.handlers.champ_select_reset import note_phase_for_reset
+                note_phase_for_reset(self.state, None)
+                self.state.phase = None
                 self._null_phase_streak += 1
 
                 # Only clean up after several consecutive None polls (~1.5-2.5 s)
                 if self._null_phase_streak >= 3:
-                    from threads.handlers.champ_select_reset import note_phase_for_reset
-                    note_phase_for_reset(self.state, None)
-                    self.state.phase = None
                     if self.state.is_swiftplay_mode:
                         # Swiftplay flag is still set but LCU returned None for
                         # several polls — the session is gone.  Full cleanup.

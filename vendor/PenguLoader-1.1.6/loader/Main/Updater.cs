@@ -88,7 +88,7 @@ namespace PenguLoader.Main
 
                 while (Module.IsLoaded)
                 {
-                    MessageBox.Show("Güncellemeyi uygulamak için League of Legends istemcisini kapat.",
+                    MessageBox.Show("Please close your League of Legends Client to apply update.",
                         Program.Name, MessageBoxButton.OK, MessageBoxImage.Information);
                 }
 
@@ -101,7 +101,7 @@ namespace PenguLoader.Main
 
                 MainWindow.Instance.Show();
                 MessageBox.Show(MainWindow.Instance,
-                    "Güncelleme indirilemedi. Güncellemeyi GitHub'daki sürümler sayfasından indirmeyi dene.",
+                    "Failed to download update. Please try downloading the update on GitHub releases page.",
                     Program.Name, MessageBoxButton.OK, MessageBoxImage.Warning);
 
                 Utils.OpenLink(DownloadUrl);
@@ -154,7 +154,7 @@ namespace PenguLoader.Main
             catch (Exception ex)
             {
                 MessageBox.Show(MainWindow.Instance,
-                    "Güncelleme kontrol edilemedi.\n" + ex.Message,
+                    "Failed to check update.\n" + ex.Message,
                     Program.Name, MessageBoxButton.OK, MessageBoxImage.Warning);
                 return null;
             }
