@@ -246,8 +246,10 @@ def listing() -> dict:
     """What the hub's Map page shows."""
     maps = installed()
     names = {m["name"].casefold() for m in maps}
+    from launcher import parasite_default_rift
+    built = [parasite_default_rift.catalog_item()]
     items = [dict(item, installed=item["name"].casefold() in names, installing=item["id"] in _installing)
-             for item in catalog()]
+             for item in built + catalog()]
     for item in items:
         item.pop("url", None), item.pop("sha256", None), item.pop("file", None)
     return {"installed": maps, "catalog": items, "selected": _selected()}
@@ -335,8 +337,25 @@ def import_upload(name: str, stream, length: int) -> str:
         shutil.rmtree(work, ignore_errors=True)
 
 
+def _build_default_rift() -> str:
+    """The default Summoner's Rift, built from the player's game (parasite_default_rift)."""
+    from launcher import parasite_default_rift
+    key = parasite_default_rift.CATALOG_ID
+    with _lock:
+        if key in _installing:
+            return ""
+        _installing.add(key)
+    try:
+        return parasite_default_rift.install()
+    finally:
+        with _lock:
+            _installing.discard(key)
+
+
 def install(catalog_id: str) -> str:
     """Download a catalog map, check its SHA-256 and add it."""
+    if catalog_id == "default-rift":
+        return _build_default_rift()
     item = next((i for i in catalog() if i["id"] == catalog_id), None)
     if item is None:
         return "Bu harita katalogda yok"

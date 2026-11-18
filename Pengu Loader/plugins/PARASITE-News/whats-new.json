@@ -1,13 +1,11 @@
 {
-  "version": "2.13",
+  "version": "2.14",
   "en": [
-    "Built on Rose 1.5.9",
-    "Custom skins are matched to the base skin the way RoseBin now builds them, sounds included",
-    "A custom skin an older Parasite prepared asks, in Troubleshooting, to be added again"
+    "Maps: \"Varsayılan Sihirdar Vadisi\" builds the default Summoner's Rift from your own game, in place of a seasonal map like Winter Rift",
+    "An update no longer restarts Parasite again and again while Parasite Offline runs: it waits until League is closed"
   ],
   "tr": [
-    "Rose 1.5.9 üzerine kuruldu",
-    "Özel skinler artık RoseBin'in yeni yöntemiyle, sesleriyle birlikte varsayılan skine uyarlanıyor",
-    "Eski bir Parasite'ın hazırladığı özel skin, Sorun giderme'de yeniden eklenmesini istiyor"
+    "Haritalar: \"Varsayılan Sihirdar Vadisi\", Kış Vadisi gibi sezonluk haritanın yerine varsayılan haritayı senin oyununun dosyalarından kurar",
+    "Parasite Offline açıkken güncelleme artık Parasite'ı tekrar tekrar yeniden başlatmıyor: League kapanana kadar bekliyor"
   ]
 }
