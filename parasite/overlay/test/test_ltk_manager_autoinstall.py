@@ -22,7 +22,8 @@ class LtkManagerAutoInstallTests(unittest.TestCase):
             (self.tools / name).write_bytes(b"x")
         self.exe = self.tools / "ltk-manager.exe"
         for patcher in (
-            patch.object(parasite_main, "_get_tools_dir", return_value=self.tools),
+            # Rose 1.5.6+ reads it from utils.core.paths when the check runs
+            patch("utils.core.paths.get_tools_dir", return_value=self.tools),
             patch.object(ToolsManager, "detect_ltk_manager", return_value=None),
             # Never this PC's own cf.ini
             patch("config.set_config_option"),
@@ -73,6 +74,41 @@ class InstallerSourceTests(unittest.TestCase):
         with patch.object(ltk_manager_install.sys, "platform", "linux"):
             self.assertIsNone(ltk_manager_install.install_ltk_manager(lambda: None))
             self.assertIsNone(ltk_manager_install.registered_ltk_manager())
+
+
+class SignatureTests(unittest.TestCase):
+    """The installer runs as administrator: its signature must be valid and LTK Manager's own"""
+
+    def check(self, stdout):
+        from unittest.mock import MagicMock
+        result = MagicMock(stdout=stdout, stderr="")
+        with patch.object(ltk_manager_install.subprocess, "run", return_value=result) as run:
+            valid = ltk_manager_install.signature_is_valid(Path("setup.exe"))
+        return valid, run.call_args[0][0]
+
+    def test_ltk_managers_signer_is_accepted(self):
+        self.assertTrue(self.check("Valid\r\nCN=Natoken LLC, O=Natoken LLC, L=Austin, S=Texas, C=US\r\n")[0])
+
+    def test_a_valid_signature_from_anybody_else_is_refused(self):
+        for subject in ("CN=Evil Corp, O=Evil Corp, C=US", "CN=Natoken LLC, O=Someone Else", "",
+                        'CN="Natoken LLC, O=Natoken LLC", O=Evil'):
+            with self.subTest(subject=subject):
+                self.assertFalse(self.check(f"Valid\n{subject}\n")[0])
+
+    def test_an_invalid_signature_is_refused(self):
+        for status in ("NotSigned", "HashMismatch", "UnknownError", ""):
+            with self.subTest(status=status):
+                self.assertFalse(self.check(f"{status}\nCN=Natoken LLC, O=Natoken LLC\n")[0])
+
+    def test_powershell_is_run_by_its_full_path(self):
+        _, command = self.check("Valid\nCN=Natoken LLC, O=Natoken LLC\n")
+        self.assertTrue(Path(command[0]).is_absolute() or command[0].startswith("C:\\"))
+        self.assertTrue(command[0].replace("/", "\\").lower().endswith(
+            "\\system32\\windowspowershell\\v1.0\\powershell.exe"))
+
+    def test_powershell_ignores_a_systemroot_set_by_the_user(self):
+        with patch.dict("os.environ", {"SystemRoot": r"C:\Users\me\fake", "windir": r"C:\Users\me\fake"}):
+            self.assertNotIn("fake", ltk_manager_install.powershell_exe())
 
 
 if __name__ == "__main__":

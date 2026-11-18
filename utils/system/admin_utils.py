@@ -231,10 +231,10 @@ def show_message_box_threaded(message: str, title: str, flags: int = 0x40):
 def show_admin_required_dialog():
     """Show a dialog box explaining that admin rights are required"""
     show_message_box_threaded(
-        "Parasite requires Administrator privileges to function properly.\n\n"
-        "The application will now request elevation.\n\n"
-        "Click 'Yes' on the UAC prompt to continue.",
-        "Administrator Rights Required",
+        "Parasite'ın düzgün çalışması için yönetici izni gerekiyor.\n\n"
+        "Şimdi yönetici izni istenecek.\n\n"
+        "Devam etmek için Windows'un sorusunda 'Evet'e tıkla.",
+        "Yönetici izni gerekiyor",
         0x30  # MB_ICONWARNING
     )
 
@@ -242,8 +242,8 @@ def show_admin_required_dialog():
 def show_autostart_success_dialog():
     """Show a dialog box confirming auto-start registration"""
     show_message_box_threaded(
-        "Parasite will now start automatically when turn on your computer.",
-        "Auto-Start Enabled",
+        "Parasite artık bilgisayarını açınca kendiliğinden başlayacak.",
+        "Windows ile başlatma açık",
         0x40  # MB_ICONINFORMATION
     )
 
@@ -251,10 +251,9 @@ def show_autostart_success_dialog():
 def show_autostart_removed_dialog():
     """Show a dialog box confirming auto-start removal"""
     show_message_box_threaded(
-        "Parasite has been removed from auto-start.\n\n"
-        "The application will no longer start automatically with Windows.\n\n"
-        "You can re-enable auto-start from the settings menu.",
-        "Auto-Start Removed",
+        "Parasite artık Windows ile başlamayacak.\n\n"
+        "Bunu ayarlardan yeniden açabilirsin.",
+        "Windows ile başlatma kapalı",
         0x40  # MB_ICONINFORMATION
     )
 

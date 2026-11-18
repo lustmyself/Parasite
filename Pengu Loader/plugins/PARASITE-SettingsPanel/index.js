@@ -6,8 +6,6 @@
  */
 (function initSettingsPanel() {
   const LOG_PREFIX = "[Parasite-SettingsPanel]";
-  const DISCORD_INVITE_URL = "https://discord.com/invite/roseskins";
-  const KOFI_URL = "https://ko-fi.com/roseapp";
   const GITHUB_URL = "https://github.com/lustmyself/Parasite";
 
   const PANEL_ID = "parasite-settings-panel";
@@ -1592,7 +1590,7 @@
     }
     updateSettingsForm();
     // Badge count should reflect what's actually in diagnostics (and not change while dragging sliders).
-    const localCount = Array.isArray(diagnosticsState.errors) ? diagnosticsState.errors.length : 0;
+    const localCount = currentSessionErrors().length;
     if (localCount > 0) {
       updateErrorBadges(true, localCount);
     } else {
@@ -1600,14 +1598,14 @@
     }
     // If backend reports errors but we don't have the list yet, fetch it once so we can
     // show per-category guidance and clear it after Save (not while dragging).
-    if (payload.hasErrors && (!Array.isArray(diagnosticsState.errors) || diagnosticsState.errors.length === 0)) {
+    if (payload.hasErrors && localCount === 0) {
       requestDiagnostics();
     }
     log("info", "Settings data received", currentSettings);
   }
 
   let diagnosticsDialog = null;
-  let diagnosticsState = { errors: [], path: "", settingsSnapshot: null, baseSkinStats: null };
+  let diagnosticsState = { errors: [], path: "", settingsSnapshot: null, baseSkinStats: null, sessionStart: null };
   let errorBadgeState = { hasErrors: false, count: 0 };
   let _badgeObserverStarted = false;
   let _pendingSave = null;
@@ -1616,6 +1614,12 @@
 
   function _clamp(n, min, max) {
     return Math.max(min, Math.min(max, n));
+  }
+
+  // Errors from this run of Parasite: an earlier session's don't light up Troubleshooting
+  function currentSessionErrors() {
+    const errors = Array.isArray(diagnosticsState.errors) ? diagnosticsState.errors : [];
+    return errors.filter((e) => e?.thisSession !== false);
   }
 
   function _diagnosticsCategory(e) {
@@ -1726,8 +1730,10 @@
       path: payload.path || "",
       settingsSnapshot: snapshot,
       baseSkinStats: payload.baseSkinStats || null,
+      sessionStart: typeof payload.sessionStart === "number" ? payload.sessionStart : null,
     };
-    updateErrorBadges(diagnosticsState.errors.length > 0, diagnosticsState.errors.length);
+    const current = currentSessionErrors();
+    updateErrorBadges(current.length > 0, current.length);
     renderDiagnosticsDialog();
     renderThresholdBenchmark();
   }
@@ -2086,6 +2092,23 @@
     document.querySelectorAll(".parasite-language-menu").forEach((menu) => menu.remove());
   }
 
+  // The (i) icon whose tooltip is shown. One listener pair for every panel
+  // opened: the flyout is rebuilt on each open and its icons go with it.
+  let _tooltipOwner = null;
+  function repositionSettingsTooltip() {
+    if (!_tooltipOwner) return;
+    const tt = document.getElementById("parasite-global-tooltip");
+    if (!tt || tt.getAttribute("data-show") !== "true") return;
+    if (!_tooltipOwner.btn.isConnected) {
+      _tooltipOwner = null;
+      return;
+    }
+    _tooltipOwner.reposition();
+  }
+  // Keep tooltip in correct position while resizing/scrolling
+  window.addEventListener("resize", repositionSettingsTooltip);
+  window.addEventListener("scroll", repositionSettingsTooltip, true);
+
   function createSettingsFlyout(navItem) {
     closeLanguageMenu();
     // Remove existing panel if any
@@ -2213,6 +2236,7 @@
     }
 
     function hideGlobalTooltip() {
+      _tooltipOwner = null;
       const el = document.getElementById("parasite-global-tooltip");
       if (!el) return;
       el.setAttribute("data-show", "false");
@@ -2264,22 +2288,17 @@
         e.stopPropagation();
       });
 
-      const show = () => showGlobalTooltipFor(btn, tooltipText);
+      const reposition = () => showGlobalTooltipFor(btn, tooltipText);
+      const show = () => {
+        _tooltipOwner = { btn, reposition };
+        reposition();
+      };
       const hide = () => hideGlobalTooltip();
 
       btn.addEventListener("mouseenter", show);
       btn.addEventListener("mouseleave", hide);
       btn.addEventListener("focus", show);
       btn.addEventListener("blur", hide);
-
-      // Keep tooltip in correct position while resizing/scrolling
-      const reposition = () => {
-        const tt = document.getElementById("parasite-global-tooltip");
-        if (!tt || tt.getAttribute("data-show") !== "true") return;
-        showGlobalTooltipFor(btn, tooltipText);
-      };
-      window.addEventListener("resize", reposition);
-      window.addEventListener("scroll", reposition, true);
 
       wrapper.appendChild(btn);
       return wrapper;
@@ -2320,7 +2339,7 @@
       versionBadge.style.fontWeight = "normal";
       versionBadge.style.whiteSpace = "nowrap";
       title.appendChild(versionBadge);
-      titleRow.appendChild(createLanguagePicker());
+      // Parasite is Turkish only: no language picker
     }
 
     form.appendChild(titleRow);
@@ -4198,6 +4217,14 @@
     nameEl.style.whiteSpace = "nowrap";
     infoWrapper.appendChild(nameEl);
 
+    if (mod.missing) {
+      nameEl.style.opacity = "0.6";
+      const missingEl = document.createElement("div");
+      missingEl.textContent = t("Missing - add it again");
+      missingEl.style.cssText = "color:#a09b8c;font-size:11px;font-style:italic;flex:0 0 auto;";
+      infoWrapper.appendChild(missingEl);
+    }
+
     row.appendChild(infoWrapper);
 
     const actions = document.createElement("div");
@@ -4673,7 +4700,7 @@
       const key = mod.name;
       renderModRow(
         listContainer,
-        { name: mod.name, displayName: mod.displayName, selected: selection.has(key) },
+        { name: mod.name, displayName: mod.displayName, missing: mod.missing, selected: selection.has(key) },
         (deleteButton) => {
           deleteButton.disabled = true;
           deleteButton.textContent = t("Deleting...");
@@ -5035,15 +5062,8 @@
     const card = overlay.querySelector(".parasite-mod-import-card");
     const lines = [
       ...errors.map((item) => ({ className: "is-error", text: importErrorText(item, several) })),
-      // What LTK Manager's check repaired in a mod it kept (check_mod in overlay_manager.py)
-      ...imported
-        .filter((item) => item && item.health && item.health.repaired > 0)
-        .map((item) => ({
-          className: "is-repaired",
-          text: several
-            ? t("LTK Manager repaired {name}.", { name: item.modName || item.fileName || "" })
-            : t("LTK Manager repaired this mod."),
-        })),
+      ...ltkCheckRepairedLines(imported, several),
+      ...baseSkinAdjustedLines(imported, several),
     ];
     if (lines.length) {
       overlay.classList.add("has-notes");
@@ -5071,6 +5091,29 @@
     modImportTimer = setTimeout(hideModImportLoading, lines.length ? MOD_IMPORT_DONE_MS * 2 : MOD_IMPORT_DONE_MS);
   }
 
+  function ltkCheckRepairedLines(imported, several) {
+    return imported
+      .filter((item) => item && item.health && item.health.repaired > 0)
+      .map((item) => ({
+        className: "is-repaired",
+        text: several
+          ? t("LTK Manager repaired {name}.", { name: item.modName || item.fileName || "" })
+          : t("LTK Manager repaired this mod."),
+      }));
+  }
+
+  // A skin Parasite wrote again so LTK Manager does not take it for a skinhack (_fix_base_skin in message_handler.py)
+  function baseSkinAdjustedLines(imported, several) {
+    return imported
+      .filter((item) => item && item.baseSkin)
+      .map((item) => ({
+        className: "is-repaired",
+        text: several
+          ? t("Parasite adjusted {name} so LTK Manager won't treat it as a skinhack.", { name: item.modName || item.fileName || "" })
+          : t("Parasite adjusted this mod so LTK Manager won't treat it as a skinhack."),
+      }));
+  }
+
   // A failed import's line: LTK Manager's refusals (_rejected_import in message_handler.py) in the
   // user's language, any other failure with Parasite's error text
   function importErrorText(item, several) {
@@ -5085,6 +5128,12 @@
       return several
         ? t("LTK Manager found problems it can't repair in {name}, so it won't be playable. {reason}", { name, reason }).trim()
         : t("LTK Manager found problems it can't repair in this mod, so it won't be playable. {reason}", { reason }).trim();
+    }
+    if (item.code === "ltk_cleanup_failed") {
+      // Not "Failed to import": the mod was added, and stays
+      return several
+        ? t("LTK Manager rejected {name}, but Parasite could not remove it. It is still in your library.", { name })
+        : t("LTK Manager rejected this mod, but Parasite could not remove it. It is still in your library.");
     }
     return t("Failed to import {name}: {error}", { name, error: item.error || "" });
   }
@@ -5297,10 +5346,42 @@
     if (!body || !foot) return;
 
     const errors = Array.isArray(diagnosticsState.errors) ? diagnosticsState.errors : [];
+    // In a screenshot, this line says which run of Parasite the errors belong to
+    const language = String(window.ParasiteI18n?.language || "en").replace("_", "-");
+    const formatTime = (seconds, options) => {
+      try {
+        return new Date(seconds * 1000).toLocaleString(language, options);
+      } catch (e) {
+        return new Date(seconds * 1000).toLocaleString(undefined, options);
+      }
+    };
+    const timeAgo = (seconds) => {
+      const elapsed = Math.max(0, Date.now() / 1000 - seconds);
+      const [value, unit] =
+        elapsed < 3600 ? [Math.max(1, Math.round(elapsed / 60)), "minute"]
+        : elapsed < 86400 ? [Math.round(elapsed / 3600), "hour"]
+        : [Math.round(elapsed / 86400), "day"];
+      try {
+        return new Intl.RelativeTimeFormat(language, { numeric: "auto" }).format(-value, unit);
+      } catch (e) {
+        return new Intl.RelativeTimeFormat("en", { numeric: "auto" }).format(-value, unit);
+      }
+    };
+    const sessionStart = diagnosticsState.sessionStart;
+    const sessionHtml =
+      typeof sessionStart === "number"
+        ? `<div style="opacity:0.75; margin-bottom:8px;">${escapeHtml(
+            t("This session: Parasite v{version}, started {time}", {
+              version: currentSettings?.version || "?",
+              time: formatTime(sessionStart, { dateStyle: "short", timeStyle: "short" }),
+            })
+          )}</div>`
+        : "";
     if (errors.length === 0) {
       body.innerHTML = `
+        ${sessionHtml}
         <div style="opacity:0.85; margin-bottom:8px;">${escapeHtml(t("No recent errors."))}</div>
-        <div style="opacity:0.75;">${escapeHtml(t("If something feels off, open the logs folder and share the latest log in a discord ticket."))}</div>
+        <div style="opacity:0.75;">${escapeHtml(t("If something feels off, open the logs folder and attach the latest log to a GitHub issue."))}</div>
       `.trim();
     } else {
       const clamp = (n, min, max) => Math.max(min, Math.min(max, n));
@@ -5497,12 +5578,25 @@
           };
         }
 
+        if (code === 'LAUNCHER_ELEVATED') {
+          const detail = String(e?.detail || '').trim();
+          return {
+            title: t("Parasite's launcher is set to run as administrator"),
+            details: [
+              t("What it means: Windows' compatibility settings run Parasite's ltk_launcher.exe as administrator, so Windows refuses to start it for your Windows account, LTK Manager does not start under explorer.exe and its patcher refuses the skins. Parasite could not take that setting off by itself: {detail}", { detail }),
+              t('Fix: untick "Run this program as an administrator" in the Compatibility tab of the Properties of ltk_launcher.exe, in Parasite\'s _internal\\injection\\tools folder (for one marked "all users", under "Change settings for all users"), then restart Parasite.'),
+            ],
+          };
+        }
+
         if (code === 'LTF_FAILED') {
           const detail = String(e?.detail || '').trim();
           // Why it failed (ltk_failure_cause in overlay_manager.py): what to
           // do depends on it
           const fixes = {
             start: () => t("Fix: Parasite could not start the LTK patcher. Check that ltk_launcher.exe and LeagueToolFlop.dll are still in Parasite's tools folder: an antivirus may have removed them."),
+            inject: () => t("Fix: Parasite's launcher started LTK Manager but could not get into it. With err=5 (access denied) above, Windows or an antivirus refused it: add Parasite's folder to your antivirus exclusions, update Parasite, then retry. If Parasite runs as administrator through another Windows account than the one you are signed in with, make your own account an administrator instead."),
+            launcher_admin: () => t('Fix: Windows refused to start Parasite\'s ltk_launcher.exe because it is set to run as administrator, so LTK Manager did not start under explorer.exe. Parasite takes that setting off before it starts LTK Manager: retry the next game. If it happens again, untick "Run this program as an administrator" in the Compatibility tab of the Properties of ltk_launcher.exe, in Parasite\'s _internal\\injection\\tools folder (also under "Change settings for all users"), then restart Parasite.'),
             running: () => t('Fix: close LTK Manager (also from the system tray), then retry. Parasite starts it with its bridge and closes it again after the game.'),
             late: () => t('Fix: the game started before the patcher was ready. Retry the next game.'),
             bridge: () => t('Fix: LTK Manager closed while the game was running. Retry the next game. If it happens every game, report it with your Parasite logs.'),
@@ -5517,6 +5611,8 @@
             disabled: () => t("Fix: LTK Manager's integrity check turned the overlay off because of a mod (named above): it refuses a skin made of another skin's files. For a custom skin, use another one; for one of Parasite's skins or chromas, the package is at fault: pick another skin or chroma and report it at github.com/Alban1911/LeagueSkins/issues."),
             ltk_admin: () => t(LTK_ADMIN_FIX),
             delivery: () => t("Fix: LTK Manager could not download its patcher: LTK's delivery service refused the request (the reason above). Parasite cannot change that. Retry later, or from another network (without a VPN or proxy)."),
+            delivery_unreachable: () => t("Fix: LTK Manager could not connect to LTK's delivery service (patcher.leaguetoolkit.dev) to download its patcher: something on your PC or network blocks it. Allow ltk-manager.exe through your firewall and antivirus, turn off any VPN, proxy or DNS blocker, then retry."),
+            patcher_outdated: () => t("Fix: LTK Manager is out of date: its patcher does not support this League patch. Open LTK Manager from the Start menu, install the update it offers, then close it (also from the system tray) and retry. If it is already up to date, it has not caught up with this League patch yet: retry after its next update."),
             corrupt: () => t("Fix: League could not read a file of the overlay, most often a mod made for an older patch. Turn your mods off, then back on one at a time to find it. LTK Manager's incident file (named above) lists the mods it suspects."),
             incident: () => t("Fix: LTK Manager's incident file (named above) says what went wrong in the game and which mods it suspects."),
             not_attached: () => t("Fix: LTK Manager's patcher found the game but could not get into it, so the game ran without skins. Check that League and the Riot Client are not set to run as administrator and that your antivirus does not block LTK Manager, then retry."),
@@ -5541,18 +5637,22 @@
       };
 
       const headerHtml = `
+        ${sessionHtml}
         <div style="display:flex; flex-direction:column; gap:4px; margin-bottom:10px;">
           <div style="font-weight:700;">${escapeHtml(t("Errors (most recent first)"))}</div>
           <div style="opacity:0.75;">${escapeHtml(t("Tip: after changing a setting, click {save}, then retry.")).replace("{save}", `<span style="font-weight:700;">${escapeHtml(t("Save"))}</span>`)}</div>
         </div>
       `.trim();
 
-      const itemsHtml = errors
-        .map((e, idx) => {
+      const itemHtml = (e, idx, earlier) => {
           const ts = String(e?.ts || "").trim();
+          const at = typeof e?.at === "number" ? e.at : null;
+          // This session's: the date and time (Parasite runs for days, and a setup problem
+          // can be carried from an earlier session). An earlier one's: how long ago, the date on hover
+          const when = at == null ? ts : earlier ? timeAgo(at) : formatTime(at, { dateStyle: "short", timeStyle: "short" });
           const desc = describe(e);
           const title = escapeHtml(desc.title);
-          const tsHtml = ts ? `<span style="opacity:0.75;">${escapeHtml(ts)}</span>` : "";
+          const tsHtml = when ? `<span style="opacity:0.75;" title="${escapeHtml(ts)}">${escapeHtml(when)}</span>` : "";
 
           const detailsHtml = (desc.details || [])
             .map((d) => `<li style="margin:2px 0;">${escapeHtml(d)}</li>`)
@@ -5575,10 +5675,27 @@
               }
             </div>
           `.trim();
-        })
-        .join("");
+        };
 
-      body.innerHTML = `${headerHtml}${itemsHtml}`;
+      const current = errors.filter((e) => e?.thisSession !== false);
+      const earlier = errors.filter((e) => e?.thisSession === false);
+      const currentHtml = current.length
+        ? current.map((e, idx) => itemHtml(e, idx, false)).join("")
+        : `<div style="opacity:0.85; margin-bottom:8px;">${escapeHtml(t("No errors in this session."))}</div>`;
+      // Stays open across the refreshes while the user reads it
+      const earlierOpen = !!body.querySelector("#parasite-diagnostics-earlier")?.open;
+      const earlierHtml = earlier.length
+        ? `
+          <details id="parasite-diagnostics-earlier" style="margin-top:6px; opacity:0.6;"${earlierOpen ? " open" : ""}>
+            <summary style="cursor:pointer; margin-bottom:6px;">${escapeHtml(
+              t("Earlier sessions ({count}), not from this run of Parasite", { count: earlier.length })
+            )}</summary>
+            ${earlier.map((e, idx) => itemHtml(e, idx, true)).join("")}
+          </details>
+        `.trim()
+        : "";
+
+      body.innerHTML = `${headerHtml}${currentHtml}${earlierHtml}`;
       body.querySelectorAll(".parasite-diagnostics-delete").forEach((btn) => {
         btn.addEventListener("click", () => deleteDiagnostics([btn.dataset.key]));
       });
@@ -5621,11 +5738,14 @@
     const recS = typeof recMs === "number" ? (recMs / 1000).toFixed(2) : null;
     const curThresholdVal = typeof currentSettings?.threshold === "number" ? currentSettings.threshold : null;
     const needsIncrease = recS !== null && curThresholdVal !== null && curThresholdVal < parseFloat(recS) - 0.001;
+    // A lower value only when Parasite has enough games to back it (base_skin_tracker.py)
+    const canDecrease = recS !== null && curThresholdVal !== null && stats.can_recommend_lower === true &&
+      curThresholdVal > parseFloat(recS) + 0.001;
     const games = stats.confirmed_count;
     const label = games > 1 ? t("{count} games", { count: games }) : t("{count} game", { count: games });
 
     let html;
-    if (needsIncrease) {
+    if (needsIncrease || canDecrease) {
       const recommended = `<span style="color:#c89b3c; font-weight:700;">${recS}s</span>`;
       html = `<span style="color:#c8aa6e;">${escapeHtml(t("Based on {games}, we recommend {value}", { games: label })).replace("{value}", recommended)}</span>`;
       html += ` <button id="parasite-apply-recommended-btn" style="

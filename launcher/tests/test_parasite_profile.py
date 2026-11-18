@@ -101,5 +101,43 @@ class ProfileTests(unittest.TestCase):
         self.assertEqual(data["champions"], [{"id": 103, "name": "Ahri"}])
 
 
+
+class SkinListCacheTests(unittest.TestCase):
+    def setUp(self):
+        from unittest.mock import MagicMock
+        p = patch.multiple(parasite_profile, _skins={}, _failed={})
+        p.start()
+        self.addCleanup(p.stop)
+        self.clock = [5000.0]
+        p = patch.object(parasite_profile.time, "monotonic", side_effect=lambda: self.clock[0])
+        p.start()
+        self.addCleanup(p.stop)
+        self.get = MagicMock(side_effect=OSError("offline"))
+        p = patch("requests.get", self.get)
+        p.start()
+        self.addCleanup(p.stop)
+
+    def test_a_failed_download_waits_before_the_next_try(self):
+        self.assertEqual(parasite_profile.skins(103), [])
+        self.assertEqual(parasite_profile.skins(103), [])
+        self.assertEqual(self.get.call_count, 1)
+        self.clock[0] += parasite_profile.RETRY_S
+        self.get.side_effect = None
+        self.get.return_value.json.return_value = AHRI
+        self.assertTrue(parasite_profile.skins(103))
+        parasite_profile.skins(103)
+        self.assertEqual(self.get.call_count, 2)
+
+    def test_an_expired_list_is_kept_when_the_refresh_fails(self):
+        self.get.side_effect = None
+        self.get.return_value.json.return_value = AHRI
+        first = parasite_profile.skins(103)
+        self.clock[0] += parasite_profile.SKINS_TTL_S + 1
+        self.get.side_effect = OSError("offline")
+        self.assertEqual(parasite_profile.skins(103), first)
+        self.assertEqual(parasite_profile.skins(103), first)
+        self.assertEqual(self.get.call_count, 2)
+
+
 if __name__ == "__main__":
     unittest.main()

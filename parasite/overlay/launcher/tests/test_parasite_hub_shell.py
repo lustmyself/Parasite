@@ -96,21 +96,37 @@ class ApiTests(unittest.TestCase):
 
 
 class UpdateScriptTests(unittest.TestCase):
-    def test_update_closes_leftover_parasite_windows_before_copying(self):
+    """apply.ps1 swaps the install folder for the staged update once the old Parasite exits"""
+
+    def script(self):
         from launcher.update.update_installer import APPLY_UPDATE_SCRIPT
-        close = APPLY_UPDATE_SCRIPT.index("Closing Parasite windows left open")
-        self.assertLess(close, APPLY_UPDATE_SCRIPT.index("Mirroring files"))
-        self.assertIn("Stop-Process", APPLY_UPDATE_SCRIPT)
+        return APPLY_UPDATE_SCRIPT
+
+    def test_update_closes_leftover_parasite_windows_before_the_swap(self):
+        script = self.script()
+        close = script.index("Closing Parasite windows left open")
+        self.assertLess(script.index("WaitForExit"), close)
+        self.assertLess(close, script.index("Move-Directory $destination $previous"))
+        self.assertIn("Stop-Process", script[close:script.index("Move-Directory $destination $previous")])
 
 
 class UpdateScriptOfflineTests(unittest.TestCase):
-    def test_a_running_parasite_offline_is_left_alone_and_a_failure_restarts_parasite(self):
+    def script(self):
         from launcher.update.update_installer import APPLY_UPDATE_SCRIPT
-        self.assertIn("%KEEP_OFFLINE%", APPLY_UPDATE_SCRIPT)
-        self.assertLess(APPLY_UPDATE_SCRIPT.index('set "KEEP_OFFLINE='), APPLY_UPDATE_SCRIPT.index("robocopy"))
-        failure = APPLY_UPDATE_SCRIPT[APPLY_UPDATE_SCRIPT.index(":robofail"):]
-        self.assertNotIn("pause", failure)
-        self.assertIn('start "" /D "%DEST%"', failure)
+        return APPLY_UPDATE_SCRIPT
+
+    def test_a_running_parasite_offline_stops_the_swap_and_is_not_closed(self):
+        script = self.script()
+        offline = script.index("Get-InstalledProcess 'ParasiteOffline'")
+        self.assertLess(offline, script.index("$swapStarted = $true"))
+        self.assertIn("throw", script[offline:script.index("$swapStarted = $true")])
+        self.assertNotIn("ParasiteOffline' | Stop-Process", script)
+
+    def test_a_failure_restarts_parasite_without_an_error_box(self):
+        script = self.script()
+        self.assertIn("elseif ($result -ne 0 -and !$Recover -and $parentExited", script)
+        self.assertIn("$restarted = $true", script)
+        self.assertIn("if ($result -ne 0 -and $Notify -and !$restarted)", script)
 
 
 class GeometryTests(unittest.TestCase):

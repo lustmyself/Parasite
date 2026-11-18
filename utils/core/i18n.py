@@ -18,6 +18,7 @@ log = get_logger()
 
 AUTO = "auto"
 ENGLISH = "en"
+TURKISH = "tr"
 
 # Every language the League client ships, by the name it gives itself
 LANGUAGES: Dict[str, str] = {
@@ -120,20 +121,16 @@ def load_strings(language: str, directory: Optional[Path] = None) -> Dict[str, s
 
 def current_language(shared_state=None) -> str:
     """The language Parasite's menus use right now."""
-    from config import get_config_option
-    setting = get_config_option("General", "language")
-    client_locale = getattr(shared_state, "current_locale", None) if shared_state else None
-    return resolve_language(setting, client_locale)
+    return TURKISH  # Parasite is Turkish only, whatever the client's or a saved language
 
 
 def i18n_payload(shared_state=None) -> dict:
     """What the plugins load: the language, its direction and its texts."""
     language = current_language(shared_state)
-    from config import get_config_option
     return {
         "language": language,
-        "setting": get_config_option("General", "language") or AUTO,
+        "setting": TURKISH,
         "direction": "rtl" if language in RIGHT_TO_LEFT else "ltr",
-        "languages": LANGUAGES,
+        "languages": {TURKISH: LANGUAGES[TURKISH]},
         "strings": load_strings(language),
     }
