@@ -19,6 +19,9 @@ class TranslateTests(unittest.TestCase):
 class HubDialogTests(unittest.TestCase):
     def setUp(self):
         self.dialog = parasite_hub.HubDialog(show=False)
+        offline = patch("launcher.parasite_autoupdate.offline_running", return_value=False)
+        offline.start()
+        self.addCleanup(offline.stop)
 
     def test_progress_is_clamped_and_marquee_clears_it(self):
         self.dialog.set_progress(140)
@@ -54,6 +57,16 @@ class HubDialogTests(unittest.TestCase):
              patch("launcher.parasite_autoupdate.enabled", return_value=True), \
              patch.object(parasite_hub, "open_window") as open_window:
             self.assertTrue(self.dialog.confirm_update("9.9.9", "1.0.0"))
+        open_window.assert_not_called()
+
+    def test_no_update_at_start_while_parasite_offline_runs(self):
+        # The update can't move Parasite's folder then: installing would restart Parasite into
+        # the same update again and again
+        with patch("launcher.parasite_autoupdate.offline_running", return_value=True), \
+             patch.object(parasite_hub, "take_update_acceptance", return_value=True), \
+             patch("launcher.parasite_autoupdate.enabled", return_value=True), \
+             patch.object(parasite_hub, "open_window") as open_window:
+            self.assertFalse(self.dialog.confirm_update("9.9.9", "1.0.0"))
         open_window.assert_not_called()
 
     def test_update_accepted_in_the_hub_skips_the_prompt(self):
