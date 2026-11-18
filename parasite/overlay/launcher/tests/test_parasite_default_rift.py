@@ -85,11 +85,11 @@ class MaterialsTest(unittest.TestCase):
         # the seasonal keys in their order with the default values, then the default-only keys
         self.assertEqual(pairs, [(5, 55), (1, 10), (2, 20), (9, 90)])
 
-    def test_the_default_entries_win_and_only_seasonal_materials_and_placeables_come_along(self):
+    def test_the_default_entries_win_and_every_seasonal_only_entry_comes_along(self):
         self.assertEqual(self.merged[fnv1a_lower("Maps/Grass")].fields[0].value.v, "base grass")
         self.assertEqual(self.merged[fnv1a_lower("Maps/Snow")].fields[0].value.v, "snow")
-        self.assertNotIn(fnv1a_lower("Maps/SnowFx"), self.merged)
-        self.assertEqual(len(self.merged), 5)
+        self.assertEqual(self.merged[fnv1a_lower("Maps/SnowFx")].fields[0].value.v, "snow effect")
+        self.assertEqual(len(self.merged), 6)
 
     def test_seasonal_structures_get_the_default_skins(self):
         winter = _skins_of(self.merged[fnv1a_lower("Maps/WinterStructures")])
@@ -100,7 +100,7 @@ class MaterialsTest(unittest.TestCase):
         parsed = Bin(rift.merged_materials(BASE, WINTER, SEASONAL))
         paths = [rift._parse_entry(parsed._data, t, s, e).path_hash for t, (s, e) in zip(parsed.types, parsed._locate())]
         self.assertEqual(paths, [fnv1a_lower(p) for p in (SEASONAL, "Maps/Grass", "Maps/Structures", "Maps/Snow",
-                                                          "Maps/WinterStructures")])
+                                                          "Maps/SnowFx", "Maps/WinterStructures")])
 
     def test_materials_without_either_container_are_refused(self):
         with self.assertRaises(rift.DefaultRiftError):

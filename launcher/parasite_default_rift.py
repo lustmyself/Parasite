@@ -18,8 +18,9 @@ byte for byte):
 - <seasonal>.mapgeo: Base_SRX's mapgeo, as the game stores it;
 - <seasonal>.materials.bin: Base_SRX's entries, in their order, but its MapContainer is the
   seasonal one, whose placeables map takes Base_SRX's values (and keeps the keys only the
-  seasonal map has); then the seasonal materials and placeable containers Base_SRX has none of,
-  their structures (turrets, inhibitors, nexus, shops) given the skins Base_SRX gives them.
+  seasonal map has); then every seasonal entry Base_SRX has none of (materials, placeables,
+  effects...), the structures they place (turrets, inhibitors, nexus, shops) given the skins
+  Base_SRX gives them.
 """
 
 from __future__ import annotations
@@ -49,9 +50,6 @@ MATERIALS = "data/maps/mapgeometry/map11/{}.materials.bin"
 DEFAULT_CONTAINER = "Maps/MapGeometry/Map11/Base_SRX"
 MAP_SKIN = "Maps/Shipping/Map11/MapSkins/{}"
 MAP_CONTAINER_TYPE = "MapContainer"
-# The seasonal entries the default materials take along (TheKillerey's Default Rift: its
-# materials and placeables, none of its effects or visibility controllers)
-SEASONAL_TYPES = ("StaticMaterialDef", "MapPlaceableContainer")
 MAPSKIN_LINE = re.compile(r"mapskin\s*=\s*([A-Za-z0-9_]+)")
 # The map skins the game has shown Summoner's Rift with that are the default one
 DEFAULT_SKINS = {"default", "base_srx", "sr_seasonal_map"}
@@ -202,7 +200,6 @@ def merged_materials(base: bytes, seasonal: bytes, container: str) -> bytes:
     from injection.baseskin.propbin import _entry_bytes, fnv1a_lower
     container_type = fnv1a_lower(MAP_CONTAINER_TYPE)
     placeables_type = fnv1a_lower("MapPlaceableContainer")
-    taken = {fnv1a_lower(name) for name in SEASONAL_TYPES}
     default_hash, seasonal_hash = fnv1a_lower(DEFAULT_CONTAINER), fnv1a_lower(container)
     base_head, base_types, base_entries, base_tail = _entries(base)
     _head, seasonal_types, seasonal_entries, _tail = _entries(seasonal)
@@ -235,7 +232,7 @@ def merged_materials(base: bytes, seasonal: bytes, container: str) -> bytes:
     if not replaced:
         raise DefaultRiftError("Varsayılan haritanın ayarları bulunamadı (Base_SRX)")
     for type_hash, (start, end, path_hash) in zip(seasonal_types, seasonal_entries):
-        if path_hash in seen or type_hash not in taken:
+        if path_hash in seen or type_hash == container_type:
             continue
         raw = seasonal[start:end]
         if type_hash == placeables_type:
