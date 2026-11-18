@@ -18,6 +18,30 @@ if sys.version_info < MIN_PYTHON:
     )
 
 
+def _get_tools_dir() -> Path:
+    """Get the tools directory path (works in both frozen and development environments)"""
+    if getattr(sys, 'frozen', False):
+        # Running as compiled executable (PyInstaller)
+        if hasattr(sys, '_MEIPASS'):
+            # One-file mode: tools are in _MEIPASS
+            base_path = Path(sys._MEIPASS)
+            return base_path / "injection" / "tools"
+        else:
+            # One-dir mode: tools are alongside executable
+            base_dir = Path(sys.executable).parent
+            possible_dirs = [
+                base_dir / "injection" / "tools",
+                base_dir / "_internal" / "injection" / "tools",
+            ]
+            for dir_path in possible_dirs:
+                if dir_path.exists():
+                    return dir_path
+            return possible_dirs[0]
+    else:
+        # Running as Python script
+        return Path(__file__).parent.parent / "injection" / "tools"
+
+
 LTK_MANAGER_DOWNLOAD_URL = "https://github.com/LeagueToolkit/ltk-manager/releases"
 
 
@@ -26,26 +50,27 @@ def _dll_dialog_text(reason: str, detail: str = ""):
     runtime problem; *action* is the label of the button that fixes it."""
     if reason == "no_manager":
         return (
-            "Parasite - LTK Manager bulunamadı",
-            "Parasite, LTK Manager'ı kuramadı",
-            "Parasite skinleri LTK Manager üzerinden uygular ve onu senin için kurmayı denedi, ama "
-            "indirme ya da kurulum bitmedi (internet yok ya da Windows'un sorusu reddedildi). "
-            "Yalnızca bir kez kurulması yeter: Parasite onu şampiyon seçiminde arka planda açar "
-            "ve maçtan sonra kapatır, senin hiç açman gerekmez.",
-            "1. Tekrar denemek için Parasite'ı yeniden başlat ve Windows'un sorusunda Evet'e tıkla. "
-            f"Ya da LTK Manager'ı kendin kur ({LTK_MANAGER_DOWNLOAD_URL}).\n"
-            "2. Başka bir klasöre mi kurulu? Yolu ayarla'ya tıkla ve oradaki ltk-manager.exe'yi seç: "
-            "Parasite onu hatırlar ve hemen açılır.",
-            "Yolu ayarla",
+            "Parasite - LTK Manager Missing",
+            "Parasite couldn't install LTK Manager",
+            "Parasite applies skins through LTK Manager and tried to install it for you, but the "
+            "download or the installation did not finish (no internet, or the Windows prompt was "
+            "declined). It only has to be installed once: Parasite "
+            "opens it in the background during champ select and closes it after the game, "
+            "so you never have to open it yourself.",
+            "1. Restart Parasite to try again, and click Yes on the Windows prompt. Or install "
+            f"LTK Manager yourself ({LTK_MANAGER_DOWNLOAD_URL}).\n"
+            "2. Already installed in another folder? Click Set up path and select its "
+            "ltk-manager.exe: Parasite remembers it and starts right away.",
+            "Set up path",
         )
     return (
-        "Parasite - Eksik bileşen",
-        "Parasite'ın bir bileşeni eksik",
-        f"Parasite'ın açılabilmesi için araçlar klasöründe {detail or 'köprü dosyaları'} gerekiyor.",
-        "1. Parasite'ı yeniden kur: bu dosyalar her kurulumda gelir.\n"
-        "2. Bir antivirüs onları sildiyse dosyaları geri yükle ya da Parasite'ın klasörünü antivirüsün istisnalarına ekle.\n"
-        "3. Parasite'ı yeniden başlat.",
-        "Araçlar klasörünü aç",
+        "Parasite - Missing Component",
+        "One Parasite component is missing",
+        f"Parasite needs {detail or 'its bridge files'} in its tools folder before it can start.",
+        "1. Reinstall Parasite: these files are part of every install.\n"
+        "2. If an antivirus removed them, restore the files or add Parasite's folder to its exclusions.\n"
+        "3. Restart Parasite.",
+        "Open tools folder",
     )
 
 
@@ -111,10 +136,10 @@ def _show_native_dll_dialog(reason="missing", detail=""):
     button_close = 1002
     buttons = (TaskDialogButton * 2)(
         TaskDialogButton(button_open, action),
-        TaskDialogButton(button_close, "Parasite'ı kapat"),
+        TaskDialogButton(button_close, "Close Parasite"),
     )
-    content = _with_links(f"{status_body}\n\nNasıl düzeltilir:\n{steps}")
-    footer = _with_links("Yardım mı lazım? Sorun bildir: https://github.com/lustmyself/Parasite/issues")
+    content = _with_links(f"{status_body}\n\nHow to fix it:\n{steps}")
+    footer = _with_links("Need help? Join the Parasite Discord: https://discord.gg/roseskins")
     assets_dirs = []
     if hasattr(sys, "_MEIPASS"):
         assets_dirs.append(Path(sys._MEIPASS) / "assets")
@@ -243,9 +268,9 @@ def _show_fallback_dll_dialog(reason="missing", detail="") -> str:
 
     title, status_title, status_body, steps, action = _dll_dialog_text(reason, detail)
     message = (
-        f"{status_title}\n\n{status_body}\n\nNasıl düzeltilir:\n{steps}\n\n"
-        "Yardım mı lazım? Sorun bildir: https://github.com/lustmyself/Parasite/issues\n\n"
-        f"Tamam: {action}. İptal: Parasite'ı kapat."
+        f"{status_title}\n\n{status_body}\n\nHow to fix it:\n{steps}\n\n"
+        "Discord: https://discord.gg/roseskins\n\n"
+        f"Press OK to {action.lower()}, or Cancel to close Parasite."
     )
     response = ctypes.windll.user32.MessageBoxW(
         0, message, title, 0x00000001 | 0x00000030 | 0x00040000
@@ -288,7 +313,7 @@ def _pick_ltk_manager() -> Optional[Path]:
 
     # Pairs of label and pattern, each ending in a NUL, the list in a second one
     file_filter = ctypes.create_unicode_buffer(
-        "LTK Manager (ltk-manager.exe)\0ltk-manager.exe;LTK Manager.exe\0Programlar (*.exe)\0*.exe\0\0"
+        "LTK Manager (ltk-manager.exe)\0ltk-manager.exe;LTK Manager.exe\0Programs (*.exe)\0*.exe\0\0"
     )
     file_buffer = ctypes.create_unicode_buffer(1024)
     initial_dir = os.environ.get("ProgramW6432") or os.environ.get("ProgramFiles") or ""
@@ -299,7 +324,7 @@ def _pick_ltk_manager() -> Optional[Path]:
         lpstrFile=ctypes.cast(file_buffer, wintypes.LPWSTR),
         nMaxFile=len(file_buffer),
         lpstrInitialDir=initial_dir or None,
-        lpstrTitle="LTK Manager'ı seç (ltk-manager.exe)",
+        lpstrTitle="Select LTK Manager (ltk-manager.exe)",
         # OFN_FILEMUSTEXIST | OFN_PATHMUSTEXIST | OFN_NOCHANGEDIR | OFN_EXPLORER | OFN_DONTADDTORECENT
         Flags=0x1000 | 0x0800 | 0x0008 | 0x00080000 | 0x02000000,
     )
@@ -329,9 +354,9 @@ def _set_up_ltk_manager_path(tools_dir) -> Optional[bool]:
     if picked.name.lower() not in {name.lower() for name in LTK_MANAGER_EXECUTABLES}:
         ctypes.windll.user32.MessageBoxW(
             0,
-            f"{picked.name}, LTK Manager değil.\n\nLTK Manager'ın kurulu olduğu klasördeki "
-            "ltk-manager.exe'yi seç.",
-            "Parasite - LTK Manager bulunamadı",
+            f"{picked.name} is not LTK Manager.\n\nSelect ltk-manager.exe in the folder LTK Manager "
+            "is installed in.",
+            "Parasite - LTK Manager Missing",
             message_flags,
         )
         return None
@@ -339,9 +364,9 @@ def _set_up_ltk_manager_path(tools_dir) -> Optional[bool]:
     if ToolsManager(tools_dir).detect_ltk_manager() is None:
         ctypes.windll.user32.MessageBoxW(
             0,
-            "Parasite yolu cf.ini dosyasına kaydedemedi.\n\nParasite'ın %LOCALAPPDATA%\\Parasite "
-            "klasörüne yazabildiğini kontrol et, sonra tekrar dene.",
-            "Parasite - LTK Manager bulunamadı",
+            "Parasite could not save the path in its cf.ini.\n\nCheck that Parasite can write to "
+            "%LOCALAPPDATA%\\Parasite, then try again.",
+            "Parasite - LTK Manager Missing",
             message_flags,
         )
         return None
@@ -381,9 +406,8 @@ def _check_dll_present() -> bool:
         return True  # Only relevant on Windows
 
     from injection.tools.tools_manager import LTF_BRIDGE_DLL, LTF_LAUNCHER, ToolsManager
-    from utils.core.paths import get_tools_dir
 
-    tools_dir = get_tools_dir()
+    tools_dir = _get_tools_dir()
     missing = [name for name in (LTF_LAUNCHER, LTF_BRIDGE_DLL) if not (tools_dir / name).exists()]
     if missing:
         return _show_dll_dialog(tools_dir, reason="missing", detail=" and ".join(missing))
@@ -415,7 +439,7 @@ setup_signal_handlers()
 
 # Now import everything else
 from .setup.arguments import setup_arguments
-from .setup.initialization import convert_stored_mods, setup_logging_and_cleanup, initialize_tray_manager
+from .setup.initialization import setup_logging_and_cleanup, initialize_tray_manager
 from .core.lockfile import check_single_instance
 from .core.initialization import initialize_core_components
 from .core.threads import initialize_threads
@@ -427,12 +451,10 @@ import utils.integration.pengu_loader as pengu_loader
 from state import AppStatus
 from utils.core.logging import get_logger, log_success
 from utils.core.issue_reporter import report_issue
-from utils.threading.thread_manager import ThreadManager, create_daemon_thread
+from utils.threading.thread_manager import create_daemon_thread
 from config import APP_VERSION, MAIN_LOOP_FORCE_QUIT_TIMEOUT_S, get_config_option, set_config_option
 from injection.config.config_manager import ConfigManager
 from injection.game.game_detector import GameDetector
-from injection.mods.ltk_sync import start_saved_mods_sync
-from injection.mods.mod_facts import remove_unpacked_leftovers
 import time
 
 log = get_logger()
@@ -461,10 +483,10 @@ def _warn_pengu_activation_failed() -> None:
         try:
             ctypes.windll.user32.MessageBoxW(
                 0,
-                "Parasite, Pengu Loader'ı etkinleştiremedi; bu yüzden League istemcisinde görünmeyecek.\n\n"
-                "League istemcisini kapat, sonra Parasite'ı yeniden başlat.\n"
-                "Yine olursa antivirüsünün Pengu Loader'ı engellemediğinden emin ol.\n\n"
-                "Ayrıntılar %LOCALAPPDATA%\\Parasite\\logs\\ klasöründe.",
+                "Parasite could not activate Pengu Loader, so it will not appear in the League client.\n\n"
+                "Close the League client, then restart Parasite.\n"
+                "If it happens again, make sure your antivirus is not blocking Pengu Loader.\n\n"
+                "Details are in %LOCALAPPDATA%\\Parasite\\logs\\",
                 "Parasite - Pengu Loader",
                 0x50030,  # MB_OK | MB_ICONWARNING | MB_SETFOREGROUND | MB_TOPMOST
             )
@@ -493,12 +515,13 @@ def _warn_pengu_injection_failed(client_pid: int) -> None:
     try:
         ctypes.windll.user32.MessageBoxW(
             0,
-            "Parasite bu League istemcisine yüklenmedi: Pengu Loader'ın DLL'i istemcide yok.\n\n"
-            "Sistem tepsisindeki Parasite simgesine sağ tıkla ve Başlangıç sorununu tanıla'yı seç. "
-            "Rapor toplanırken League açık kalsın.\n\n"
-            "Sonra nedenini bulabilmemiz için report.txt ve report.json dosyalarını bir GitHub sorun bildirimine ekle (https://github.com/lustmyself/Parasite/issues). "
-            "İlk bakış için onları bir yapay zekâ asistanına da yapıştırabilirsin.",
-            "Parasite - İstemciye yüklenemedi",
+            "Parasite did not load into this League client: Pengu Loader's DLL is missing from it.\n\n"
+            "Right-click Parasite's system tray icon and choose Diagnose Parasite startup. "
+            "Keep League open while collecting the report.\n\n"
+            "Then send report.txt and report.json on the Parasite Discord (https://discord.gg/roseskins) "
+            "or in a GitHub issue (https://github.com/lustmyself/Parasite/issues), so we can find out why. "
+            "You can also paste them into an AI assistant for a first look.",
+            "Parasite - Client injection failed",
             0x50030,  # MB_OK | MB_ICONWARNING | MB_SETFOREGROUND | MB_TOPMOST
         )
     except Exception as e:
@@ -648,24 +671,11 @@ def _schedule_restart() -> bool:
         log.error(f"Failed to schedule restart: {e}")
         return False
 
-def _remove_unpacked_mods_while_alone() -> None:
-    """Remove the .modpkg copies earlier reads left unpacked: Parasite runs alone
-    now and nothing has read a mod yet, so none is being unpacked."""
-    remove_unpacked_leftovers()
-
-
-def _sync_mods_changed_while_closed() -> None:
-    """Sync the saved mods with LTK Manager's library, which may have lost or
-    changed one while Parasite was closed."""
-    start_saved_mods_sync(only_if_changed=False)
-
-
 def run_league_unlock(args: Optional[argparse.Namespace] = None,
                       injection_threshold: Optional[float] = None) -> None:
     """Run the core Parasite application startup and main loop."""
     # Check for single instance before doing anything else
     check_single_instance()
-    _remove_unpacked_mods_while_alone()
 
     # Keep the Windows "Apps & features" version in sync after auto-updates
     _update_registry_version()
@@ -690,14 +700,7 @@ def run_league_unlock(args: Optional[argparse.Namespace] = None,
     
     # Check initial status (will show locked until all components are ready)
     app_status.update_status(force=True)
-
-    # Mods an earlier Parasite stored as folders become the archives LTK Manager
-    # installs as they are. Before anything else starts: no injection, import
-    # or mod list may touch a folder while it is converted
-    convert_stored_mods(tray_manager)
-
-    _sync_mods_changed_while_closed()
-
+    
     # Start with Windows is on by default, set once on the first run
     from launcher.autostart_default import apply_autostart_default
     apply_autostart_default()
@@ -801,15 +804,6 @@ def run_league_unlock(args: Optional[argparse.Namespace] = None,
         # The desktop hub takes over from the launcher and uses the tray's quit and restart
         from launcher.parasite_hub import attach as attach_hub
         attach_hub(tray_manager)
-
-        # A Quit or Restart clicked while Parasite was starting runs now
-        tray_manager.run_pending_request()
-
-    # Stopped while starting (a Quit or Restart clicked then): end before the
-    # threads start and Pengu's activation restarts a running client
-    if state.stop:
-        perform_cleanup(state, ThreadManager(), tray_manager, injection_manager)
-        return
     
     # Initialize threads (this starts the WebSocket server)
     thread_manager, t_phase, t_ui, t_ws, t_lcu_monitor = initialize_threads(
@@ -850,47 +844,16 @@ def run_league_unlock(args: Optional[argparse.Namespace] = None,
         perform_cleanup(state, thread_manager, tray_manager, injection_manager)
 
 
-def _remove_ltk_mods() -> int:
-    """Remove from LTK Manager's library the mods Parasite added there
-    (ltk_library.remove_parasite_mods): Parasite's uninstaller runs Parasite with
-    --remove-ltk-mods when the user does not keep Parasite's data. It checked
-    that Parasite is closed and waits for this, hidden: no single-instance check,
-    no launcher, no dialog, and a watchdog ends it should LTK Manager hang."""
-    import threading
-
-    from config import UNINSTALL_CLEANUP_DEADLINE_S
-    from injection.overlay.ltf_session import LtfHost
-    from injection.overlay.ltk_library import remove_parasite_mods
-    from utils.core.logging import exit_now, setup_logging
-    from utils.core.paths import get_injection_dir, get_tools_dir
-
-    setup_logging('customer')
-    watchdog = threading.Timer(UNINSTALL_CLEANUP_DEADLINE_S, exit_now, args=(1,))
-    watchdog.daemon = True
-    watchdog.start()
-    try:
-        return remove_parasite_mods(LtfHost(get_tools_dir(), get_injection_dir()))
-    except Exception as e:
-        log.error(f"[MODS] Could not remove Parasite's mods from LTK Manager's library: {e}", exc_info=True)
-        return 1
-
-
 def main() -> None:
     """Program entry point that prepares and launches Parasite."""
-    # The desktop hub window runs as a second Parasite process (pywebview needs a main thread).
-    # Only that process loads the hub here: any other start (the uninstaller's
-    # --remove-ltk-mods...) goes through Parasite's own flags first, as in Rose
-    if "--parasite-hub-window" in sys.argv:
-        from launcher.parasite_hub_shell import main_if_window
-        if main_if_window():
-            return
+    # The desktop hub window runs as a second Parasite process (pywebview needs a main thread)
+    from launcher.parasite_hub_shell import main_if_window
+    if main_if_window():
+        return
     args = setup_arguments()
-    if args.uninstaller_removes_ltk_mods:
-        sys.exit(_remove_ltk_mods())
     # Update before checking the DLL: a Parasite that refuses to start still
     # receives the version that fixes its check
     if sys.platform == "win32":
-        check_single_instance()
         if not args.dev:
             try:
                 from launcher import run_launcher
@@ -958,8 +921,8 @@ Log location: Check %LOCALAPPDATA%\\Parasite\\logs\\
             try:
                 ctypes.windll.user32.MessageBoxW(
                     0,
-                    f"Parasite beklenmeyen bir hatayla kapandı:\n\n{str(e)}\n\nHata türü: {type(e).__name__}\n\nKayıt dosyasına bak:\n%LOCALAPPDATA%\\Parasite\\logs\\",
-                    "Parasite - Ölümcül hata",
+                    f"Parasite crashed with an unhandled error:\n\n{str(e)}\n\nError type: {type(e).__name__}\n\nPlease check the log file in:\n%LOCALAPPDATA%\\Parasite\\logs\\",
+                    "Parasite - Fatal Error",
                     0x50010  # MB_OK | MB_ICONERROR | MB_SETFOREGROUND | MB_TOPMOST
                 )
             except Exception:

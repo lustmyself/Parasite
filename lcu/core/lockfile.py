@@ -8,20 +8,13 @@ Handles finding and parsing League Client lockfile
 import os
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterable, List, Optional
+from typing import Optional
 
 import psutil
 
-from config import get_config_option
 from utils.core.logging import get_logger
-from utils.system.process_cmdline import query_cmdline
-from utils.system.process_list import running_processes
 
 log = get_logger()
-
-_CLIENT_PROCESS_NAMES = frozenset({"leagueclient.exe", "leagueclientux.exe"})
-# The only process whose command line is read for LCU credentials
-_CREDENTIALS_PROCESS_NAME = "leagueclientux.exe"
 
 SWIFTPLAY_MODES = {"SWIFTPLAY", "BRAWL"}
 # Queues where champions and skins are picked in the lobby (no champ select):
@@ -38,55 +31,6 @@ class Lockfile:
     port: int
     password: str
     protocol: str
-
-
-def _is_lockfile_candidate(path: Path) -> bool:
-    """Keep existing lockfiles unless their recorded process fails validation."""
-    try:
-        if not path.is_file():
-            return False
-        data = parse_lockfile(str(path))
-        if data is None:
-            # Regional clients may leave an empty file. The connection reads
-            # process credentials directly in this case.
-            return True
-        return data.pid > 0 and psutil.Process(data.pid).name().lower() in _CLIENT_PROCESS_NAMES
-    except psutil.AccessDenied:
-        # The readable lockfile can still work when process metadata is denied.
-        return True
-    except (psutil.Error, OSError):
-        return False
-
-
-def _common_lockfiles() -> List[Path]:
-    if os.name == "nt":
-        return [
-            Path("C:/Riot Games/League of Legends/lockfile"),
-            Path("C:/Program Files/Riot Games/League of Legends/lockfile"),
-            Path("C:/Program Files (x86)/Riot Games/League of Legends/lockfile"),
-        ]
-    return [
-        Path("/Applications/League of Legends.app/Contents/LoL/lockfile"),
-        Path.home() / ".local/share/League of Legends/lockfile",
-    ]
-
-
-def lockfile_folders(explicit: Optional[str] = None, seen: Iterable[str] = ()) -> List[Path]:
-    """The existing folders a client writes its lockfile in, as find_lockfile
-    looks for it, plus *seen* (folders a lockfile was found in this session)."""
-    candidates = [Path(path).parent for path in (explicit, os.environ.get("LCU_LOCKFILE")) if path]
-    client_dir = (get_config_option("General", "clientPath") or "").strip()
-    if client_dir:
-        candidates.append(Path(client_dir))
-    candidates += [path.parent for path in _common_lockfiles()]
-    candidates += [Path(folder) for folder in seen if folder]
-    folders, keys = [], set()
-    for folder in candidates:
-        key = os.path.normcase(os.path.abspath(folder))
-        if key not in keys and folder.is_dir():
-            keys.add(key)
-            folders.append(folder)
-    return folders
 
 
 def find_lockfile(explicit: Optional[str] = None) -> Optional[str]:
@@ -110,36 +54,37 @@ def find_lockfile(explicit: Optional[str] = None) -> Optional[str]:
         env_path = Path(env)
         if env_path.is_file():
             return str(env_path)
-
-    # Try the saved folder first, but skip stale lockfiles from old installs.
-    client_dir = (get_config_option("General", "clientPath") or "").strip()
-    if client_dir:
-        configured = Path(client_dir) / "lockfile"
-        if _is_lockfile_candidate(configured):
-            return str(configured)
-
-    # Check common installation paths
-    for path in _common_lockfiles():
-        if _is_lockfile_candidate(path):
-            return str(path)
     
-    # Try to find via process scanning (repeated every second while no
-    # lockfile is found: the client closed, or installed elsewhere)
+    # Check common installation paths
+    if os.name == "nt":
+        common_paths = [
+            Path("C:/Riot Games/League of Legends/lockfile"),
+            Path("C:/Program Files/Riot Games/League of Legends/lockfile"),
+            Path("C:/Program Files (x86)/Riot Games/League of Legends/lockfile"),
+        ]
+    else:
+        common_paths = [
+            Path("/Applications/League of Legends.app/Contents/LoL/lockfile"),
+            Path.home() / ".local/share/League of Legends/lockfile",
+        ]
+    
+    for p in common_paths:
+        if p.is_file():
+            return str(p)
+    
+    # Try to find via process scanning
     try:
-        for pid, name in running_processes():
-            if "leagueclient" not in name.lower():
-                continue
-            try:
-                exe = psutil.Process(pid).exe()
-            except psutil.Error:
-                continue
-            if exe:
-                exe_path = Path(exe)
-                # Check in same directory and parent directory
-                for directory in [exe_path.parent, exe_path.parent.parent]:
-                    candidate = directory / "lockfile"
-                    if _is_lockfile_candidate(candidate):
-                        return str(candidate)
+        for proc in psutil.process_iter(attrs=["name", "exe"]):
+            nm = (proc.info.get("name") or "").lower()
+            if "leagueclient" in nm:
+                exe = proc.info.get("exe") or ""
+                if exe:
+                    exe_path = Path(exe)
+                    # Check in same directory and parent directory
+                    for directory in [exe_path.parent, exe_path.parent.parent]:
+                        lockfile = directory / "lockfile"
+                        if lockfile.is_file():
+                            return str(lockfile)
     except (psutil.Error, OSError, AttributeError) as e:
         log.debug(f"Failed to find lockfile via process iteration: {e}")
     
@@ -180,19 +125,16 @@ def parse_lockfile(lockfile_path: str) -> Optional[Lockfile]:
 def find_process_credentials() -> Optional[Lockfile]:
     """Read the local LCU endpoint when a regional client leaves lockfile empty.
 
-    Only LeagueClientUx.exe is eligible. Never log its command
-    line or authentication token and never persist these credentials.
+    Only the main client / UX processes are eligible. Never log their command
+    lines or authentication tokens and never persist these credentials.
     """
     try:
-        for pid, name in running_processes():
+        for proc in psutil.process_iter(attrs=["name"]):
             try:
-                if name.lower() != _CREDENTIALS_PROCESS_NAME:
+                name = proc.info.get("name") or ""
+                if name.lower() not in {"leagueclientux.exe", "leagueclient.exe"}:
                     continue
-                # Not psutil's cmdline(): it opens the client with
-                # PROCESS_VM_READ first, which Vanguard strips and logs.
-                args = query_cmdline(pid)
-                if not args:
-                    continue
+                args = proc.cmdline()
                 options = {}
                 for index, arg in enumerate(args):
                     key, separator, value = arg.partition("=")
@@ -207,7 +149,7 @@ def find_process_credentials() -> Optional[Lockfile]:
                     continue
                 port = int(port_text)
                 if 0 < port < 65536:
-                    return Lockfile(name, pid, port, password, "https")
+                    return Lockfile(name, proc.pid, port, password, "https")
             except (psutil.Error, OSError, ValueError):
                 continue
     except (psutil.Error, OSError) as e:

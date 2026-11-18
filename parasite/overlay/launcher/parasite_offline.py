@@ -330,7 +330,7 @@ def _watch(exe) -> None:
 # the status it applies in this file ("chat" is online).
 STATUS_FILE = Path(os.environ.get("APPDATA", "")) / "Parasite Offline" / "status"
 PARASITE_OFFLINE_FRIEND = "41c322a1-b328-495b-a004-5ccd3e45eae8@eu1.pvp.net"
-STATUSES = [("online", "Çevrimiçi"), ("offline", "Çevrimdışı"), ("mobile", "Mobil")]
+STATUSES = [("online", "Online"), ("offline", "Offline"), ("mobile", "Mobile")]
 
 
 def parasite_offline_running() -> bool:
@@ -411,7 +411,7 @@ def tray_status_menu() -> pystray.Menu:
     return pystray.Menu(
         *(item(command, label) for command, label in STATUSES),
         pystray.MenuItem(
-            "League, Parasite üzerinden açılmadı",
+            "League wasn't started through Parasite",
             None,
             enabled=False,
             visible=lambda menu_item: not parasite_offline_running(),

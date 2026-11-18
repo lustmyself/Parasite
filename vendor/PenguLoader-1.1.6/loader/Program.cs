@@ -9,6 +9,8 @@ namespace PenguLoader
     public static class Program
     {
         public static string Name => "Parasite Loader";
+        public static string HomepageUrl => "https://ko-fi.com/roseapp";
+        public static string DiscordUrl => "https://discord.gg/roseskins";
         public static string GithubRepo => "lustmyself/Parasite";
         public static string GithubUrl => $"https://github.com/{GithubRepo}";
         public static string GithubIssuesUrl => $"https://github.com/{GithubRepo}/issues";
@@ -82,7 +84,7 @@ namespace PenguLoader
 
             if (!Environment.Is64BitOperatingSystem)
             {
-                MessageBox.Show("32 BİT DESTEĞİ BİTTİ\n\nLoL 13.8 yamasından beri 32 bit Windows desteklenmiyor. Windows'unu 64 bite yükselt.",
+                MessageBox.Show("32-BIT CLIENT DEPRECATION\n\nStarting with LoL patch 13.8, 32-bit Windows is no longer supported. Please upgrade your Windows to 64-bit.",
                     Name, MessageBoxButton.OK, MessageBoxImage.Warning);
                 return 1;
             }

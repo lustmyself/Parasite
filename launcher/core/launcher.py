@@ -1,14 +1,26 @@
+"""
+Native Win32 startup dialog used to prepare Parasite before launching.
+
+This replaces the former PyQt-based launcher with a lightweight Steam-style
+progress window that:
+    1. Checks for application updates and applies them if needed.
+    2. Verifies local skin data and downloads missing content.
+
+Once all checks succeed, the dialog closes automatically and the main
+application continues bootstrapping.
+"""
 
 from __future__ import annotations
 
 import logging
+import os
 import sys
 import threading
 import time
 from contextlib import contextmanager
 from typing import Callable, Iterator
 
-from utils.core.logging import exit_now, get_logger, get_named_logger
+from utils.core.logging import get_logger, get_named_logger
 from utils.system.win32_base import (
     WM_CLOSE,
     SW_SHOWNORMAL,
@@ -19,7 +31,6 @@ from ..ui.update_dialog import UpdateDialog
 from ..update.update_sequence import UpdateSequence
 from ..sequences.hash_check_sequence import HashCheckSequence
 from ..sequences.skin_sync_sequence import SkinSyncSequence
-from ..sequences.mod_migration_sequence import ModMigrationSequence
 
 log = get_logger()
 updater_log = get_named_logger("updater", prefix="log_updater")
@@ -57,7 +68,7 @@ def _show_error(message: str) -> None:
         user32.MessageBoxW(
             None,
             message,
-            "Parasite - Başlatıcı",
+            "Parasite - Launcher",
             MB_OK | MB_ICONERROR | MB_TOPMOST,
         )
         updater_log.error(f"Error dialog shown to user: {message}")
@@ -85,14 +96,14 @@ def _confirm_update(dialog: UpdateDialog, remote_version: str, local_version: st
     """Ask whether the user wants to download an available Parasite update."""
     dialog.set_marquee(False)
     dialog.set_detail("Update available")
-    dialog.set_status(f"Parasite {remote_version} kurulmaya hazır.")
+    dialog.set_status(f"Parasite {remote_version} is ready to install.")
     dialog.pump_messages()
 
     message = (
-        f"Parasite'ın yeni bir sürümü var.\n\n"
-        f"Şu anki sürüm: {local_version}\n"
-        f"Yeni sürüm: {remote_version}\n\n"
-        "Şimdi indirip kurmak ister misin?"
+        f"A new version of Parasite is available.\n\n"
+        f"Current version: {local_version}\n"
+        f"New version: {remote_version}\n\n"
+        "Do you want to download and install it now?"
     )
     # The desktop hub asks in its window; None means no hub page, so ask with a message box
     hub_answer = dialog.confirm_update(remote_version, local_version) if hasattr(dialog, "confirm_update") else None
@@ -102,7 +113,7 @@ def _confirm_update(dialog: UpdateDialog, remote_version: str, local_version: st
         result = user32.MessageBoxW(
             dialog.hwnd or None,
             message,
-            "Parasite güncellemesi var",
+            "Parasite update available",
             MB_YESNO | MB_ICONINFORMATION | MB_DEFBUTTON2 | MB_TOPMOST,
         )
         accepted = result == IDYES
@@ -152,7 +163,7 @@ def _perform_update(dialog: UpdateDialog, dev_mode: bool = False) -> bool:
                 local_version,
             ),
         )
-        updater_log.info("Auto-update check completed. Helper ready: %s", updated)
+        updater_log.info(f"Auto-update completed. Update installed: {updated}")
     except Exception as exc:  # noqa: BLE001
         log.error(f"Auto-update failed: {exc}")
         dialog.set_status(f"Update failed: {exc}")
@@ -164,12 +175,13 @@ def _perform_update(dialog: UpdateDialog, dev_mode: bool = False) -> bool:
         return False
 
     if updated:
-        dialog.set_status("Update prepared. Closing Parasite to apply it…")
+        dialog.set_status("Update installed. Restarting…")
         dialog.set_progress(100)
         dialog.pump_messages()
         time.sleep(1.0)
-        updater_log.info("Update helper acknowledged the handoff. Closing Parasite to apply it.")
-        exit_now(0)
+        # auto_update already launched the new process via batch file; exit current one
+        updater_log.info("Update applied successfully; exiting for restart.")
+        os._exit(0)
 
     dialog.set_marquee(False)
     dialog.reset_progress()
@@ -190,19 +202,14 @@ def run_launcher(dev_mode: bool = False, test_download_fail: bool = False) -> No
         log.debug("Win32 launcher skipped on non-Windows platform.")
         return
 
-    from main.core.lockfile import update_instance_lock
-
-    with update_instance_lock() as acquired:
-        if not acquired:
-            return
-        with _route_logger(log, updater_log):
-            _run_launcher_dialog(dev_mode, test_download_fail, holds_instance_lock=True)
+    with _route_logger(log, updater_log):
+        _run_launcher_dialog(dev_mode, test_download_fail)
 
 
-def _run_launcher_dialog(dev_mode: bool, test_download_fail: bool, *, holds_instance_lock: bool = False) -> None:
+def _run_launcher_dialog(dev_mode: bool, test_download_fail: bool) -> None:
     updater_log.info("Launcher sequence starting.")
     from launcher.parasite_hub import make_launcher_dialog
-    dialog = make_launcher_dialog(UpdateDialog)
+    dialog = make_launcher_dialog()
     try:
         dialog.show_window(SW_SHOWNORMAL)
         dialog.pump_messages()
@@ -221,8 +228,6 @@ def _run_launcher_dialog(dev_mode: bool, test_download_fail: bool, *, holds_inst
                 skin_sequence = SkinSyncSequence()
                 skin_sequence.perform_skin_sync(dialog, test_fail=test_download_fail)
 
-                ModMigrationSequence().perform(dialog, holds_instance_lock=holds_instance_lock)
-
                 dialog.set_detail("All checks complete.")
                 dialog.set_status("Launching Parasite…")
                 dialog.set_progress(100)
@@ -235,7 +240,7 @@ def _run_launcher_dialog(dev_mode: bool, test_download_fail: bool, *, holds_inst
             except Exception as exc:  # noqa: BLE001
                 result["error"] = exc
                 log.error(f"Launcher error: {exc}", exc_info=True)
-                _show_error(f"Parasite hazırlanamadı:\n\n{exc}")
+                _show_error(f"Failed to prepare Parasite:\n\n{exc}")
                 updater_log.exception("Launcher sequence crashed", exc_info=True)
             finally:
                 dialog.allow_close()

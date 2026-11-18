@@ -70,7 +70,7 @@ namespace PenguLoader.Main
 
         public static string Language
         {
-            get => Get("Language", "Türkçe");
+            get => Get("Language", "English");
             set => Set("Language", value);
         }
 

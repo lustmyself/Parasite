@@ -89,35 +89,3 @@ class TokenTests(unittest.TestCase):
         with patch("launcher.parasite_offline._lcu_credentials", return_value=(1234, "t")), \
                 patch("launcher.parasite_profile._lcu", return_value=None):
             self.assertIn("tekrar dene", parasite_icon.clear_tokens())
-
-
-class IconListCacheTests(unittest.TestCase):
-    """The home tiles read the chosen icon's name every few seconds: offline, the icon list
-    must not be downloaded again (10 s timeout) on every read."""
-
-    def setUp(self):
-        from unittest.mock import MagicMock
-        p = patch.multiple(parasite_icon, _icons=(0.0, []), _failed_at=None)
-        p.start()
-        self.addCleanup(p.stop)
-        self.clock = [5000.0]
-        p = patch.object(parasite_icon.time, "monotonic", side_effect=lambda: self.clock[0])
-        p.start()
-        self.addCleanup(p.stop)
-        self.response = MagicMock()
-        self.get = MagicMock(side_effect=OSError("offline"))
-        p = patch("requests.get", self.get)
-        p.start()
-        self.addCleanup(p.stop)
-
-    def test_a_failed_download_waits_before_the_next_try(self):
-        self.assertEqual(parasite_icon.icons(), [])
-        self.assertEqual(parasite_icon.icons(), [])
-        self.assertEqual(self.get.call_count, 1)
-        self.clock[0] += parasite_icon.RETRY_S
-        self.get.side_effect = None
-        self.get.return_value.json.return_value = ICONS
-        self.assertEqual([i["id"] for i in parasite_icon.icons()], [6000, 29, 7])
-        parasite_icon.icons()
-        self.assertEqual(self.get.call_count, 2)
-

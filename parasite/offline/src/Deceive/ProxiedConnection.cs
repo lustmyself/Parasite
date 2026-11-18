@@ -261,7 +261,7 @@ internal class ProxiedConnection
                                                "premierPresenceData":
                                                {
                                                    "rosterId": "",
-                                                   "rosterName": "Parasite Offline açık. Sürüm uyuşmazlığı uyarılarını yok say.",
+                                                   "rosterName": "Parasite is active. Ignore any version mismatch warnings.",
                                                    "rosterTag": "Parasite Active!",
                                                    "rosterType": "VCT",
                                                    "division": 0,

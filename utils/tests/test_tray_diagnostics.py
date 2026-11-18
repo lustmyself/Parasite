@@ -40,7 +40,7 @@ class TrayDiagnosticsTests(unittest.TestCase):
                 self.tray._on_diagnose_startup(None, None)
                 self.assertTrue(entered.wait(2))
                 menu = self.tray._create_menu()
-                item = next(item for item in menu.items if item.text == "Başlangıç tanılanıyor...")
+                item = next(item for item in menu.items if item.text == "Diagnosing Parasite startup...")
                 self.assertFalse(item.enabled)
                 self.tray._on_diagnose_startup(None, None)
                 self.assertEqual(run.call_count, 1)
@@ -51,7 +51,7 @@ class TrayDiagnosticsTests(unittest.TestCase):
             open_folder.assert_called_once_with(self.result.directory)
             self.dialog.finish.assert_called_once_with(self.result.message, self.result.directory, True)
         self.assertFalse(self.tray._diagnostics_lock.locked())
-        self.assertEqual(item.text, "Başlangıç sorununu tanıla")
+        self.assertEqual(item.text, "Diagnose Parasite startup")
         self.assertTrue(item.enabled)
 
     def test_worker_failure_releases_lock_and_notifies(self):
@@ -59,8 +59,8 @@ class TrayDiagnosticsTests(unittest.TestCase):
         with patch.object(tray_manager, "run_startup_diagnostics", side_effect=OSError("cannot write")):
             self.tray._collect_startup_diagnostics()
         self.assertFalse(self.tray._diagnostics_lock.locked())
-        self.assertIn("Tanılama kaydedilemedi", self.tray.icon.notify.call_args.args[0])
-        self.assertIn("Tanılama kaydedilemedi", self.dialog.finish.call_args.args[0])
+        self.assertIn("Could not save", self.tray.icon.notify.call_args.args[0])
+        self.assertIn("Could not save", self.dialog.finish.call_args.args[0])
 
     def test_progress_window_failure_still_runs_collector(self):
         self.tray._diagnostics_lock.acquire()
@@ -104,7 +104,7 @@ class TrayDiagnosticsTests(unittest.TestCase):
             patch.object(tray_manager, "open_folder_in_explorer", side_effect=OSError("no explorer")),
         ):
             self.tray._collect_startup_diagnostics()
-        self.assertIn("Raporlar kaydedildi", self.tray.icon.notify.call_args.args[0])
+        self.assertIn("Reports saved", self.tray.icon.notify.call_args.args[0])
         self.assertFalse(self.tray._diagnostics_lock.locked())
 
 

@@ -2,14 +2,17 @@
 # -*- coding: utf-8 -*-
 """
 Mod Manager
-Prepares the injection's mods directory: one entry per mod, a folder (or a
-junction to one) or an archive linked under the mod's name
+Handles mod extraction, installation, and management
 """
 
+import shutil
 from pathlib import Path
+from typing import List
 
 from utils.core.logging import get_logger, log_success
-from utils.core.junction import link_file, safe_remove_entry
+from utils.core.paths import get_user_data_dir
+from utils.core.safe_extract import safe_extractall
+from utils.core.junction import is_junction, safe_remove_entry
 
 log = get_logger()
 
@@ -28,7 +31,7 @@ def empty_directory(path: Path) -> None:
 
 
 class ModManager:
-    """Prepares the mods an injection installs"""
+    """Manages mod extraction and installation"""
 
     def __init__(self, mods_dir: Path):
         self.mods_dir = mods_dir
@@ -51,12 +54,36 @@ class ModManager:
         except Exception as e:
             log.warning(f"[INJECT] Failed to clean overlay directory: {e}")
 
-    def link_archive(self, zp: Path) -> Path:
-        """Put a skin archive (.fantome/.zip) into the mod directory as the mod
-        named after it: a hard link LTK Manager installs as it is, so nothing
-        is extracted (injection.mods.mod_files)."""
+    def extract_zip_to_mod(self, zp: Path) -> Path:
+        """Extract a ZIP-compatible skin archive to the mod directory."""
         target = self.mods_dir / zp.stem
-        safe_remove_entry(target)
-        link_file(zp, target)
-        log_success(log, f"Linked skin archive: {zp.name}", "ðŸ“¦")
+        if target.exists():
+            shutil.rmtree(target, ignore_errors=True)
+        target.mkdir(parents=True, exist_ok=True)
+
+        # Security: Use safe extraction to prevent path traversal attacks.
+        safe_extractall(zp, target)
+
+        # Hide extracted files so they can't be easily browsed
+        self._hide_directory(target)
+
+        file_type = {".zip": "ZIP", ".fantome": ".fantome"}.get(zp.suffix.lower(), zp.suffix)
+        log_success(log, f"Extracted {file_type}: {zp.name}", "ðŸ“¦")
         return target
+
+    @staticmethod
+    def _hide_directory(path: Path):
+        """Set hidden + system attributes on a directory and its contents (Windows only)"""
+        import sys
+        if sys.platform != "win32":
+            return
+        try:
+            import ctypes
+            FILE_ATTRIBUTE_HIDDEN = 0x02
+            FILE_ATTRIBUTE_SYSTEM = 0x04
+            attrs = FILE_ATTRIBUTE_HIDDEN | FILE_ATTRIBUTE_SYSTEM
+            ctypes.windll.kernel32.SetFileAttributesW(str(path), attrs)
+            for item in path.rglob('*'):
+                ctypes.windll.kernel32.SetFileAttributesW(str(item), attrs)
+        except Exception as e:
+            log.debug("[INJECT] Could not hide directory %s: %s", path, e)
