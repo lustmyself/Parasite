@@ -76,9 +76,9 @@ internal class MainController : ApplicationContext
                     {
                         Trace.WriteLine(e);
                         var result = MessageBox.Show(
-                            "Unable to connect to the chat server. Please check your internet connection. " +
-                            "If this issue persists and you can connect to chat normally without Parasite, " +
-                            "please file a bug report through GitHub (https://github.com/lustmyself/Parasite) or Discord.",
+                            "Sohbet sunucusuna bağlanılamadı. İnternet bağlantını kontrol et. " +
+                            "Sorun sürerse ve Parasite Offline olmadan sohbete normal bağlanabiliyorsan, " +
+                            "lütfen GitHub'da bildir (https://github.com/lustmyself/Parasite/issues).",
                             StartupHandler.DeceiveTitle,
                             MessageBoxButtons.RetryCancel,
                             MessageBoxIcon.Error,
@@ -131,7 +131,7 @@ internal class MainController : ApplicationContext
         {
             Enabled = !Enabled;
             await UpdateStatusAsync(Enabled ? Status : "chat");
-            await SendMessageFromFakePlayerAsync(Enabled ? "Parasite is now enabled." : "Parasite is now disabled.");
+            await SendMessageFromFakePlayerAsync(Enabled ? "Parasite Offline açıldı." : "Parasite Offline kapatıldı.");
             UpdateTray();
         })
         { Checked = Enabled };
@@ -258,45 +258,45 @@ internal class MainController : ApplicationContext
         if (content.ToLower().Contains("offline"))
         {
             if (!Enabled)
-                await SendMessageFromFakePlayerAsync("Parasite is now enabled.");
+                await SendMessageFromFakePlayerAsync("Parasite Offline açıldı.");
             OfflineStatus.PerformClick();
         }
         else if (content.ToLower().Contains("mobile"))
         {
             if (!Enabled)
-                await SendMessageFromFakePlayerAsync("Parasite is now enabled.");
+                await SendMessageFromFakePlayerAsync("Parasite Offline açıldı.");
             MobileStatus.PerformClick();
         }
         else if (content.ToLower().Contains("online"))
         {
             if (!Enabled)
-                await SendMessageFromFakePlayerAsync("Parasite is now enabled.");
+                await SendMessageFromFakePlayerAsync("Parasite Offline açıldı.");
             ChatStatus.PerformClick();
         }
         else if (content.ToLower().Contains("enable"))
         {
             if (Enabled)
-                await SendMessageFromFakePlayerAsync("Parasite is already enabled.");
+                await SendMessageFromFakePlayerAsync("Parasite Offline zaten açık.");
             else
                 EnabledMenuItem.PerformClick();
         }
         else if (content.ToLower().Contains("disable"))
         {
             if (!Enabled)
-                await SendMessageFromFakePlayerAsync("Parasite is already disabled.");
+                await SendMessageFromFakePlayerAsync("Parasite Offline zaten kapalı.");
             else
                 EnabledMenuItem.PerformClick();
         }
         else if (content.ToLower().Contains("status"))
         {
             if (Status == "chat")
-                await SendMessageFromFakePlayerAsync("You are appearing online.");
+                await SendMessageFromFakePlayerAsync("Çevrimiçi görünüyorsun.");
             else
-                await SendMessageFromFakePlayerAsync("You are appearing " + Status + ".");
+                await SendMessageFromFakePlayerAsync((Status == "mobile" ? "Mobilde" : "Çevrimdışı") + " görünüyorsun.");
         }
         else if (content.ToLower().Contains("help"))
         {
-            await SendMessageFromFakePlayerAsync("You can send the following messages to quickly change Parasite settings: online/offline/mobile/enable/disable/status");
+            await SendMessageFromFakePlayerAsync("Parasite Offline'ı hızlıca ayarlamak için şu mesajları gönderebilirsin: online/offline/mobile/enable/disable/status");
         }
     }
 
@@ -327,9 +327,9 @@ internal class MainController : ApplicationContext
             await connection.UpdateStatusAsync(newStatus);
 
         if (newStatus == "chat")
-            await SendMessageFromFakePlayerAsync("You are now appearing online.");
+            await SendMessageFromFakePlayerAsync("Artık çevrimiçi görünüyorsun.");
         else
-            await SendMessageFromFakePlayerAsync("You are now appearing " + newStatus + ".");
+            await SendMessageFromFakePlayerAsync("Artık " + (newStatus == "mobile" ? "mobilde" : "çevrimdışı") + " görünüyorsun.");
     }
 
     private void LoadStatus()

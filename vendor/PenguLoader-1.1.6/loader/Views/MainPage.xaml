@@ -42,7 +42,7 @@
                 <Button Click="HomePageButtonClick" Background="Transparent" BorderBrush="#6888" Focusable="False" HorizontalAlignment="Stretch" Margin="20,5">
                     <StackPanel Orientation="Horizontal">
                         <Image Source="/Resources/icon_parasite.png" Width="16" Height="16" />
-                        <TextBlock Text="Support Parasite Team" Margin="8,0,0,0" />
+                        <TextBlock Text="Sorun bildir" Margin="8,0,0,0" />
                     </StackPanel>
                 </Button>
                 <Grid Margin="20,5">
@@ -50,26 +50,14 @@
                         <ColumnDefinition Width="*" />
                         <ColumnDefinition Width="*" />
                     </Grid.ColumnDefinitions>
-                    <Button Click="DiscordButtonClick" Grid.Column="0" Background="Transparent" BorderBrush="#6888" Focusable="False" HorizontalAlignment="Stretch" Margin="0">
-                        <StackPanel Orientation="Horizontal">
-                            <Image Source="/Resources/icon_discord.png" Width="16" Height="16" />
-                            <TextBlock Text="Discord" Margin="8,0,0,0" />
-                        </StackPanel>
-                    </Button>
-                    <Button Click="GitHubButtonClick" Grid.Column="1" Background="Transparent" BorderBrush="#6888" Focusable="False" HorizontalAlignment="Stretch" Margin="5,0,0,0">
+                    <Button Click="GitHubButtonClick" Grid.Column="0" Grid.ColumnSpan="2" Background="Transparent" BorderBrush="#6888" Focusable="False" HorizontalAlignment="Stretch" Margin="0">
                         <StackPanel Orientation="Horizontal">
                             <Image Source="/Resources/icon_github.png" Width="16" Height="16" />
                             <TextBlock Text="GitHub" Margin="8,0,0,0" />
                         </StackPanel>
                     </Button>
                 </Grid>
-                <ComboBox
-                    ItemsSource="{Binding Source={x:Static root:App.Languages}}"
-                    SelectedItem="{Binding Path=(root:App.Language), Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                    Margin="20,5"
-                    BorderThickness="1"
-                    BorderBrush="#33333333"
-                    HorizontalAlignment="Stretch" />
+                <!-- Parasite is Turkish only: no language list -->
             </StackPanel>
             <StackPanel Grid.Column="1" VerticalAlignment="Center">
                 <TextBlock Text="{DynamicResource t_options}" HorizontalAlignment="Stretch" Margin="20,10" FontSize="14" FontWeight="SemiBold" />
@@ -84,7 +72,7 @@
                 FontSize="13" HorizontalAlignment="Center" VerticalAlignment="Bottom" Padding="10,2"
                 Cursor="Hand" MouseEnter="LeaguePath_MouseEnter" MouseLeave="LeaguePath_MouseLeave" MouseUp="LeaguePath_MouseUp"
             >
-                <TextBlock FontWeight="SemiBold" Text="League path" Margin="0,0,8,0" />
+                <TextBlock FontWeight="SemiBold" Text="League yolu" Margin="0,0,8,0" />
                 <TextBlock x:Name="tLeaguePath" Text="..." />
             </TextBlock>
         </Grid>
@@ -98,7 +86,7 @@
             </Grid>
             <Grid Grid.Column="1">
                 <ui:ToggleSwitch
-                    IsOn="{Binding Path=IsActivated, Mode=TwoWay}" OffContent="OFF" OnContent="READY" Focusable="False"
+                    IsOn="{Binding Path=IsActivated, Mode=TwoWay}" OffContent="KAPALI" OnContent="HAZIR" Focusable="False"
                     Margin="57,19,51,19" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" RenderTransformOrigin="0.5,0.5">
                     <ui:ToggleSwitch.RenderTransform>
                         <TransformGroup>

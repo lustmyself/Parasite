@@ -2,8 +2,9 @@
 
 PARASITE_RELAY_URL wins when set. Otherwise the address comes from the Cloudflare account
 the relay is deployed to (CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID): the worker
-parasite-party-relay answers on <account's workers.dev subdomain>. Without either, Parasite
-uses the relay Lust already runs (same code, DEFAULT_RELAY).
+PARASITE_RELAY_WORKER (parasite-party-relay when unset, as relay-deploy.yml) answers on
+<account's workers.dev subdomain>. Without either, Parasite uses the relay Lust already
+runs (DEFAULT_RELAY), which needs this code deployed for Parasite 2.11+ (see README.md).
 """
 
 import json
@@ -12,8 +13,8 @@ import sys
 import urllib.request
 from pathlib import Path
 
-WORKER = "parasite-party-relay"
-# The owner's relay deployed for Lust; Parasite's relay code is the same
+WORKER = os.environ.get("PARASITE_RELAY_WORKER", "").strip() or "parasite-party-relay"
+# The owner's relay deployed for Lust, shared by Lust and Parasite (both protocols, see src/room.ts)
 DEFAULT_RELAY = "wss://lust-party-relay.nysperado.workers.dev"
 OUT = Path(__file__).resolve().parents[2] / "party" / "network" / "relay_config.py"
 
