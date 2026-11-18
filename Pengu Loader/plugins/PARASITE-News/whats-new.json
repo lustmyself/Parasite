@@ -1,13 +1,13 @@
 {
-  "version": "2.12",
+  "version": "2.13",
   "en": [
-    "Built on Rose 1.5.8",
-    "Custom skins that ship their WAD as an unpacked folder now play on the champion's default skin too",
-    "Every stored custom skin is checked once more after the update"
+    "Built on Rose 1.5.9",
+    "Custom skins are matched to the base skin the way RoseBin now builds them, sounds included",
+    "A custom skin an older Parasite prepared asks, in Troubleshooting, to be added again"
   ],
   "tr": [
-    "Rose 1.5.8 üzerine kuruldu",
-    "WAD'ını açılmış klasör olarak getiren özel skinler de artık şampiyonun varsayılan skininde oynuyor",
-    "Güncellemeden sonra kayıtlı her özel skin bir kez daha kontrol ediliyor"
+    "Rose 1.5.9 üzerine kuruldu",
+    "Özel skinler artık RoseBin'in yeni yöntemiyle, sesleriyle birlikte varsayılan skine uyarlanıyor",
+    "Eski bir Parasite'ın hazırladığı özel skin, Sorun giderme'de yeniden eklenmesini istiyor"
   ]
 }

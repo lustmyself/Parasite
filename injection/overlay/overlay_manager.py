@@ -24,6 +24,7 @@ from injection.game.reconnect import kill_game, reconnect_to_game
 from utils.core.logging import get_logger, log_event
 from utils.core.issue_reporter import report_issue
 from ..tools.bridge import BridgeCommandError, BridgeUnavailable
+from ..baseskin.skin_sounds import sound_mods
 from ..mods.fantome import fantome_display_name, write_fantome_zip
 from ..mods.fingerprint import mod_fingerprint
 from ..mods.ltk_ref import split_mod_names
@@ -395,6 +396,12 @@ class OverlayManager:
         session["library_snapshot"] = None
 
         files, ltk_ids = split_mod_names(mod_names)
+        # A skin ParasiteBin built, or a custom skin Parasite fixed (injection.baseskin),
+        # loads some of the game's sound banks from new paths and lists them
+        # (META/parasite_sounds.json): copied here from this PC's game WADs, in the
+        # client's language, as a mod of their own. The staging builds the
+        # same mod as the injection, so it stays installed.
+        files = files + sound_mods(self.game_dir, folder_dir, files)
         wanted = []
         for name in files:
             folder = folder_dir / name
@@ -473,6 +480,10 @@ class OverlayManager:
                     before_ids = {str(e.get("id")) for e in shared_library_read if e.get("id")}
                     entry = self.host.import_archive(ltf, Path(archive), folder, display_name, fingerprint,
                                                      before_ids=before_ids)
+                    # LTK Manager answers an archive its library holds already with that entry
+                    if str(entry.get("id")) in before_ids:
+                        shared_library_read = [e for e in shared_library_read
+                                               if str(e.get("id")) != str(entry.get("id"))]
                     shared_library_read.append(entry)
                     # Under the session's lock, as SavedModSwitches.switch: one that
                     # ended during the import removed it (LtfHost._track)
@@ -482,7 +493,9 @@ class OverlayManager:
                             return False
                         if not entry.get("enabled"):
                             bridge.toggle(str(entry.get("id")), True)
-                    log.info(f"[INJECT] Installed {display_name} into LTK Manager")
+                            entry["enabled"] = True
+                    if str(entry.get("id")) not in before_ids:
+                        log.info(f"[INJECT] Installed {display_name} into LTK Manager")
                 except (OSError, BridgeUnavailable, BridgeCommandError) as e:
                     log.error(f"[INJECT] Could not install {display_name}: {e}")
                     if report and not stopped():

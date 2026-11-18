@@ -882,6 +882,15 @@ class MessageHandler:
                 if "injection skipped" in ml and "base skin selected" in ml:
                     return None
 
+                # Category: a custom skin an older Parasite fixed (CUSTOM_SKIN_OUTDATED)
+                if "was added with an older parasite" in ml:
+                    m = re.search(r"Custom skin (.+) was added with an older Parasite", msg or "")
+                    return {
+                        "code": "CUSTOM_SKIN_OUTDATED",
+                        "text": "Custom skin added with an older Parasite → reinstall it",
+                        "detail": m.group(1) if m else "",
+                    }
+
                 # Parse helper(s)
                 def _extract_first_seconds(text: str) -> Optional[float]:
                     try:
@@ -1394,6 +1403,19 @@ class MessageHandler:
         name_value = self._normalize_mod_identifier(entry.mod_name)
         return requested in {relative_value, name_value}
 
+    def _warn_if_outdated(self, selected_mod) -> None:
+        """Tell the player in Troubleshooting to add the picked custom skin
+        again when it is still as an older Parasite fixed it, or this Parasite could
+        not fix it (injection.baseskin.library.needs_reinstall). The skin
+        stays picked: the injection still tries it. Never raises."""
+        try:
+            from injection.baseskin.library import needs_reinstall, report_outdated
+
+            if needs_reinstall(self.mod_storage.mods_root, selected_mod.path):
+                report_outdated(selected_mod.display_name or selected_mod.mod_name)
+        except Exception as e:  # noqa: BLE001 - a warning must never fail the pick
+            log.debug(f"[SkinMonitor] Could not check whether {selected_mod.mod_name} is up to date: {e}")
+
     def _send_custom_mod_selection_result(
         self,
         payload: dict,
@@ -1783,6 +1805,8 @@ class MessageHandler:
                     selected_mod=selected_mod,
                 )
                 return
+
+            self._warn_if_outdated(selected_mod)
 
             # Nothing goes into the mods folder on a pick: the injection cleans it
             # and links the mods picked itself, and a pick made while it runs (past
@@ -2791,14 +2815,14 @@ class MessageHandler:
     _MOD_CHECK_BUSY_PHASES = frozenset({
         "Matchmaking", "ReadyCheck", "ChampSelect", "FINALIZATION", "GameStart", "InProgress", "Reconnect",
     })
-    # Client phases where the base-skin fix of an added skin waits until the client is idle
-    # (injection.baseskin.library): it rewrites the whole mod, which neither the countdown's
-    # staging nor a running game should share the disk with
+    # Client phases where an added skin is not matched to the base skin (injection.baseskin):
+    # the fix rewrites the whole mod, which neither the countdown's staging nor a running game
+    # should share the disk with. Parasite does not fix it later: picked, it asks to be added again
     _BASE_SKIN_WAIT_PHASES = frozenset({"FINALIZATION", "GameStart", "InProgress", "Reconnect"})
 
     def _fix_base_skin(self, imported: list[dict], game_dir) -> None:
         """Make each just-imported skin match the base skin's identity (its
-        sound banks, bank units, SKN/SKL padding and championSkinName: see
+        sound banks, bank units and bank paths, rebuilt SKN/SKL and championSkinName: see
         injection.baseskin) so LTK Manager does not take it for a skinhack,
         writing the mod again only when it did not. A mod written again gets
         "baseSkin" ({"fixes": how many}). This needs the game's files, not
@@ -2872,7 +2896,7 @@ class MessageHandler:
         LTK Manager's check is skipped while a game wants it (_ltk_wanted_by_game:
         a queue, champion select, a game), and one running gives way when the
         client gets there: the mod stays in Parasite as it was added. From the
-        countdown on, the base-skin fix waits for the client to be idle."""
+        countdown on, the base-skin fix is skipped: Parasite does not fix the skin later."""
         injection_manager = getattr(self, "injection_manager", None)
         injector = getattr(injection_manager, "injector", None)
         overlay = getattr(injector, "overlay_manager", None)
@@ -2880,8 +2904,8 @@ class MessageHandler:
         injecting = bool(getattr(injection_manager, "_injection_in_progress", False))
         if skins and imported:
             if phase in self._BASE_SKIN_WAIT_PHASES or injecting:
-                log.info("[BASESKIN] The added skins are matched to the base skin once the client is idle, "
-                         "not during the countdown or a game")
+                log.info("[BASESKIN] The added skins are not matched to the base skin during the countdown "
+                         "or a game: one picked asks to be added again")
             else:
                 # Before LTK Manager's check, so its verdict is on the mod as it will be played
                 game_dir = getattr(overlay, "game_dir", None) or getattr(injector, "game_dir", None)
