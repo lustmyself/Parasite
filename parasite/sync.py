@@ -1049,6 +1049,8 @@ EDITS += [
      '        except Exception as e:  # noqa: BLE001\n'
      '            log.debug(f"[Fonts] Default font not set up: {e}")\n'),
     ("Parasite.spec", "    'launcher.parasite_maps',\n", "    'launcher.parasite_maps',\n    'launcher.parasite_fonts',\n"),
+    # The default Summoner's Rift, built from the player's game (launcher/parasite_default_rift.py)
+    ("Parasite.spec", "    'launcher.parasite_maps',\n", "    'launcher.parasite_maps',\n    'launcher.parasite_default_rift',\n"),
 ]
 
 

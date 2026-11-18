@@ -2822,9 +2822,15 @@ function mapCard(m, catalogItem) {
   if (catalogItem) {
     const get = document.createElement("button");
     get.className = "btn get" + (m.installed ? "" : " primary");
-    get.textContent = m.installing ? "İndiriliyor…" : m.installed ? "Kurulu" : "İndir";
-    get.disabled = m.installed || m.installing;
-    get.addEventListener("click", (e) => { e.stopPropagation(); act("map_install", { id: m.id }).then(() => setTimeout(loadMaps, 400)); });
+    if (m.build) {
+      get.textContent = m.installing ? "Kuruluyor…" : m.installed ? "Yeniden kur" : "Kur";
+      get.disabled = m.installing;
+      card.title = m.description;
+    } else {
+      get.textContent = m.installing ? "İndiriliyor…" : m.installed ? "Kurulu" : "İndir";
+      get.disabled = m.installed || m.installing;
+    }
+    get.addEventListener("click", (e) => { e.stopPropagation(); if (m.build) { get.textContent = "Kuruluyor…"; get.disabled = true; } act("map_install", { id: m.id }).then(() => setTimeout(loadMaps, 400)); });
     card.appendChild(get);
   } else {
     card.addEventListener("click", () => act("map_select", { id: m.id || null }).then(() => setTimeout(loadMaps, 300)));

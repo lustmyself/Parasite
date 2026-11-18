@@ -324,6 +324,7 @@ hiddenimports = [
     'tkinter',
     'launcher.parasite_offline',
     'launcher.parasite_maps',
+    'launcher.parasite_default_rift',
     'launcher.parasite_fonts',
     'launcher.parasite_client',
     'launcher.parasite_auto',
