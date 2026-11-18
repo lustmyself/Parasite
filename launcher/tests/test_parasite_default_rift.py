@@ -1,10 +1,11 @@
 import shutil
+import struct
 import tempfile
 import unittest
 import zipfile
 from pathlib import Path
 
-from injection.baseskin.propbin import Bin, Entry, Field, Value, build, fnv1a_lower
+from injection.baseskin.propbin import HASH, MAP, POINTER, Bin, Embed, Entry, Field, Value, build, fnv1a_lower
 from injection.baseskin.wad import GameWad, ModWad
 from launcher import parasite_default_rift as rift
 
@@ -12,12 +13,31 @@ NAME_FIELD = fnv1a_lower("name")
 SEASONAL = "Maps/MapGeometry/Map11/Milkshake_SRS"
 
 
-def _container(path: str) -> Entry:
-    return Entry(fnv1a_lower("MapContainer"), fnv1a_lower(path), [Field(NAME_FIELD, Value.string(path))])
+PLACED = fnv1a_lower("mPlaceables")
 
 
-def _material(path: str, text: str) -> Entry:
-    return Entry(fnv1a_lower("StaticMaterialDef"), fnv1a_lower(path), [Field(NAME_FIELD, Value.string(text))])
+def _map(pairs) -> Value:
+    return Value(MAP, [(Value(HASH, struct.pack("<I", k)), Value(HASH, struct.pack("<I", v))) for k, v in pairs],
+                 HASH, HASH)
+
+
+def _container(path: str, terrain: str, pairs) -> Entry:
+    return Entry(fnv1a_lower("MapContainer"), fnv1a_lower(path),
+                 [Field(NAME_FIELD, Value.string(path)), Field(TERRAIN_FIELD, Value.string(terrain)),
+                  Field(PLACED, _map(pairs))])
+
+
+def _material(path: str, text: str, kind: str = "StaticMaterialDef") -> Entry:
+    return Entry(fnv1a_lower(kind), fnv1a_lower(path), [Field(NAME_FIELD, Value.string(text))])
+
+
+def _placeables(path: str, objects) -> Entry:
+    """A MapPlaceableContainer placing {key: skin} structures."""
+    embed = fnv1a_lower("MapPlaceable")
+    pairs = [(Value(HASH, struct.pack("<I", key)),
+              Value(POINTER, Embed(embed, [Field(SKIN_FIELD, Value.string(skin))]))) for key, skin in objects]
+    return Entry(fnv1a_lower("MapPlaceableContainer"), fnv1a_lower(path),
+                 [Field(fnv1a_lower("items"), Value(MAP, pairs, HASH, POINTER))])
 
 
 def _entries(data: bytes) -> dict:
@@ -25,63 +45,68 @@ def _entries(data: bytes) -> dict:
     found = {}
     for type_hash, (start, end) in zip(parsed.types, parsed._locate()):
         entry = rift._parse_entry(data, type_hash, start, end)
-        found[entry.path_hash] = entry.fields[0].value.as_string()
+        found[entry.path_hash] = entry
     return found
 
 
-BASE = build([_container(rift.DEFAULT_CONTAINER), _material("Maps/Grass", "base grass")])
-WINTER = build([_container(SEASONAL), _material("Maps/Grass", "snowy grass"), _material("Maps/Snow", "snow")])
+def _skins_of(entry) -> dict:
+    return {struct.unpack("<I", k.v)[0]: v.v.fields[0].value.v for k, v in entry.fields[0].value.v}
 
 
-class MaterialsTest(unittest.TestCase):
-    def test_the_default_materials_take_the_seasonal_name(self):
-        merged = _entries(rift.merged_materials(BASE, WINTER, SEASONAL))
-        self.assertEqual(merged[fnv1a_lower(SEASONAL)], SEASONAL)
-        self.assertNotIn(fnv1a_lower(rift.DEFAULT_CONTAINER), merged)
-        self.assertEqual(merged[fnv1a_lower("Maps/Grass")], "base grass")  # the default look wins
-        self.assertEqual(merged[fnv1a_lower("Maps/Snow")], "snow")  # seasonal-only entries are kept
-        self.assertEqual(len(merged), 3)
-
-    def test_materials_without_the_default_container_are_refused(self):
-        with self.assertRaises(rift.DefaultRiftError):
-            rift.merged_materials(WINTER, WINTER, SEASONAL)
-
-
-def _skin(name: str, container: str, grass: str, extra=()) -> Entry:
-    return Entry(fnv1a_lower("MapSkin"), fnv1a_lower(rift.MAP_SKIN.format(name)),
-                 [Field(NAME_FIELD, Value.string(name)), Field(GRASS_FIELD, Value.string(grass)),
-                  Field(LINK_FIELD, Value.string(container)), *extra])
-
-
-GRASS_FIELD = fnv1a_lower("mGrassTintTexture")
-LINK_FIELD = fnv1a_lower("mMapContainerLink")
-SNOW_FIELD = fnv1a_lower("mSnow")
-MAP_BIN = build([
-    _skin("Default", rift.DEFAULT_CONTAINER, "GrassTint_SRX.tex"),
-    _skin("Milkshake_SRS", SEASONAL, "GrassTint_Winter.tex", [Field(SNOW_FIELD, Value.string("on"))]),
+TERRAIN_FIELD = fnv1a_lower("terrainPaint")
+SKIN_FIELD = fnv1a_lower("skin")
+BASE = build([
+    _container(rift.DEFAULT_CONTAINER, "Base_SRX.tex", [(1, 10), (2, 20), (9, 90)]),
+    _material("Maps/Grass", "base grass"),
+    _placeables("Maps/Structures", [(100, "Characters/Turret/Skins/Skin0"), (101, "Characters/Turret/Skins/Skin3")]),
+])
+WINTER = build([
+    _material("Maps/Grass", "snowy grass"),
+    _material("Maps/Snow", "snow"),
+    _material("Maps/SnowFx", "snow effect", "VfxSystemDefinitionData"),
+    _placeables("Maps/WinterStructures", [(100, "Characters/Turret/Skins/Skin48"),
+                                          (101, "Characters/Turret/Skins/Skin49"),
+                                          (102, "Characters/Snowman/Skins/Skin1")]),
+    _container(SEASONAL, "Milkshake_SRS.tex", [(5, 55), (1, 11), (2, 22)]),
 ])
 
 
-class MapSkinTest(unittest.TestCase):
-    def test_the_seasonal_map_skin_takes_the_default_look_but_keeps_its_container(self):
-        out = rift.default_map_skin(MAP_BIN, "Milkshake_SRS")
-        parsed = Bin(out)
-        skins = {}
-        for type_hash, (start, end) in zip(parsed.types, parsed._locate()):
-            entry = rift._parse_entry(out, type_hash, start, end)
-            skins[entry.path_hash] = {f.name_hash: f.value.as_string() for f in entry.fields}
-        winter = skins[fnv1a_lower(rift.MAP_SKIN.format("Milkshake_SRS"))]
-        self.assertEqual(winter, {NAME_FIELD: "Milkshake_SRS", GRASS_FIELD: "GrassTint_SRX.tex", LINK_FIELD: SEASONAL})
-        default = skins[fnv1a_lower(rift.MAP_SKIN.format("Default"))]
-        self.assertEqual(default[LINK_FIELD], rift.DEFAULT_CONTAINER)
+class MaterialsTest(unittest.TestCase):
+    def setUp(self):
+        self.merged = _entries(rift.merged_materials(BASE, WINTER, SEASONAL))
 
-    def test_a_default_map_skin_already_matching_is_left_as_it_is(self):
-        once = rift.default_map_skin(MAP_BIN, "Milkshake_SRS")
-        self.assertEqual(rift.default_map_skin(once, "Milkshake_SRS"), once)
+    def test_the_seasonal_container_takes_the_default_placeables(self):
+        container = self.merged[fnv1a_lower(SEASONAL)]
+        self.assertNotIn(fnv1a_lower(rift.DEFAULT_CONTAINER), self.merged)
+        fields = {f.name_hash: f.value for f in container.fields}
+        self.assertEqual(fields[NAME_FIELD].v, SEASONAL)
+        self.assertEqual(fields[TERRAIN_FIELD].v, "Milkshake_SRS.tex")
+        pairs = [(struct.unpack("<I", k.v)[0], struct.unpack("<I", v.v)[0]) for k, v in fields[PLACED].v]
+        # the seasonal keys in their order with the default values, then the default-only keys
+        self.assertEqual(pairs, [(5, 55), (1, 10), (2, 20), (9, 90)])
 
-    def test_an_unknown_map_skin_is_refused(self):
+    def test_the_default_entries_win_and_only_seasonal_materials_and_placeables_come_along(self):
+        self.assertEqual(self.merged[fnv1a_lower("Maps/Grass")].fields[0].value.v, "base grass")
+        self.assertEqual(self.merged[fnv1a_lower("Maps/Snow")].fields[0].value.v, "snow")
+        self.assertNotIn(fnv1a_lower("Maps/SnowFx"), self.merged)
+        self.assertEqual(len(self.merged), 5)
+
+    def test_seasonal_structures_get_the_default_skins(self):
+        winter = _skins_of(self.merged[fnv1a_lower("Maps/WinterStructures")])
+        self.assertEqual(winter, {100: "Characters/Turret/Skins/Skin0", 101: "Characters/Turret/Skins/Skin3",
+                                  102: "Characters/Snowman/Skins/Skin1"})
+
+    def test_the_order_is_the_default_one_then_the_seasonal_extras(self):
+        parsed = Bin(rift.merged_materials(BASE, WINTER, SEASONAL))
+        paths = [rift._parse_entry(parsed._data, t, s, e).path_hash for t, (s, e) in zip(parsed.types, parsed._locate())]
+        self.assertEqual(paths, [fnv1a_lower(p) for p in (SEASONAL, "Maps/Grass", "Maps/Structures", "Maps/Snow",
+                                                          "Maps/WinterStructures")])
+
+    def test_materials_without_either_container_are_refused(self):
         with self.assertRaises(rift.DefaultRiftError):
-            rift.default_map_skin(MAP_BIN, "Nope")
+            rift.merged_materials(WINTER, WINTER, SEASONAL)
+        with self.assertRaises(rift.DefaultRiftError):
+            rift.merged_materials(BASE, BASE, SEASONAL)
 
 
 class GameTest(unittest.TestCase):
@@ -106,8 +131,10 @@ class GameTest(unittest.TestCase):
         self.assertIsNone(rift.last_map_skin(self.game))
 
     def _wad(self):
+        skin = Entry(fnv1a_lower("MapSkin"), fnv1a_lower(rift.MAP_SKIN.format("Milkshake_SRS")),
+                     [Field(fnv1a_lower("mMapContainerLink"), Value.string(SEASONAL))])
         wad = ModWad(rift.EMPTY_WAD)
-        wad.put_path(rift.MAP_BIN, MAP_BIN)
+        wad.put_path(rift.MAP_BIN, build([skin]))
         wad.put_path(rift.GEOMETRY.format("base_srx"), b"default geometry")
         wad.put_path(rift.GEOMETRY.format("milkshake_srs"), b"winter geometry")
         wad.put_path(rift.MATERIALS.format("base_srx"), BASE)
@@ -126,9 +153,9 @@ class GameTest(unittest.TestCase):
         mod = GameWad(inner)
         self.assertEqual(mod.read_path(rift.GEOMETRY.format("milkshake_srs")), b"default geometry")
         materials = _entries(mod.read_path(rift.MATERIALS.format("milkshake_srs")))
-        self.assertEqual(materials[fnv1a_lower(SEASONAL)], SEASONAL)
+        self.assertIn(fnv1a_lower(SEASONAL), materials)
         self.assertFalse(mod.has_path(rift.GEOMETRY.format("base_srx")))
-        self.assertEqual(mod.read_path(rift.MAP_BIN), rift.default_map_skin(MAP_BIN, "Milkshake_SRS"))
+        self.assertFalse(mod.has_path(rift.MAP_BIN))
 
     def test_the_default_map_skin_is_not_rebuilt(self):
         self._wad()

@@ -1,9 +1,9 @@
 {
   "version": "2.15",
   "en": [
-    "Maps: \"Varsayılan Sihirdar Vadisi\" no longer closes the game as the champions spawn: build it again with \"Yeniden kur\""
+    "Maps: \"Varsayılan Sihirdar Vadisi\" is now built exactly the way TheKillerey's Default Rift is and no longer closes the game as the champions spawn: build it again with \"Yeniden kur\""
   ],
   "tr": [
-    "Haritalar: \"Varsayılan Sihirdar Vadisi\" artık şampiyonlar doğarken oyunu kapatmıyor: \"Yeniden kur\" ile yeniden kur"
+    "Haritalar: \"Varsayılan Sihirdar Vadisi\" artık TheKillerey'in Default Rift moduyla birebir aynı yöntemle kuruluyor ve şampiyonlar doğarken oyunu kapatmıyor: \"Yeniden kur\" ile yeniden kur"
   ]
 }
