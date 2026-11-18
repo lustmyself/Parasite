@@ -76,7 +76,7 @@ def rebrand_text(text):
     # needs in META/rose_sounds.json: renamed, Parasite never found them and skins played silent
     return (REPO_LINK_RE.sub(PARASITE_REPO, "".join(out)).replace("config.ini", "cf.ini")
             .replace("parasite_character_displayname_", "prst_character_displayname_")
-            .replace("META/parasite_sounds.json", "META/rose_sounds.json"))
+            .replace("parasite_sounds.json", "rose_sounds.json"))
 
 
 def read_text(path):
