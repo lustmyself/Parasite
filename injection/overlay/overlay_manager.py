@@ -398,7 +398,7 @@ class OverlayManager:
         files, ltk_ids = split_mod_names(mod_names)
         # A skin ParasiteBin built, or a custom skin Parasite fixed (injection.baseskin),
         # loads some of the game's sound banks from new paths and lists them
-        # (META/parasite_sounds.json): copied here from this PC's game WADs, in the
+        # (META/rose_sounds.json): copied here from this PC's game WADs, in the
         # client's language, as a mod of their own. The staging builds the
         # same mod as the injection, so it stays installed.
         files = files + sound_mods(self.game_dir, folder_dir, files)

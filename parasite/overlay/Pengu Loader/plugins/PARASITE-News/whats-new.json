@@ -1,9 +1,9 @@
 {
-  "version": "2.16",
+  "version": "2.17",
   "en": [
-    "Maps: \"Varsayılan Sihirdar Vadisi\" takes along the winter map's own effects too, which the game needs while it loads: build it again with \"Yeniden kur\""
+    "Skins: a skin's auto attack and ability sounds play again (the sound banks listed by the skin are copied from your game again)"
   ],
   "tr": [
-    "Haritalar: \"Varsayılan Sihirdar Vadisi\" artık kış haritasının oyunun yüklenirken ihtiyaç duyduğu efektlerini de alıyor: \"Yeniden kur\" ile yeniden kur"
+    "Kostümler: kostümle oynarken şampiyonun temel saldırı ve yetenek sesleri yeniden geliyor"
   ]
 }

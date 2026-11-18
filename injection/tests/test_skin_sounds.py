@@ -39,7 +39,7 @@ def skin_folder(mods: Path, copies, name="Aatrox Skin 1") -> str:
     meta.mkdir(parents=True)
     (meta / "info.json").write_text('{"Name": "Aatrox Skin 1"}', encoding="utf-8")
     if copies is not None:
-        (meta / "parasite_sounds.json").write_text(json.dumps({"version": 1, "copies": copies}), encoding="utf-8")
+        (meta / "rose_sounds.json").write_text(json.dumps({"version": 1, "copies": copies}), encoding="utf-8")
     return name
 
 

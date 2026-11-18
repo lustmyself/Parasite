@@ -72,8 +72,11 @@ def rebrand_text(text):
     # core.dll reads %LOCALAPPDATA%\\Parasite\\cf.ini (see patch_core_dll)
     # The loading screen's name record must keep the game key's length
     # (game_character_displayname_), so Parasite's own key uses a 4-letter prefix
+    # Rose's skin packs (Parasite downloads the same ones) list the game sound banks a skin
+    # needs in META/rose_sounds.json: renamed, Parasite never found them and skins played silent
     return (REPO_LINK_RE.sub(PARASITE_REPO, "".join(out)).replace("config.ini", "cf.ini")
-            .replace("parasite_character_displayname_", "prst_character_displayname_"))
+            .replace("parasite_character_displayname_", "prst_character_displayname_")
+            .replace("parasite_sounds.json", "rose_sounds.json"))
 
 
 def read_text(path):

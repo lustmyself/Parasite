@@ -1023,7 +1023,7 @@ class BankPathTests(_GameAndMod):
 
     def manifest(self):
         with zipfile.ZipFile(self.archive) as archive:
-            return json.loads(archive.read("META/parasite_sounds.json"))
+            return json.loads(archive.read("META/rose_sounds.json"))
 
     def test_game_banks_move_to_base_paths_for_parasite_to_copy(self):
         audio_bank, events = self.sfx("Skin12/Aatrox_Skin12_SFX_audio.bnk"), self.sfx("Skin12/Aatrox_Skin12_SFX_events.bnk")
@@ -1044,7 +1044,7 @@ class BankPathTests(_GameAndMod):
         self.assertEqual([u.events for u in units_of(skin)], [[], []])
         # Game banks do not ship: the mod lists them for Parasite to copy
         self.assertEqual(sorted(files), [path_hash(SKIN0_BIN)])
-        self.assertIn("META/parasite_sounds.json", names)
+        self.assertIn("META/rose_sounds.json", names)
         self.assertEqual(self.manifest(), {"version": 1, "copies": [
             {"wad": "Aatrox", "localized": False, "from": audio_bank, "to": base_audio, "packagedLocales": []},
             {"wad": "Aatrox", "localized": False, "from": events, "to": base_events, "packagedLocales": []},
@@ -1092,7 +1092,7 @@ class BankPathTests(_GameAndMod):
         files, names = self.mod_files()
         self.assertEqual(audio.bank_paths_of(Bin(files[path_hash(SKIN0_BIN)]).find_entry(SKIN_DATA)), [events])
         self.assertEqual(result.sound_copies, [])
-        self.assertNotIn("META/parasite_sounds.json", names)
+        self.assertNotIn("META/rose_sounds.json", names)
 
     def test_a_skin_an_older_parasite_fixed_is_brought_up_to_date(self):
         """Its bin already at the base mesh paths, its meshes padded, its banks still at Skin<n> paths"""
