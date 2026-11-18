@@ -11,7 +11,7 @@ skin's mesh paths and put its own mesh there.
 The mod's WADs are read file by file (wad.py), never whole. The patched and
 moved banks and the rebuilt meshes go in the champion WAD, a voice bank the mod
 ships moves inside its own locale WAD, and the game banks the skin now loads
-from new paths are listed in META/parasite_sounds.json, for Parasite to copy from the
+from new paths are listed in META/rose_sounds.json, for Parasite to copy from the
 player's own WADs as it injects the skin (skin_sounds.py). Files come from the mod first, so a
 modder's own banks and meshes are the ones patched or moved, then from the
 game's WADs in champions_dir. A mod that already matches is not written again,
@@ -217,7 +217,7 @@ class _Mod:
     def write(self, edited: Dict[str, "_Wad"], files: Optional[Dict[str, bytes]] = None) -> None:
         """Write the WADs *edited* names again: a WAD file gets its new
         content, an unpacked WAD folder its edited and new files; and *files*
-        ({path in the mod: content}, META/parasite_sounds.json). Every new file is
+        ({path in the mod: content}, META/rose_sounds.json). Every new file is
         written, beside the mod, before anything is replaced."""
         def temporary() -> Path:
             return self.path.with_name(f"{IMPORT_TEMP_PREFIX}{uuid.uuid4().hex}.tmp")
@@ -411,7 +411,7 @@ class FixResult:
         self.complete = True
         self.findings = Findings()
         self.game_wads: Dict[str, List[int]] = {}
-        # The game banks the skin now loads from new paths, for META/parasite_sounds.json
+        # The game banks the skin now loads from new paths, for META/rose_sounds.json
         self.sound_copies: List[SoundCopy] = []
 
     @property
@@ -474,7 +474,7 @@ def fix_mod(path: Path, game_dir: Path, steps=ALL_STEPS) -> FixResult:
 
 
 def _sound_manifest(files: ModFiles, copies: List[SoundCopy]) -> Optional[bytes]:
-    """META/parasite_sounds.json listing *copies* after those the mod lists
+    """META/rose_sounds.json listing *copies* after those the mod lists
     already (a copy to the same path replaces the old one), or None when
     that is what the mod holds. A check of a skin fixed before finds no bank
     to move: the list it holds stays."""

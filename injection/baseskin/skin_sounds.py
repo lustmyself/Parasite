@@ -7,7 +7,7 @@ ParasiteBin moves every bank a skin loads from a Skin<n> path to a base path
 unchanged: the client links banks by the id inside them, not by their path.
 It ships the banks it patches, but not the game's own: a skin's SFX would make
 every package megabytes bigger, and its voice lines come in every language.
-The skin lists those in META/parasite_sounds.json:
+The skin lists those in META/rose_sounds.json:
 
     {"version": 1, "copies": [{"wad": "Aatrox", "localized": true,
       "from": ".../Skin01/Aatrox_Skin01_VO_audio.wpk", "to": ".../Base/Aatrox_Base_VO_audio.wpk",
@@ -44,7 +44,7 @@ from .wad import FileSource, GameWad, ModWad, path_hash
 
 log = get_logger()
 
-MANIFEST = "META/parasite_sounds.json"
+MANIFEST = "META/rose_sounds.json"
 FOLDER_PREFIX = "PARASITE-SkinSounds-"
 _EMPTY_WAD = b"RW\x03\x04" + bytes(264) + struct.pack("<I", 0)
 
@@ -55,7 +55,7 @@ def _client_locale(game_dir: Path) -> Optional[str]:
 
 
 def read_copies(mod: Path) -> List[dict]:
-    """The banks a mod (folder or archive) lists in META/parasite_sounds.json ([] for none)."""
+    """The banks a mod (folder or archive) lists in META/rose_sounds.json ([] for none)."""
     with ModFiles(Path(mod)) as files:
         if not files.is_file(MANIFEST):
             return []

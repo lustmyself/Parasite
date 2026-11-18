@@ -22,7 +22,7 @@ character's game skin0.bin:
    the skin still loads a bank at that path. A bank keeps its id, which is how
    the client links banks, so only the path changes. A bank the mod ships or
    the merge patches ships at the new path, a voice bank in its own locale
-   WAD; a game bank is listed in META/parasite_sounds.json (SoundCopy) and copied
+   WAD; a game bank is listed in META/rose_sounds.json (SoundCopy) and copied
    from the player's WADs as the skin is injected (skin_sounds.py);
 6. its bank units' event lists: names with a Skin<n> tag are unlisted (the
    merge lists the base-tag alias of each).
@@ -518,7 +518,7 @@ class BaseSkinSteps:
 
 class Finished:
     """What BaseSkinSteps.finish leaves the mod to ship: *files*, and the game
-    banks Parasite copies (*sound_copies*, for META/parasite_sounds.json)."""
+    banks Parasite copies (*sound_copies*, for META/rose_sounds.json)."""
 
     __slots__ = ("files", "sound_copies")
 
