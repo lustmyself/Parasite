@@ -9,17 +9,17 @@ data/maps/mapgeometry/map11/<container>.mapgeo and .materials.bin in Map11.wad.c
 
 Pointing the map skin at the default container (Base_SRX) crashes the game while it loads
 (it builds the lane paths of the seasonal container). Mod authors (TheKillerey's Default Rift)
-instead ship the default container's files under the seasonal container's names: the game
-loads the seasonal map and shows the default one. Their mod carries the files of the patch it
-was made for, and a newer game fails on them ("Missing data"). This builds the same mod from
-the player's own game, so it always matches the patch:
+instead ship the default map's files under the seasonal container's names: the game loads the
+seasonal map and shows the default one. Their mod carries the files of the patch it was made
+for, and a newer game fails on them. This builds the same files from the player's own game, so
+they always match the patch (checked: from the 16.6 files it gives TheKillerey's 16.6 materials
+byte for byte):
 
 - <seasonal>.mapgeo: Base_SRX's mapgeo, as the game stores it;
-- <seasonal>.materials.bin: Base_SRX's materials with its MapContainer entry renamed to the
-  seasonal container, plus the seasonal materials Base_SRX has none of (its particles use them);
-- map11.bin: the seasonal map skin made the Default one (its grass tint, minimap, nav grid,
-  objects, particles...) but for its name and container: the default geometry with the seasonal
-  map skin's objects crashes the game as the champions spawn.
+- <seasonal>.materials.bin: Base_SRX's entries, in their order, but its MapContainer is the
+  seasonal one, whose placeables map takes Base_SRX's values (and keeps the keys only the
+  seasonal map has); then the seasonal materials and placeable containers Base_SRX has none of,
+  their structures (turrets, inhibitors, nexus, shops) given the skins Base_SRX gives them.
 """
 
 from __future__ import annotations
@@ -47,9 +47,11 @@ MAP_BIN = "data/maps/shipping/map11/map11.bin"
 GEOMETRY = "data/maps/mapgeometry/map11/{}.mapgeo"
 MATERIALS = "data/maps/mapgeometry/map11/{}.materials.bin"
 DEFAULT_CONTAINER = "Maps/MapGeometry/Map11/Base_SRX"
-DEFAULT_SKIN = "Default"
 MAP_SKIN = "Maps/Shipping/Map11/MapSkins/{}"
 MAP_CONTAINER_TYPE = "MapContainer"
+# The seasonal entries the default materials take along (TheKillerey's Default Rift: its
+# materials and placeables, none of its effects or visibility controllers)
+SEASONAL_TYPES = ("StaticMaterialDef", "MapPlaceableContainer")
 MAPSKIN_LINE = re.compile(r"mapskin\s*=\s*([A-Za-z0-9_]+)")
 # The map skins the game has shown Summoner's Rift with that are the default one
 DEFAULT_SKINS = {"default", "base_srx", "sr_seasonal_map"}
@@ -147,59 +149,110 @@ def _rebuilt(head: bytes, types: List[int], blobs: List[bytes], tail: bytes) -> 
     return bytes(out)
 
 
-def default_map_skin(map_bin: bytes, skin: str) -> bytes:
-    """map11.bin with map skin *skin* given the Default map skin's fields, but for its own
-    name and container link."""
-    from injection.baseskin.propbin import _entry_bytes, fnv1a_lower
-    keep = {fnv1a_lower("name"), fnv1a_lower("mMapContainerLink")}
-    head, types, entries, tail = _entries(map_bin)
-    wanted, default = fnv1a_lower(MAP_SKIN.format(skin)), fnv1a_lower(MAP_SKIN.format(DEFAULT_SKIN))
-    found = {path_hash: (type_hash, start, end) for type_hash, (start, end, path_hash) in zip(types, entries)
-             if path_hash in (wanted, default)}
-    if wanted not in found or default not in found:
-        raise DefaultRiftError(f"Haritanın görünüm ayarları bulunamadı ({skin})")
-    seasonal = _parse_entry(map_bin, *found[wanted])
-    own = {field.name_hash: field for field in seasonal.fields if field.name_hash in keep}
-    fields = [own.get(field.name_hash, field) for field in _parse_entry(map_bin, *found[default]).fields]
-    present = {field.name_hash for field in fields}
-    fields += [field for name_hash, field in own.items() if name_hash not in present]
-    seasonal.fields = fields
-    blobs = [_entry_bytes(seasonal) if path_hash == wanted else map_bin[start:end]
-             for start, end, path_hash in entries]
-    return _rebuilt(head, types, blobs, tail)
+def _skins(value, found: list) -> None:
+    """The skin paths (Characters/<name>/Skins/Skin<n>) under *value*, in order."""
+    text = value.as_string()
+    if text is not None:
+        if "/Skins/" in text:
+            found.append(value)
+        return
+    inner = value.v
+    if isinstance(inner, list):
+        for item in inner:
+            for part in (item if isinstance(item, tuple) else (item,)):
+                if hasattr(part, "ty"):
+                    _skins(part, found)
+    elif hasattr(inner, "fields"):
+        for field in inner.fields:
+            _skins(field.value, found)
+    elif hasattr(inner, "ty"):
+        _skins(inner, found)
+
+
+def _placed(entry):
+    """(key, value) of each object a placeable container places (its map fields)."""
+    from injection.baseskin.propbin import MAP
+    for field in entry.fields:
+        if field.value.ty == MAP:
+            yield from field.value.v
+
+
+def _merged_container(base_entry, seasonal_entry):
+    """The seasonal MapContainer whose maps take Base_SRX's values (keys only the seasonal one
+    has stay, Base_SRX's other keys come after them)."""
+    from injection.baseskin.propbin import MAP
+    base_maps = {f.name_hash: f.value for f in base_entry.fields if f.value.ty == MAP}
+    for field in seasonal_entry.fields:
+        base = base_maps.get(field.name_hash)
+        if field.value.ty != MAP or base is None:
+            continue
+        values = {key.v: value for key, value in base.v}
+        seen = set()
+        pairs = []
+        for key, value in field.value.v:
+            seen.add(key.v)
+            pairs.append((key, values.get(key.v, value)))
+        pairs += [(key, value) for key, value in base.v if key.v not in seen]
+        field.value.v = pairs
+    return seasonal_entry
 
 
 def merged_materials(base: bytes, seasonal: bytes, container: str) -> bytes:
-    """Base_SRX's materials with its container renamed to *container*, plus the seasonal
-    entries Base_SRX has none of (not the seasonal container itself)."""
-    from injection.baseskin.propbin import Value, _entry_bytes, fnv1a_lower
+    """The seasonal container's materials showing the default map (see the module's notes)."""
+    from injection.baseskin.propbin import _entry_bytes, fnv1a_lower
     container_type = fnv1a_lower(MAP_CONTAINER_TYPE)
-    default_hash = fnv1a_lower(DEFAULT_CONTAINER)
+    placeables_type = fnv1a_lower("MapPlaceableContainer")
+    taken = {fnv1a_lower(name) for name in SEASONAL_TYPES}
+    default_hash, seasonal_hash = fnv1a_lower(DEFAULT_CONTAINER), fnv1a_lower(container)
     base_head, base_types, base_entries, base_tail = _entries(base)
     _head, seasonal_types, seasonal_entries, _tail = _entries(seasonal)
-    renamed = False
+    seasonal_container = next(((t, s, e) for t, (s, e, h) in zip(seasonal_types, seasonal_entries)
+                               if t == container_type and h == seasonal_hash), None)
+    if seasonal_container is None:
+        raise DefaultRiftError("Sezonluk haritanın ayarları bulunamadı")
+
+    # The skins Base_SRX gives each object it places
+    default_skins = {}
+    for type_hash, (start, end, _path) in zip(base_types, base_entries):
+        if type_hash == placeables_type:
+            for key, value in _placed(_parse_entry(base, type_hash, start, end)):
+                found = []
+                _skins(value, found)
+                if found:
+                    default_skins[key.v] = [v.v for v in found]
+
     types, blobs, seen = [], [], set()
+    replaced = False
     for type_hash, (start, end, path_hash) in zip(base_types, base_entries):
         raw = base[start:end]
         if type_hash == container_type and path_hash == default_hash:
-            entry = _parse_entry(base, type_hash, start, end)
-            entry.path_hash = fnv1a_lower(container)
-            for field in entry.fields:
-                if field.value.as_string() == DEFAULT_CONTAINER:
-                    field.value = Value.string(container)
-            raw = _entry_bytes(entry)
-            path_hash = entry.path_hash
-            renamed = True
+            merged = _merged_container(_parse_entry(base, type_hash, start, end),
+                                       _parse_entry(seasonal, *seasonal_container))
+            raw, path_hash, replaced = _entry_bytes(merged), seasonal_hash, True
         types.append(type_hash)
         blobs.append(raw)
         seen.add(path_hash)
-    if not renamed:
+    if not replaced:
         raise DefaultRiftError("Varsayılan haritanın ayarları bulunamadı (Base_SRX)")
     for type_hash, (start, end, path_hash) in zip(seasonal_types, seasonal_entries):
-        if path_hash in seen:
+        if path_hash in seen or type_hash not in taken:
             continue
+        raw = seasonal[start:end]
+        if type_hash == placeables_type:
+            entry = _parse_entry(seasonal, type_hash, start, end)
+            changed = False
+            for key, value in _placed(entry):
+                found = []
+                _skins(value, found)
+                wanted = default_skins.get(key.v)
+                if found and wanted and len(wanted) == len(found):
+                    for skin, text in zip(found, wanted):
+                        changed |= skin.v != text
+                        skin.v = text
+            if changed:
+                raw = _entry_bytes(entry)
         types.append(type_hash)
-        blobs.append(seasonal[start:end])
+        blobs.append(raw)
         seen.add(path_hash)
     return _rebuilt(base_head, types, blobs, base_tail)
 
@@ -228,18 +281,16 @@ def build(game: Path, skin: str, target: Path) -> Path:
     if seasonal_materials is None or not wad.has_path(GEOMETRY.format(name)):
         raise DefaultRiftError(f"{skin} haritasının dosyaları oyunda yok")
     materials = merged_materials(base_materials, seasonal_materials, container)
-    skins = default_map_skin(map_bin, skin)
 
     source = FileSource(wad_path)
     try:
         mod = ModWad(EMPTY_WAD)
         mod.add(wad.stored_file(GEOMETRY.format(base_name), source, name_hash=path_hash(GEOMETRY.format(name))))
         mod.put_path(MATERIALS.format(name), materials)
-        mod.put_path(MAP_BIN, skins)
         info = {
             "Name": NAME,
             "Author": "Parasite (TheKillerey'in Default Rift yöntemiyle)",
-            "Version": "1.1.0",
+            "Version": "1.2.0",
             "Description": f"{skin} yerine varsayılan Sihirdar Vadisi, oyunun kendi dosyalarından",
         }
         target.parent.mkdir(parents=True, exist_ok=True)
