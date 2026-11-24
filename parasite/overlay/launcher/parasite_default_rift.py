@@ -64,14 +64,14 @@ class DefaultRiftError(RuntimeError):
 # ---- where things are ----
 
 def game_dir() -> Optional[Path]:
-    from injection.config.config_manager import ConfigManager
-    from injection.game.game_detector import GameDetector
+    """League's Game folder (launcher/parasite_league_path: cf.ini, the running client, where
+    the Riot Client records it, the usual folders)."""
+    from launcher import parasite_league_path
     try:
-        path = GameDetector(ConfigManager()).detect_game_dir()
+        return parasite_league_path.find_game_dir()
     except Exception as e:  # noqa: BLE001
         log.debug(f"[DefaultRift] Could not find the game: {e}")
         return None
-    return Path(path) if path else None
 
 
 def last_map_skin(game: Path, logs: int = 30) -> Optional[str]:
@@ -306,7 +306,12 @@ def install() -> str:
     older build) and pick it for the next game."""
     game = game_dir()
     if game is None:
-        return "League bulunamadı: Parasite'ın League klasörünü bildiğinden emin ol"
+        # Not where League usually is: the player shows Parasite (saved for next time)
+        from launcher import parasite_league_path
+        try:
+            game = parasite_league_path.ask()
+        except parasite_league_path.NotPicked as e:
+            return str(e)
     skin = last_map_skin(game)
     if skin is None:
         return "Sezonluk harita görülmedi: önce bir Sihirdar Vadisi maçına (antrenman da olur) gir, sonra tekrar dene"
