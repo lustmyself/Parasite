@@ -1,9 +1,9 @@
 {
-  "version": "2.17",
+  "version": "2.19",
   "en": [
-    "Skins: a skin's auto attack and ability sounds play again (the sound banks listed by the skin are copied from your game again)"
+    "Maps: the default Summoner's Rift finds League wherever it is installed (other drives too); if it can't, Parasite asks you to pick LeagueClient.exe"
   ],
   "tr": [
-    "Kostümler: kostümle oynarken şampiyonun temel saldırı ve yetenek sesleri yeniden geliyor"
+    "Haritalar: Varsayılan Sihirdar Vadisi League'i nereye kurulu olursa olsun buluyor (başka sürücüler dahil); bulamazsa LeagueClient.exe'yi seçmeni istiyor"
   ]
 }
